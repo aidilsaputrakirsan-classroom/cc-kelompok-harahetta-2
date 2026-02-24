@@ -1,0 +1,1 @@
+"Nama: [Riqqah Khalda Karina] | NIM: [10231082] | Peran: [Lead QA & Docs]"
