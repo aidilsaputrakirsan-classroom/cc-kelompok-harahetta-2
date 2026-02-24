@@ -1,0 +1,1 @@
+Nama: [Achmad Zaki Zaidan] | Nim: [10231002] | Peran; [Lead FrontEnd]
