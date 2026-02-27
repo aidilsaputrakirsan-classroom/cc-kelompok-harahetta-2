@@ -34,12 +34,12 @@ def health_check():
 @app.get("/team")
 def team_info():
     return {
-        "team": "cloud-team-XX",
+        "team": "cloud-team-harahetta-2",
         "members": [
             # TODO: Isi dengan data tim Anda
             {"name": "Djaky Abbyyu Fauzan Timumum", "nim": "10231032", "role": "Lead Backend"},
-            {"name": "Ahmad Zaki Zaidan", "nim": "10231002", "role": "Lead Frontend"},
-            {"name": "Muhammad Alif", "nim": "NIM3", "10231056": "Lead DevOps"},
+            {"name": "Achmad Zaki Zaidan", "nim": "10231002", "role": "Lead Frontend"},
+            {"name": "Muhammad Alif Setiawan", "nim": "10231056", "role": "Lead DevOps"},
             {"name": "Riqqah Khalda Karina", "nim": "10231082", "role": "Lead QA & Docs"},
         ]
     }
