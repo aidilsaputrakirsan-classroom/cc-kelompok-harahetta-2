@@ -4,6 +4,8 @@ SEWAIN adalah platform berbasis web yang memfasilitasi proses penyewaan barang s
 
 SEWAIN ditujukan untuk pelaku usaha penyewaan, khususnya UMKM, serta masyarakat yang membutuhkan barang tanpa harus membelinya. Aplikasi ini membantu mengatasi berbagai kendala dalam sistem penyewaan manual, seperti pencatatan yang tidak rapi, jangkauan pelanggan yang terbatas, kesulitan dalam promosi, serta risiko penyalahgunaan barang. Dengan digitalisasi melalui SEWAIN, proses pengelolaan menjadi lebih efisien, transparan, dan mampu menjangkau lebih banyak pengguna.
 
+---
+
 # Fitur Sistem
 
 SEWAIN memiliki tiga peran utama dalam sistem:
@@ -11,8 +13,6 @@ SEWAIN memiliki tiga peran utama dalam sistem:
 - Super Admin  
 - Admin (Penyedia Barang)  
 - User (Penyewa)
-
----
 
 ## 1. Super Admin
 
@@ -27,8 +27,6 @@ Super Admin bertugas mengelola keseluruhan sistem dan penyedia layanan.
 - Mengelola kategori barang
 - Melihat seluruh aktivitas penyewaan
 - Monitoring keseluruhan platform
-
----
 
 ## 2. Admin (Penyedia Barang)
 
@@ -49,8 +47,6 @@ Admin merupakan pemilik usaha atau penyedia jasa penyewaan.
   - Disetujui
   - Sedang Disewa
   - Selesai
-
----
 
 ## 3. User (Penyewa)
 
@@ -92,6 +88,8 @@ User hanya dapat melakukan penyewaan jika data diri lengkap dan verifikasi ident
   - Selesai
 - Melihat riwayat penyewaan
 
+---
+
 ## 👥 Tim
 
 | Nama | NIM | Peran |
@@ -100,6 +98,8 @@ User hanya dapat melakukan penyewaan jika data diri lengkap dan verifikasi ident
 | Achmad Zaki Zaidan | 10231002 | Lead Frontend |
 | Muhammad Alif Setiawan | 10231056 | Lead DevOps |
 | Riqqah Khalda Karina | 10231082 | Lead QA & Docs |
+
+---
 
 ## 🛠️ Tech Stack
 
@@ -112,6 +112,8 @@ User hanya dapat melakukan penyewaan jika data diri lengkap dan verifikasi ident
 | GitHub Actions | CI/CD |
 | Railway/Render | Cloud Deployment |
 
+---
+
 ## 🏗️ Architecture
 
 ```
@@ -119,6 +121,8 @@ User hanya dapat melakukan penyewaan jika data diri lengkap dan verifikasi ident
 ```
 
 *(Diagram ini akan berkembang setiap minggu)*
+
+---
 
 ## 🚀 Getting Started
 
