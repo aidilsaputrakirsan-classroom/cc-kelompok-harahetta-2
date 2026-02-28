@@ -158,3 +158,36 @@ npm run dev
 | 9-11 | CI/CD Pipeline | ⬜ |
 | 12-14 | Microservices | ⬜ |
 | 15-16 | Final & UAS | ⬜ |
+
+---
+
+## 📁 Project Structure
+
+```
+cc-kelompok-harahetta-2/
+├── backend/                    # FastAPI Backend
+│   ├── main.py                 # Entry point aplikasi backend
+│   └── requirements.txt        # Daftar dependensi Python
+│
+├── frontend/                   # React Frontend (Vite)
+│   ├── public/                 # Aset statis publik
+│   ├── src/                    # Source code utama
+│   │   ├── assets/             # Gambar & aset statis
+│   │   ├── App.jsx             # Komponen utama React
+│   │   ├── App.css             # Style komponen App
+│   │   ├── main.jsx            # Entry point React
+│   │   └── index.css           # Style global
+│   ├── index.html              # Template HTML utama
+│   ├── package.json            # Dependensi & scripts Node.js
+│   ├── vite.config.js          # Konfigurasi Vite
+│   └── eslint.config.js        # Konfigurasi ESLint
+│
+├── docs/                       # Dokumentasi tim
+│   ├── member-Alif.md
+│   ├── member-Fauzanabbyu.md
+│   ├── member-Riqqah.md
+│   └── member-ZakiZaidan.md
+│
+├── .gitignore
+└── README.md
+```
