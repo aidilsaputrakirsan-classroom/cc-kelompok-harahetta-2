@@ -24,12 +24,7 @@ SEWAIN ditujukan untuk pelaku usaha penyewaan, khususnya UMKM, serta masyarakat 
 
 ## 👥 Tim
 
-| Nama | NIM | Peran |
-|------|-----|-------|
-| Djaky Abbyyu Fauzan Timumum | 10231032 | Lead Backend |
-| Achmad Zaki Zaidan  | 10231002 | Lead Frontend |
-| Muhammad Alif Setiawan  | 10231056 | Lead DevOps |
-| Riqqah Khalda Karina | 10231082 | Lead QA & Docs |
+
 
 ## 🛠️ Tech Stack
 
