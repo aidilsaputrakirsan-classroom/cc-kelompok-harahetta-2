@@ -26,3 +26,5 @@
 ![gambr](img/7.png)
 **8. GET /items/1** — Harus response 404
 ![gambr](img/8.png)
+**9. GET /items/stats** - Harus menampilkan status total items, total value (sum of price × quantity), item termahal, item termurah
+![gambr](img/9.png)
