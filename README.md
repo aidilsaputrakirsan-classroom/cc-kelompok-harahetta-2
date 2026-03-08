@@ -718,21 +718,21 @@ Semua skenario pengujian menghasilkan output yang sesuai (SEMUA PASS).
 ```json
 {
   "name": "Laptop",
-  "price": 15000000,
   "description": "Laptop untuk cloud computing",
-  "quantity": 5
+  "price": 15000000,
+  "quantity": 10
 }
 ```
 
-**Response Example:**
+**Response Body:**
 ```json
 {
   "id": 1,
   "name": "Laptop",
-  "price": 15000000,
   "description": "Laptop untuk cloud computing",
-  "quantity": 5,
-  "created_at": "2026-03-05T10:00:00",
+  "price": 15000000,
+  "quantity": 10,
+  "created_at": "2026-03-06T22:45:09.421640+08:00",
   "updated_at": null
 }
 ```
@@ -744,14 +744,38 @@ Semua skenario pengujian menghasilkan output yang sesuai (SEMUA PASS).
 **URL:** `/items`  
 **Status Code:** 200 OK  
 
-**Response Example:**
+**Response Body:**
 ```json
 {
   "total": 3,
   "items": [
-    {...},
-    {...},
-    {...}
+    {
+      "name": "Keyboard Mechanical",
+      "description": "Keyboard untuk coding",
+      "price": 1200000,
+      "quantity": 8,
+      "id": 4,
+      "created_at": "2026-03-06T22:48:30.987654+08:00",
+      "updated_at": null
+    },
+    {
+      "name": "Mouse Wireless",
+      "description": "Mouse bluetooth",
+      "price": 250000,
+      "quantity": 20,
+      "id": 3,
+      "created_at": "2026-03-06T22:47:15.123456+08:00",
+      "updated_at": null
+    },
+    {
+      "name": "Laptop",
+      "description": "Laptop untuk cloud computing",
+      "price": 15000000,
+      "quantity": 10,
+      "id": 1,
+      "created_at": "2026-03-06T22:45:09.421640+08:00",
+      "updated_at": null
+    }
   ]
 }
 ```
@@ -763,13 +787,16 @@ Semua skenario pengujian menghasilkan output yang sesuai (SEMUA PASS).
 **URL:** `/items/1`  
 **Status Code:** 200 OK  
 
-**Response Example:**
+**Response Body:**
 ```json
 {
-  "id": 1,
   "name": "Laptop",
+  "description": "Laptop untuk cloud computing",
   "price": 15000000,
-  "quantity": 5
+  "quantity": 10,
+  "id": 1,
+  "created_at": "2026-03-06T22:45:09.421640+08:00",
+  "updated_at": null
 }
 ```
 
@@ -787,13 +814,16 @@ Semua skenario pengujian menghasilkan output yang sesuai (SEMUA PASS).
 }
 ```
 
-**Response Example:**
+**Response Body:**
 ```json
 {
-  "id": 1,
   "name": "Laptop",
+  "description": "Laptop untuk cloud computing",
   "price": 14000000,
-  "quantity": 5
+  "quantity": 10,
+  "id": 1,
+  "created_at": "2026-03-06T22:45:09.421640+08:00",
+  "updated_at": "2026-03-06T22:52:47.410707+08:00"
 }
 ```
 
@@ -804,13 +834,16 @@ Semua skenario pengujian menghasilkan output yang sesuai (SEMUA PASS).
 **URL:** `/items/1`  
 **Status Code:** 200 OK  
 
-**Response Example:**
+**Response Body:**
 ```json
 {
-  "id": 1,
   "name": "Laptop",
+  "description": "Laptop untuk cloud computing",
   "price": 14000000,
-  "quantity": 5
+  "quantity": 10,
+  "id": 1,
+  "created_at": "2026-03-06T22:45:09.421640+08:00",
+  "updated_at": "2026-03-06T22:52:47.410707+08:00"
 }
 ```
 
@@ -821,14 +854,19 @@ Semua skenario pengujian menghasilkan output yang sesuai (SEMUA PASS).
 **URL:** `/items?search=laptop`  
 **Status Code:** 200 OK  
 
-**Response Example:**
+**Response Body:**
 ```json
 {
   "total": 1,
   "items": [
     {
       "name": "Laptop",
-      "price": 14000000
+      "description": "Laptop untuk cloud computing",
+      "price": 14000000,
+      "quantity": 10,
+      "id": 1,
+      "created_at": "2026-03-06T22:45:09.421640+08:00",
+      "updated_at": "2026-03-06T22:52:47.410707+08:00"
     }
   ]
 }
@@ -852,26 +890,48 @@ Kosong (No Content)
 **URL:** `/items/1`  
 **Status Code:** 404 Not Found  
 
-**Response Example:**
+**Response Body:**
 ```json
 {
   "detail": "Item dengan id=1 tidak ditemukan"
 }
 ```
 
+9️⃣ **GET /items/stats**
+
+**Method:** GET  
+**URL:** `/items/stats`  
+**Status Code:** 200 OK
+
+**Response Body:**
+```json
+{
+  "total_items": 3,
+  "total_value": 84600000,
+  "most_expensive": {
+    "name": "Laptop",
+    "price": 14000000
+  },
+  "cheapest": {
+    "name": "Mouse Wireless",
+    "price": 250000
+  }
+}
+```
 
 #### 4.2 Ringkasan Hasil Pengujian
 Seluruh endpoint telah diuji melalui Swagger UI dan berjalan sesuai dengan spesifikasi fungsional. Validasi data, pagination, search, serta error handling berfungsi dengan baik. Backend dinyatakan stabil dan siap untuk tahap integrasi frontend maupun deployment ke lingkungan cloud.
 
-| No | Method | URL | Request Body | Response Example | HTTP Status Code | Hasil Pengujian |
-|----|--------|-----|--------------|------------------|------------------|-----------------|
-| 1 | POST | /items | `{name, price, description, quantity}` | Data item + id | 201 Created | ✅ Sesuai |
-| 2 | GET | /items | - | `{ total: 3, items: [...] }` | 200 OK | ✅ Sesuai |
-| 3 | GET | /items/1 | - | Data item dengan id=1 | 200 OK | ✅ Sesuai |
-| 4 | PUT | /items/1 | `{price: 14000000}` | Data item ter-update | 200 OK | ✅ Sesuai |
-| 5 | GET | /items/1 | - | Harga berubah | 200 OK | ✅ Sesuai |
-| 6 | GET | /items?search=laptop | - | `{ total: 1, items: [...] }` | 200 OK | ✅ Sesuai |
-| 7 | DELETE | /items/1 | - | No Content | 204 No Content | ✅ Sesuai |
-| 8 | GET | /items/1 | - | `{detail: "...tidak ditemukan"}` | 404 Not Found | ✅ Sesuai |
+| No | Method | URL | Request Body | Response Body (Actual) | HTTP Status Code | Hasil Pengujian |
+|----|--------|-----|--------------|------------------------|------------------|-----------------|
+| 1 | POST | /items | `{name, description, ...}` | Data item baru + ID & Timestamp | 201 Created | ✅ Sesuai |
+| 2 | GET | /items | - | List 3 item (JSON Array) | 200 OK | ✅ Sesuai |
+| 3 | GET | /items/1 | - | Detail item ID 1 (Laptop) | 200 OK | ✅ Sesuai |
+| 4 | PUT | /items/1 | `{price: 14000000}` | Data ter-update & Timestamp berubah | 200 OK | ✅ Sesuai |
+| 5 | GET | /items/1 | - | Detail item ID 1 (Harga terbaru) | 200 OK | ✅ Sesuai |
+| 6 | GET | /items?search=laptop | - | List item hasil pencarian (Laptop) | 200 OK | ✅ Sesuai |
+| 7 | DELETE | /items/1 | - | Kosong (No Content) | 204 No Content | ✅ Sesuai |
+| 8 | GET | /items/1 | - | Error Message: Not Found | 404 Not Found | ✅ Sesuai |
+| 9 | GET | /items/stats | - | Statistik total item & nilai inventaris | 200 OK | ✅ Sesuai |
 
 ---
