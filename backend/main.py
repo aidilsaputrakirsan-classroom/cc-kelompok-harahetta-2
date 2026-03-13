@@ -117,3 +117,5 @@ def team_info():
             {"name": "Riqqah Khalda Karina", "nim": "10231082", "role": "Lead QA & Docs"},
         ],
     }
+
+    # Fitur sudah aman ces
