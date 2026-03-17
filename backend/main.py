@@ -1,6 +1,7 @@
 import os
 from dotenv import load_dotenv
 from fastapi import FastAPI, Depends, HTTPException, Query
+from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
@@ -62,14 +63,16 @@ def register(user_data: UserCreate, db: Session = Depends(get_db)):
 
 
 @app.post("/auth/login", response_model=TokenResponse)
-def login(login_data: LoginRequest, db: Session = Depends(get_db)):
+def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     """
     Login dan dapatkan JWT token.
-    
-    Token berlaku selama 60 menit (default).
-    Gunakan token di header: Authorization: Bearer <token>
+    Swagger akan pakai form x-www-form-urlencoded otomatis.
     """
-    user = crud.authenticate_user(db=db, email=login_data.email, password=login_data.password)
+    user = crud.authenticate_user(
+        db=db,
+        email=form_data.username,
+        password=form_data.password
+    )
     if not user:
         raise HTTPException(status_code=401, detail="Email atau password salah")
 
@@ -109,6 +112,23 @@ def list_items(
 ):
     """Ambil daftar items. *Membutuhkan autentikasi.*"""
     return crud.get_items(db=db, skip=skip, limit=limit, search=search)
+
+
+# ==================== ITEMS STATS ====================
+# ⚠️ Harus di atas /items/{item_id} agar tidak terbaca sebagai item_id
+
+@app.get("/items/stats")
+def items_stats(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Statistik inventory. *Membutuhkan autentikasi.*"""
+    stats = crud.get_items_stats(db)
+    return {
+        "total_items": stats["total_items"],
+        "total_stock": stats["total_stock"],
+        "total_inventory_value": stats["total_inventory_value"],
+    }
 
 
 @app.get("/items/{item_id}", response_model=ItemResponse)
@@ -164,5 +184,3 @@ def team_info():
             {"name": "Riqqah Khalda Karina", "nim": "10231082", "role": "Lead QA & Docs"},
         ],
     }
-
-    # Fitur sudah aman ces
