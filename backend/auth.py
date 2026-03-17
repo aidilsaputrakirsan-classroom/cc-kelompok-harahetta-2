@@ -73,21 +73,9 @@ def get_current_user(
     """
     payload = decode_token(token)
     user_id = payload.get("sub")
-
     if user_id is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token tidak valid",
-        )
-
-    # ✅ FIX: konversi str → int dengan error handling
-    try:
-        user_id = int(user_id)
-    except (ValueError, TypeError):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token tidak valid",
-        )
+        raise HTTPException(status_code=401, detail="Token tidak valid")
+    user_id = int(user_id)
 
     user = db.query(User).filter(User.id == user_id).first()
 

@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import or_
+from sqlalchemy import or_, func
 from models import Item, User
 from schemas import ItemCreate, ItemUpdate, UserCreate
 from auth import hash_password, verify_password
@@ -73,38 +73,73 @@ def delete_item(db: Session, item_id: int) -> bool:
     db.commit()
     return True
 
+
+def get_stats(db: Session) -> dict:
+    """
+    Ambil statistik inventory menggunakan SQL aggregation.
+    Efisien karena tidak load semua data ke memory.
+    """
+    total_items = db.query(func.count(Item.id)).scalar() or 0
+
+    if total_items == 0:
+        return {
+            "total_items": 0,
+            "total_quantity": 0,
+            "total_value": 0.0,
+            "avg_price": 0.0,
+            "most_expensive": None,
+            "cheapest": None,
+        }
+
+    total_quantity = db.query(func.sum(Item.quantity)).scalar() or 0
+    total_value = db.query(func.sum(Item.price * Item.quantity)).scalar() or 0.0
+    avg_price = db.query(func.avg(Item.price)).scalar() or 0.0
+
+    most_expensive = (
+        db.query(Item.name, Item.price)
+        .order_by(Item.price.desc())
+        .first()
+    )
+    cheapest = (
+        db.query(Item.name, Item.price)
+        .order_by(Item.price.asc())
+        .first()
+    )
+
+    return {
+        "total_items": total_items,
+        "total_quantity": int(total_quantity),
+        "total_value": round(float(total_value), 2),
+        "avg_price": round(float(avg_price), 2),
+        "most_expensive": {"name": most_expensive.name, "price": most_expensive.price} if most_expensive else None,
+        "cheapest": {"name": cheapest.name, "price": cheapest.price} if cheapest else None,
+    }
+
 # ==================== USER CRUD ====================
 
 def create_user(db: Session, user_data: UserCreate) -> User:
     """Buat user baru dengan password yang di-hash."""
-    
-    # Cek apakah email sudah ada
+    # Cek apakah email sudah terdaftar
     existing = db.query(User).filter(User.email == user_data.email).first()
     if existing:
-        return None
+        return None  # Email sudah dipakai
 
     db_user = User(
         email=user_data.email,
         name=user_data.name,
         hashed_password=hash_password(user_data.password),
     )
-
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
-
     return db_user
 
 
 def authenticate_user(db: Session, email: str, password: str) -> User | None:
-    """Cek login user."""
-    
+    """Autentikasi user: cek email & password."""
     user = db.query(User).filter(User.email == email).first()
-
     if not user:
         return None
-
     if not verify_password(password, user.hashed_password):
         return None
-
     return user

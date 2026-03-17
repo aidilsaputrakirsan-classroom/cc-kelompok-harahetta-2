@@ -51,9 +51,9 @@ def register(user_data: UserCreate, db: Session = Depends(get_db)):
     """
     Registrasi user baru.
     
-    - **email**: Email unik (akan digunakan untuk login)
-    - **name**: Nama lengkap
-    - **password**: Minimal 8 karakter
+    - *email*: Email unik (akan digunakan untuk login)
+    - *name*: Nama lengkap
+    - *password*: Minimal 8 karakter
     """
     user = crud.create_user(db=db, user_data=user_data)
     if not user:
@@ -67,13 +67,13 @@ def login(login_data: LoginRequest, db: Session = Depends(get_db)):
     Login dan dapatkan JWT token.
     
     Token berlaku selama 60 menit (default).
-    Gunakan token di header: `Authorization: Bearer <token>`
+    Gunakan token di header: Authorization: Bearer <token>
     """
     user = crud.authenticate_user(db=db, email=login_data.email, password=login_data.password)
     if not user:
         raise HTTPException(status_code=401, detail="Email atau password salah")
 
-    token = create_access_token(data={"sub": user.id})
+    token = create_access_token(data={"sub": str(user.id)})
     return {
         "access_token": token,
         "token_type": "bearer",
@@ -95,7 +95,7 @@ def create_item(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Buat item baru. **Membutuhkan autentikasi.**"""
+    """Buat item baru. *Membutuhkan autentikasi.*"""
     return crud.create_item(db=db, item_data=item)
 
 
@@ -107,7 +107,7 @@ def list_items(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Ambil daftar items. **Membutuhkan autentikasi.**"""
+    """Ambil daftar items. *Membutuhkan autentikasi.*"""
     return crud.get_items(db=db, skip=skip, limit=limit, search=search)
 
 
@@ -117,7 +117,7 @@ def get_item(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Ambil satu item. **Membutuhkan autentikasi.**"""
+    """Ambil satu item. *Membutuhkan autentikasi.*"""
     item = crud.get_item(db=db, item_id=item_id)
     if not item:
         raise HTTPException(status_code=404, detail=f"Item {item_id} tidak ditemukan")
@@ -131,7 +131,7 @@ def update_item(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Update item. **Membutuhkan autentikasi.**"""
+    """Update item. *Membutuhkan autentikasi.*"""
     updated = crud.update_item(db=db, item_id=item_id, item_data=item)
     if not updated:
         raise HTTPException(status_code=404, detail=f"Item {item_id} tidak ditemukan")
@@ -144,76 +144,11 @@ def delete_item(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Hapus item. **Membutuhkan autentikasi.**"""
+    """Hapus item. *Membutuhkan autentikasi.*"""
     success = crud.delete_item(db=db, item_id=item_id)
     if not success:
         raise HTTPException(status_code=404, detail=f"Item {item_id} tidak ditemukan")
     return None
-
-
-# ==================== ITEM ENDPOINTS (PROTECTED) ====================
-
-@app.post("/items", response_model=ItemResponse, status_code=201)
-def create_item(
-    item: ItemCreate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Buat item baru. **Membutuhkan autentikasi.**"""
-    return crud.create_item(db=db, item_data=item)
-
-
-@app.get("/items", response_model=ItemListResponse)
-def list_items(
-    skip: int = Query(0, ge=0),
-    limit: int = Query(20, ge=1, le=100),
-    search: str = Query(None),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Ambil daftar items. **Membutuhkan autentikasi.**"""
-    return crud.get_items(db=db, skip=skip, limit=limit, search=search)
-
-
-@app.get("/items/{item_id}", response_model=ItemResponse)
-def get_item(
-    item_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Ambil satu item. **Membutuhkan autentikasi.**"""
-    item = crud.get_item(db=db, item_id=item_id)
-    if not item:
-        raise HTTPException(status_code=404, detail=f"Item {item_id} tidak ditemukan")
-    return item
-
-
-@app.put("/items/{item_id}", response_model=ItemResponse)
-def update_item(
-    item_id: int,
-    item: ItemUpdate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Update item. **Membutuhkan autentikasi.**"""
-    updated = crud.update_item(db=db, item_id=item_id, item_data=item)
-    if not updated:
-        raise HTTPException(status_code=404, detail=f"Item {item_id} tidak ditemukan")
-    return updated
-
-
-@app.delete("/items/{item_id}", status_code=204)
-def delete_item(
-    item_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Hapus item. **Membutuhkan autentikasi.**"""
-    success = crud.delete_item(db=db, item_id=item_id)
-    if not success:
-        raise HTTPException(status_code=404, detail=f"Item {item_id} tidak ditemukan")
-    return None
-
 
 
 # ==================== TEAM INFO ====================
