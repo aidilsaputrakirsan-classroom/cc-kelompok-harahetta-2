@@ -935,3 +935,69 @@ Seluruh endpoint telah diuji melalui Swagger UI dan berjalan sesuai dengan spesi
 | 9 | GET | /items/stats | - | Statistik total item & nilai inventaris | 200 OK | ✅ Sesuai |
 
 ---
+
+## 🚀 Frontend React — UI & API Integration
+
+Pada tahap ini, aplikasi SEWAIN mulai mengintegrasikan antarmuka pengguna (Frontend) dengan layanan API (Backend) menggunakan React.js.
+
+**1. Fitur Frontend yang Diimplementasikan**
+
+Berdasarkan panduan Modul 3, pada tahap ini telah berhasil dikembangkan berbagai fitur pada sisi frontend. Aplikasi telah memiliki tampilan antarmuka (UI) yang memungkinkan pengguna berinteraksi secara langsung dengan sistem.
+
+Fitur yang tersedia meliputi dashboard item yang berfungsi untuk menampilkan katalog barang sewa secara dinamis dari database. Selain itu, telah diimplementasikan fitur management UI berbasis CRUD, yaitu form penambahan barang baru dengan validasi field, fitur edit detail barang langsung melalui interface, serta tombol hapus yang telah terintegrasi dengan database secara real-time.
+
+Dari sisi interaktivitas, aplikasi dilengkapi dengan SearchBar untuk melakukan pencarian barang secara instan (client-side filtering). Terdapat juga API Status Indicator yang menampilkan status koneksi ke server (Connected/Disconnected). Selain itu, digunakan conditional rendering untuk menampilkan status loading serta pesan error apabila terjadi kegagalan saat memuat data dari API.
+
+**2. Arsitektur Kode**
+
+Struktur folder pada sisi frontend (/frontend/src) telah diorganisir secara sistematis untuk mendukung pengembangan yang rapi dan terstruktur.
+
+Folder services/api.js digunakan untuk menangani logika komunikasi dengan backend FastAPI menggunakan pendekatan async/await.
+
+Komponen antarmuka pengguna ditempatkan dalam folder components/ agar bersifat reusable, yang terdiri dari Header.jsx, SearchBar.jsx, ItemForm.jsx, ItemList.jsx, dan ItemCard.jsx.
+
+Sementara itu, App.jsx berfungsi sebagai pengelola state utama aplikasi dengan memanfaatkan React Hooks seperti useState dan useEffect. Struktur ini menunjukkan penerapan konsep clean architecture dalam pengembangan frontend.
+
+**3. Cara Menjalankan Aplikasi (Local Development)**
+
+Untuk menjalankan aplikasi secara keseluruhan, pastikan database PostgreSQL dalam keadaan aktif. Selanjutnya, aplikasi dijalankan menggunakan dua terminal karena terdiri dari backend dan frontend.
+
+Terminal pertama digunakan untuk menjalankan backend pada port 8000:
+```bash
+cd backend
+source venv/bin/activate (atau venv\Scripts\activate untuk Windows)
+uvicorn main:app --reload
+```
+
+Terminal kedua digunakan untuk menjalankan frontend pada port 5173:
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Kedua server harus dijalankan secara bersamaan agar aplikasi dapat berjalan dengan baik. Jika backend tidak aktif, maka frontend tidak dapat mengambil data sehingga tampilan tidak akan muncul dengan semestinya.
+
+**4. Penggunaan Environment Variables**
+
+Dalam implementasinya, URL API seperti http://localhost:8000
+tidak dituliskan secara langsung di dalam kode program, melainkan disimpan dalam file .env. Pendekatan ini bertujuan untuk meningkatkan keamanan serta memudahkan proses konfigurasi apabila aplikasi dipindahkan ke lingkungan lain, seperti server cloud.
+
+**5. Laporan Hasil Pengujian UI (QA Testing)**
+
+Berdasarkan hasil pengujian yang telah dilakukan, seluruh fitur CRUD dan interaktivitas aplikasi berjalan dengan baik dan sesuai dengan yang diharapkan. Setiap aksi yang dilakukan pada antarmuka pengguna telah terhubung dengan backend dan database secara sinkron.
+
+Berikut adalah ringkasan hasil pengujian yang telah dilakukan:
+| No | Skenario Pengujian | Langkah Pengerjaan                                         | Hasil Sebenarnya                                           | Status   |
+| -- | ------------------ | ---------------------------------------------------------- | ---------------------------------------------------------- | -------- |
+| 1  | Status API         | Membuka dashboard dan mengecek indikator koneksi di header | Indikator berubah menjadi "Connected" saat backend aktif   | ✅ Sesuai |
+| 2  | Sync Data          | Me-refresh halaman utama aplikasi                          | Data dari PostgreSQL berhasil di-fetch dan tampil otomatis | ✅ Sesuai |
+| 3  | Create Item        | Mengisi form tambah barang dan submit                      | Data baru terkirim ke API dan muncul tanpa refresh         | ✅ Sesuai |
+| 4  | Read Data          | Melihat kartu barang di dashboard                          | Informasi nama, harga, dan deskripsi tampil akurat         | ✅ Sesuai |
+| 5  | Edit Mode          | Menekan tombol edit pada item                              | Form otomatis terisi data awal                             | ✅ Sesuai |
+| 6  | Update Data        | Mengubah data dan menyimpan                                | Data ter-update dan langsung terlihat di UI                | ✅ Sesuai |
+| 7  | Search Feature     | Mengetik kata kunci di SearchBar                           | Data terfilter sesuai input                                | ✅ Sesuai |
+| 8  | Delete Item        | Menekan tombol hapus dan konfirmasi                        | Data terhapus dari UI dan database                         | ✅ Sesuai |
+| 9  | Loading State      | Mensimulasikan delay koneksi                               | Muncul indikator "Loading..."                              | ✅ Sesuai |
+| 10 | Validation         | Mengosongkan field lalu submit                             | Muncul pesan error dan data tidak dikirim                  | ✅ Sesuai |
+
