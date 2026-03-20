@@ -946,17 +946,17 @@ Berdasarkan panduan Modul 3, pada tahap ini telah berhasil dikembangkan berbagai
 
 Fitur yang tersedia meliputi dashboard item yang berfungsi untuk menampilkan katalog barang sewa secara dinamis dari database. Selain itu, telah diimplementasikan fitur management UI berbasis CRUD, yaitu form penambahan barang baru dengan validasi field, fitur edit detail barang langsung melalui interface, serta tombol hapus yang telah terintegrasi dengan database secara real-time.
 
-Dari sisi interaktivitas, aplikasi dilengkapi dengan SearchBar untuk melakukan pencarian barang secara instan (client-side filtering). Terdapat juga API Status Indicator yang menampilkan status koneksi ke server (Connected/Disconnected). Selain itu, digunakan conditional rendering untuk menampilkan status loading serta pesan error apabila terjadi kegagalan saat memuat data dari API.
+Dari sisi interaktivitas, aplikasi dilengkapi dengan SearchBar untuk melakukan pencarian barang secara instan (client-side filtering). Terdapat juga API Status Indicator yang menampilkan status koneksi ke server (Connected/Disconnected). 
 
 **2. Arsitektur Kode**
 
-Struktur folder pada sisi frontend (/frontend/src) telah diorganisir secara sistematis untuk mendukung pengembangan yang rapi dan terstruktur.
+Struktur folder pada sisi frontend `(/frontend/src)` telah diorganisir secara sistematis untuk mendukung pengembangan yang rapi dan terstruktur.
 
-Folder services/api.js digunakan untuk menangani logika komunikasi dengan backend FastAPI menggunakan pendekatan async/await.
+Folder `services/api.js` digunakan untuk menangani logika komunikasi dengan backend FastAPI menggunakan pendekatan async/await.
 
-Komponen antarmuka pengguna ditempatkan dalam folder components/ agar bersifat reusable, yang terdiri dari Header.jsx, SearchBar.jsx, ItemForm.jsx, ItemList.jsx, dan ItemCard.jsx.
+Komponen antarmuka pengguna ditempatkan dalam folder `components/` agar bersifat reusable, yang terdiri dari `Header.jsx, SearchBar.jsx, ItemForm.jsx, ItemList.jsx, dan ItemCard.jsx.`
 
-Sementara itu, App.jsx berfungsi sebagai pengelola state utama aplikasi dengan memanfaatkan React Hooks seperti useState dan useEffect. Struktur ini menunjukkan penerapan konsep clean architecture dalam pengembangan frontend.
+Sementara itu, `App.jsx` berfungsi sebagai pengelola state utama aplikasi dengan memanfaatkan React Hooks seperti `useState` dan `useEffect`. Struktur ini menunjukkan penerapan konsep clean architecture dalam pengembangan frontend.
 
 **3. Cara Menjalankan Aplikasi (Local Development)**
 
@@ -1001,3 +1001,52 @@ Berikut adalah ringkasan hasil pengujian yang telah dilakukan:
 | 9  | Loading State      | Mensimulasikan delay koneksi                               | Muncul indikator "Loading..."                              | ✅ Sesuai |
 | 10 | Validation         | Mengosongkan field lalu submit                             | Muncul pesan error dan data tidak dikirim                  | ✅ Sesuai |
 
+---
+
+## 🔐 Authentication
+
+Pengujian sistem dilakukan untuk memastikan seluruh fitur aplikasi berjalan dengan baik sesuai dengan kebutuhan yang telah dirancang. Proses pengujian mencakup fitur autentikasi (authentication), pengelolaan data (CRUD), serta pengujian alur penggunaan secara menyeluruh (end-to-end). Untuk melihat hasil pengujian berupa screenshot, silakan buka folder berikut:
+[Folder Screenshot Testing](./docs/img/imgw4/)
+
+Pengujian dilakukan dengan mensimulasikan interaksi langsung pengguna terhadap aplikasi, mulai dari proses registrasi, login, pengelolaan data barang, hingga logout. Setiap skenario diuji untuk memastikan bahwa sistem dapat memberikan respon yang sesuai, data tersimpan dengan benar di database, serta tampilan antarmuka tetap sinkron dengan kondisi sistem.
+
+Berikut adalah hasil pengujian yang telah dilakukan:
+
+### Authentication Testing
+
+| Kode | Skenario Pengujian | Langkah Pengerjaan | Hasil Sebenarnya | Status |
+|----|-------------------|------------------|----------------------|--------|
+| auth1 | Register User | Mengisi semua field dan klik register | User berhasil dibuat dan masuk ke dashboard | ✅ Sesuai |
+| auth2 | Validasi Register | Mengosongkan field | Muncul pesan error dan data tidak dikirim | ✅ Sesuai |
+| auth3 | Login Berhasil | Login dengan email & password yang benar | User berhasil masuk ke dashboard | ✅ Sesuai |
+| auth44 | Login Gagal | Input email/password salah | Muncul error login gagal | ✅ Sesuai |
+| auth5 | Logout | Klik tombol logout | Kembali ke halaman login | ✅ Sesuai |
+
+### CRUD Testing 
+
+| No | Skenario Pengujian | Langkah Pengerjaan | Hasil yang Diharapkan | Status |
+|----|-------------------|------------------|----------------------|--------|
+| crud1 | Create Item | Mengisi form dan klik tambah | Item baru muncul di dashboard | ✅ Sesuai |
+| crud2 | Validasi Form | Mengosongkan field wajib | Muncul error dan data tidak dikirim | ✅ Sesuai |
+| crud3 | Read Data | Membuka dashboard | Semua item tampil dengan data lengkap | ✅ Sesuai |
+| crud4 | Update Item | Klik edit, ubah data, simpan | Data berubah di UI dan database | ✅ Sesuai |
+| crud5 | Delete Item | Klik hapus dan konfirmasi | Item terhapus dari UI dan database | ✅ Sesuai |
+| crud6 | Search Feature | Ketik di search bar | Data terfilter sesuai kata kunci | ✅ Sesuai |
+| crud7 | Sorting | Mengubah urutan data | Data terurut sesuai pilihan | ✅ Sesuai |
+
+### End-to-End Testing (Modul 4)
+
+| No | Skenario Pengujian | Langkah Pengerjaan | Hasil yang Diharapkan | Status |
+|----|-------------------|------------------|----------------------|--------|
+| ee1 | Buka aplikasi | Membuka localhost:5173 di browser | Halaman login muncul | ✅ Sesuai |
+| ee2 | Register user | Mengisi form register dan submit | User berhasil terdaftar | ✅ Sesuai |
+| ee3 | Auto login | Setelah register selesai | User otomatis masuk ke dashboard | ✅ Sesuai |
+| ee4 | Dashboard tampil | Setelah login berhasil | Halaman dashboard dan data item muncul | ✅ Sesuai |
+| ee5 | Nama user muncul | Melihat bagian header | Nama user tampil di header | ✅ Sesuai |
+| ee6 | CRUD berjalan | Menambah, edit, dan hapus item | Semua fitur CRUD berjalan dengan baik | ✅ Sesuai |
+| ee7 | Logout | Klik tombol logout | User keluar dari sistem | ✅ Sesuai |
+| ee8 | Kembali ke login | Setelah logout | Halaman login ditampilkan kembali | ✅ Sesuai |
+| ee9 | Login ulang | Login dengan akun yang sama | User berhasil masuk kembali | ✅ Sesuai |
+| ee10 | Data tetap ada | Setelah login ulang | Data item tetap tersimpan dan tampil | ✅ Sesuai |
+
+---
