@@ -1024,7 +1024,7 @@ Berikut adalah hasil pengujian yang telah dilakukan:
 
 ### CRUD Testing 
 
-| No | Skenario Pengujian | Langkah Pengerjaan | Hasil yang Diharapkan | Status |
+| No | Skenario Pengujian | Langkah Pengerjaan | Hasil Sebenarnya | Status |
 |----|-------------------|------------------|----------------------|--------|
 | crud1 | Create Item | Mengisi form dan klik tambah | Item baru muncul di dashboard | ✅ Sesuai |
 | crud2 | Validasi Form | Mengosongkan field wajib | Muncul error dan data tidak dikirim | ✅ Sesuai |
@@ -1036,7 +1036,7 @@ Berikut adalah hasil pengujian yang telah dilakukan:
 
 ### End-to-End Testing (Modul 4)
 
-| No | Skenario Pengujian | Langkah Pengerjaan | Hasil yang Diharapkan | Status |
+| No | Skenario Pengujian | Langkah Pengerjaan | Hasil Sebenarnya | Status |
 |----|-------------------|------------------|----------------------|--------|
 | ee1 | Buka aplikasi | Membuka localhost:5173 di browser | Halaman login muncul | ✅ Sesuai |
 | ee2 | Register user | Mengisi form register dan submit | User berhasil terdaftar | ✅ Sesuai |
