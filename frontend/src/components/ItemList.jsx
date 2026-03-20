@@ -1,8 +1,9 @@
 import ItemCard from "./ItemCard"
+import { LoadingSpinner } from "./Spinner"
 
-function ItemList({ items, onEdit, onDelete, loading }) {
+function ItemList({ items, onEdit, onDelete, loading, deletingId }) {
   if (loading) {
-    return <p style={styles.message}>⏳ Memuat data...</p>
+    return <LoadingSpinner message="Memuat data item..." />
   }
 
   if (items.length === 0) {
@@ -25,6 +26,7 @@ function ItemList({ items, onEdit, onDelete, loading }) {
           item={item}
           onEdit={onEdit}
           onDelete={onDelete}
+          isDeleting={deletingId === item.id}
         />
       ))}
     </div>

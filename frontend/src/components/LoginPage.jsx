@@ -1,4 +1,5 @@
 import { useState } from "react"
+import Spinner from "./Spinner"
 
 function LoginPage({ onLogin, onRegister }) {
   const [isRegister, setIsRegister] = useState(false)
@@ -36,7 +37,9 @@ function LoginPage({ onLogin, onRegister }) {
         await onLogin(formData.email, formData.password)
       }
     } catch (err) {
-      setError(err.message)
+      const errorMessage = err?.message || err?.detail || 
+        (typeof err === 'string' ? err : 'Terjadi kesalahan, coba lagi')
+      setError(errorMessage)
     } finally {
       setLoading(false)
     }
@@ -106,8 +109,22 @@ function LoginPage({ onLogin, onRegister }) {
             />
           </div>
 
-          <button type="submit" style={styles.btnSubmit} disabled={loading}>
-            {loading ? "Loading..." : isRegister ? "Register" : "Login"}
+          <button 
+            type="submit" 
+            style={{
+              ...styles.btnSubmit,
+              ...(loading ? styles.btnDisabled : {}),
+            }} 
+            disabled={loading}
+          >
+            {loading ? (
+              <span style={styles.btnContent}>
+                <Spinner size={18} color="#fff" />
+                <span>{isRegister ? "Mendaftar..." : "Masuk..."}</span>
+              </span>
+            ) : (
+              isRegister ? "Register" : "Login"
+            )}
           </button>
         </form>
       </div>
@@ -207,6 +224,16 @@ const styles = {
     marginBottom: "0.5rem",
     fontSize: "0.9rem",
     textAlign: "center",
+  },
+  btnDisabled: {
+    opacity: 0.7,
+    cursor: "not-allowed",
+  },
+  btnContent: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "0.5rem",
   },
 }
 

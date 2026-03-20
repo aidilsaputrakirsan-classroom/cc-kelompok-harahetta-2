@@ -24,6 +24,7 @@ function App() {
   const [editingItem, setEditingItem] = useState(null)
   const [searchQuery, setSearchQuery] = useState("")
   const [sortBy, setSortBy] = useState("newest")
+  const [deletingId, setDeletingId] = useState(null)
 
   // ==================== TOAST STATE ====================
   const [toasts, setToasts] = useState([])
@@ -124,6 +125,7 @@ function App() {
     const item = items.find((i) => i.id === id)
     if (!window.confirm(`Yakin ingin menghapus "${item?.name}"?`)) return
 
+    setDeletingId(id)
     try {
       await deleteItem(id)
       addToast("Item berhasil dihapus!", "success")
@@ -135,6 +137,8 @@ function App() {
       } else {
         addToast("Gagal menghapus: " + err.message, "error")
       }
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -205,6 +209,7 @@ function App() {
           onEdit={handleEdit}
           onDelete={handleDelete}
           loading={loading}
+          deletingId={deletingId}
         />
       </div>
     </div>

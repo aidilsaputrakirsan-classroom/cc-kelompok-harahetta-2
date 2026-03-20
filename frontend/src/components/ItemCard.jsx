@@ -1,4 +1,6 @@
-function ItemCard({ item, onEdit, onDelete }) {
+import Spinner from "./Spinner"
+
+function ItemCard({ item, onEdit, onDelete, isDeleting }) {
     const formatRupiah = (num) => {
       return new Intl.NumberFormat("id-ID", {
         style: "currency",
@@ -35,11 +37,29 @@ function ItemCard({ item, onEdit, onDelete }) {
         </div>
   
         <div style={styles.actions}>
-          <button onClick={() => onEdit(item)} style={styles.btnEdit}>
+          <button 
+            onClick={() => onEdit(item)} 
+            style={styles.btnEdit}
+            disabled={isDeleting}
+          >
             ✏️ Edit
           </button>
-          <button onClick={() => onDelete(item.id)} style={styles.btnDelete}>
-            🗑️ Hapus
+          <button 
+            onClick={() => onDelete(item.id)} 
+            style={{
+              ...styles.btnDelete,
+              ...(isDeleting ? styles.btnDisabled : {}),
+            }}
+            disabled={isDeleting}
+          >
+            {isDeleting ? (
+              <span style={styles.btnContent}>
+                <Spinner size={14} color="#C00000" />
+                <span>Menghapus...</span>
+              </span>
+            ) : (
+              "🗑️ Hapus"
+            )}
           </button>
         </div>
       </div>
@@ -113,6 +133,16 @@ function ItemCard({ item, onEdit, onDelete }) {
       cursor: "pointer",
       fontSize: "0.85rem",
       fontWeight: "bold",
+    },
+    btnDisabled: {
+      opacity: 0.7,
+      cursor: "not-allowed",
+    },
+    btnContent: {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: "0.4rem",
     },
   }
   

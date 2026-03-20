@@ -24,6 +24,33 @@ function authHeaders() {
   return headers
 }
 
+// Helper: extract error message from various formats
+function extractErrorMessage(error, statusCode) {
+  if (!error) return `Request gagal (${statusCode})`
+  
+  // Handle string detail
+  if (typeof error.detail === 'string') {
+    return error.detail
+  }
+  
+  // Handle array of validation errors (FastAPI format)
+  if (Array.isArray(error.detail)) {
+    return error.detail
+      .map(e => e.msg || e.message || JSON.stringify(e))
+      .join(', ')
+  }
+  
+  // Handle object detail
+  if (typeof error.detail === 'object') {
+    return error.detail.message || error.detail.msg || JSON.stringify(error.detail)
+  }
+  
+  // Handle message field
+  if (error.message) return error.message
+  
+  return `Request gagal (${statusCode})`
+}
+
 // Helper: handle response errors
 async function handleResponse(response) {
   if (response.status === 401) {
@@ -32,7 +59,7 @@ async function handleResponse(response) {
   }
   if (!response.ok) {
     const error = await response.json().catch(() => ({}))
-    throw new Error(error.detail || `Request gagal (${response.status})`)
+    throw new Error(extractErrorMessage(error, response.status))
   }
   // 204 No Content
   if (response.status === 204) return null
@@ -51,10 +78,15 @@ export async function register(userData) {
 }
 
 export async function login(email, password) {
+  // Backend uses OAuth2PasswordRequestForm which requires form-urlencoded
+  const formData = new URLSearchParams()
+  formData.append("username", email)  // OAuth2 uses "username" field
+  formData.append("password", password)
+
   const response = await fetch(`${API_URL}/auth/login`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password }),
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: formData,
   })
   const data = await handleResponse(response)
   setToken(data.access_token)

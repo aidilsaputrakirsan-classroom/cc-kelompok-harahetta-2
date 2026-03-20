@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react"
+import Spinner from "./Spinner"
 
 function ItemForm({ onSubmit, editingItem, onCancelEdit }) {
   const [formData, setFormData] = useState({
@@ -8,6 +9,7 @@ function ItemForm({ onSubmit, editingItem, onCancelEdit }) {
     quantity: "0",
   })
   const [error, setError] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Jika editingItem berubah, isi form dengan datanya
   useEffect(() => {
@@ -50,12 +52,14 @@ function ItemForm({ onSubmit, editingItem, onCancelEdit }) {
       quantity: parseInt(formData.quantity) || 0,
     }
 
+    setIsSubmitting(true)
     try {
       await onSubmit(itemData, editingItem?.id)
-      // Reset form setelah berhasil
       setFormData({ name: "", description: "", price: "", quantity: "0" })
     } catch (err) {
       setError(err.message)
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -121,11 +125,30 @@ function ItemForm({ onSubmit, editingItem, onCancelEdit }) {
         </div>
 
         <div style={styles.actions}>
-          <button type="submit" style={styles.btnSubmit}>
-            {editingItem ? "💾 Update Item" : "➕ Tambah Item"}
+          <button 
+            type="submit" 
+            style={{
+              ...styles.btnSubmit,
+              ...(isSubmitting ? styles.btnDisabled : {}),
+            }}
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? (
+              <span style={styles.btnContent}>
+                <Spinner size={16} color="#fff" />
+                <span>Menyimpan...</span>
+              </span>
+            ) : (
+              editingItem ? "💾 Update Item" : "➕ Tambah Item"
+            )}
           </button>
           {editingItem && (
-            <button type="button" onClick={onCancelEdit} style={styles.btnCancel}>
+            <button 
+              type="button" 
+              onClick={onCancelEdit} 
+              style={styles.btnCancel}
+              disabled={isSubmitting}
+            >
               ✕ Batal Edit
             </button>
           )}
@@ -198,6 +221,16 @@ const styles = {
     borderRadius: "8px",
     cursor: "pointer",
     fontSize: "0.95rem",
+  },
+  btnDisabled: {
+    opacity: 0.7,
+    cursor: "not-allowed",
+  },
+  btnContent: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "0.5rem",
   },
   error: {
     backgroundColor: "#FBE5D6",
