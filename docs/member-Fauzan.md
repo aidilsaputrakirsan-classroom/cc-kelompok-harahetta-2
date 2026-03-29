@@ -1,0 +1,1 @@
+Nama: [Djaky Abbyyu Fauzan Timumum] | Nim: [10231032] | Peran; [Lead Backend]
