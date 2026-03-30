@@ -150,9 +150,9 @@ npm run dev
 | Minggu | Target | Status |
 |--------|--------|--------|
 | 1 | Setup & Hello World | ✅ |
-| 2 | REST API + Database | ⬜ |
-| 3 | React Frontend | ⬜ |
-| 4 | Full-Stack Integration | ⬜ |
+| 2 | REST API + Database | ✅ |
+| 3 | React Frontend | ✅ |
+| 4 | Full-Stack Integration | ✅ |
 | 5-7 | Docker & Compose | ⬜ |
 | 8 | UTS Demo | ⬜ |
 | 9-11 | CI/CD Pipeline | ⬜ |
