@@ -1,0 +1,2 @@
+# Perbandingan ukuran Image Python
+
