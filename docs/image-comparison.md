@@ -4,6 +4,21 @@
 
 ---
 
+## 📝 Dokumentasi
+
+![Hasil Docker Images](img/imgw5/ukuranimage.jpeg)
+
+Perintah yang digunakan dalam proses dokumentasi antara lain:
+
+```bash
+docker pull python:3.12
+docker pull python:3.12-slim
+docker pull python:3.12-alpine
+
+docker images
+
+---
+
 ## 📊 Hasil Perbandingan
 
 Berdasarkan hasil pengecekan pada terminal tim, berikut perbandingan ukuran beberapa varian base image Python 3.12:
