@@ -1,16 +1,55 @@
-# Python
-__pycache__/
-*.pyc
-venv/
-.env
+# ============================================================
+# .gitignore — Sewain Project
+# ============================================================
 
-# Node
+# ==================== Python ====================
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+*.pyo
+*.pyd
+venv/
+.venv/
+env/
+.env/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+
+# ==================== Environment Files (SECRETS!) ====================
+# JANGAN PERNAH commit file .env ke Git!
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# ==================== Node.js / Frontend ====================
 node_modules/
 dist/
+.cache/
+frontend/dist/
+frontend/.env
+frontend/.env.local
 
-# Docker
+# ==================== Docker ====================
 *.log
+docker-compose.override.yml
 
-# IDE
+# ==================== IDE ====================
 .vscode/
 .idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ==================== OS ====================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
