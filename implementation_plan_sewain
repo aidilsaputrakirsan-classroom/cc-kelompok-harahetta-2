@@ -1,0 +1,593 @@
+# 🛵 Sewain — Planning Task Detail per Week & per Role (Modul 1–5)
+
+> **Aplikasi:** Sewain — Platform Sewa Barang Online  
+> **Stack:** FastAPI (Backend) + React + Vite (Frontend) + PostgreSQL + Docker  
+> **Framework:** Project-Based Learning (PjBL), Komputasi Awan SI ITK
+
+---
+
+## Gambaran Proyek Sewain
+
+**Sewain** adalah platform sewa barang berbasis web di mana:
+- Pemilik barang bisa mendaftarkan barang untuk disewakan (nama, deskripsi, harga sewa/hari, kategori, dll.)
+- Penyewa bisa melihat katalog, mencari, dan menyewa barang
+- Sistem mengelola status ketersediaan dan riwayat sewa
+
+---
+
+## Struktur Tim & Peran
+
+| Peran | Tanggung Jawab |
+|-------|----------------|
+| **Lead Backend** | REST API FastAPI, database model, autentikasi JWT |
+| **Lead Frontend** | React UI, state management, routing, UX Sewain |
+| **Lead DevOps** | Docker, Dockerfile, CI/CD, environment setup |
+| **Lead QA & Docs** | Testing, dokumentasi, README, bug tracking |
+
+---
+
+## 📅 WEEK 1 — Setup Environment & Inisialisasi Proyek Sewain
+
+**Modul: 01 — Pengantar Cloud Computing & Setup Environment**  
+**Milestone:** Semua anggota setup environment, terbentuk di GitHub Classroom, dan Hello World berjalan.
+
+---
+
+### 🎯 Lead Backend — Week 1
+
+**Fokus:** Setup Python environment + Hello World FastAPI versi Sewain
+
+| # | Task | Detail | File |
+|---|------|--------|------|
+| 1 | Install Python 3.10+, pip, venv | Verifikasi `python --version`, `pip --version` | — |
+| 2 | Setup struktur folder backend Sewain | `mkdir -p backend frontend docs` | `backend/` |
+| 3 | Buat Hello World FastAPI Sewain | `GET /` return info Sewain, `GET /health`, `GET /team` dengan data anggota tim | `backend/main.py` |
+| 4 | Setup `requirements.txt` | `fastapi==0.115.0`, `uvicorn==0.30.0` | `backend/requirements.txt` |
+| 5 | Jalankan backend dan verifikasi | `uvicorn main:app --reload --port 8000`, cek Swagger di `/docs` | — |
+| 6 | Commit & push ke GitHub Classroom | `git commit -m "feat: init sewain backend hello world"` | — |
+
+**Output:** Backend API Sewain berjalan di `localhost:8000` dengan endpoint `/`, `/health`, `/team`
+
+---
+
+### 🎨 Lead Frontend — Week 1
+
+**Fokus:** Setup React + Vite frontend Sewain + Hello World
+
+| # | Task | Detail | File |
+|---|------|--------|------|
+| 1 | Install Node.js 18+ dan npm | Verifikasi `node --version`, `npm --version` | — |
+| 2 | Inisialisasi project React Sewain | `npm create vite@latest frontend -- --template react` | `frontend/` |
+| 3 | Edit `App.jsx` Hello World Sewain | Fetch dari `localhost:8000/`, tampilkan nama app "Sewain" + status API + info tim | `frontend/src/App.jsx` |
+| 4 | Jalankan frontend | `cd frontend && npm install && npm run dev` | — |
+| 5 | Verifikasi koneksi frontend → backend | Tampilkan JSON response dari backend | — |
+| 6 | Commit & push | `git commit -m "feat: init sewain frontend hello world"` | — |
+
+**Output:** Frontend Sewain di `localhost:5173` menampilkan data dari backend
+
+---
+
+### ⚙️ Lead DevOps — Week 1
+
+**Fokus:** Setup Git repository, `.gitignore`, struktur proyek, dan verifikasi semua anggota bisa push
+
+| # | Task | Detail | File |
+|---|------|--------|------|
+| 1 | Install Git, konfigurasi identitas | `git config --global user.name`, `git config --global user.email` | — |
+| 2 | Setup SSH key dan tambahkan ke GitHub | `ssh-keygen -t ed25519`, tambahkan ke GitHub Settings | — |
+| 3 | Join GitHub Classroom, clone repo | `git clone git@github.com:...` | — |
+| 4 | Buat `.gitignore` lengkap untuk Sewain | Tambahkan: `__pycache__/`, `*.pyc`, `venv/`, `.env`, `node_modules/`, `dist/` | `.gitignore` |
+| 5 | Inisialisasi struktur folder proyek | `mkdir -p backend frontend docs` | — |
+| 6 | Install Docker Desktop (preview untuk Week 5) | Verifikasi `docker --version` | — |
+| 7 | Verifikasi semua anggota bisa push | Setiap anggota buat `docs/member-[NAMA].md` lalu push | `docs/` |
+| 8 | Commit struktur awal | `git commit -m "chore: initial project structure for sewain"` | — |
+
+**Output:** Repository Sewain siap, semua anggota bisa clone & push, struktur folder rapi
+
+---
+
+### 📋 Lead QA & Docs — Week 1
+
+**Fokus:** Testing Hello World, buat dokumen profil tim, update README
+
+| # | Task | Detail | File |
+|---|------|--------|------|
+| 1 | Verifikasi backend berjalan | Test `GET /`, `GET /health`, `GET /team` via browser/Thunder Client | — |
+| 2 | Verifikasi frontend terhubung ke backend | Pastikan data dari API muncul di UI | — |
+| 3 | Buat `docs/member-[NAMA].md` | File profil diri sendiri: Nama, NIM, Peran, Skill | `docs/` |
+| 4 | Buat `README.md` awal Sewain | Deskripsi app, anggota tim, cara setup, cara running | `README.md` |
+| 5 | Catat environment yang digunakan | OS, versi Python, Node.js, Git di `docs/environment.md` | `docs/environment.md` |
+
+**Output:** README Sewain versi awal, dokumentasi profil tim
+
+---
+
+### ✅ Checklist Week 1 (Semua Anggota)
+
+- [ ] Environment terinstall (Python, Node.js, Git, VS Code, Docker prevew)
+- [ ] Bergabung di GitHub Classroom, bisa push ke repo tim
+- [ ] Backend Hello World berjalan (`localhost:8000/docs` bisa diakses)
+- [ ] Frontend Hello World berjalan dan fetch dari backend (`localhost:5173`)
+- [ ] `.gitignore` ada dan `.env` tidak ter-commit
+- [ ] `README.md` sudah ada
+
+---
+
+## 📅 WEEK 2 — Backend REST API Sewain (FastAPI + PostgreSQL)
+
+**Modul: 02 — Backend REST API**  
+**Milestone:** Backend Sewain memiliki CRUD lengkap untuk barang sewa, terhubung ke PostgreSQL.
+
+---
+
+### 🎯 Lead Backend — Week 2
+
+**Fokus:** Implementasi semua endpoint CRUD barang sewa Sewain
+
+| # | Task | Detail | File |
+|---|------|--------|------|
+| 1 | Install PostgreSQL, buat database `sewain_db` | `psql -U postgres`, `CREATE DATABASE sewain_db;` | — |
+| 2 | Update `requirements.txt` | Tambah: `sqlalchemy==2.0.35`, `psycopg2-binary==2.9.9`, `python-dotenv==1.0.1`, `pydantic[email]==2.9.0` | `backend/requirements.txt` |
+| 3 | Buat `backend/.env` | `DATABASE_URL=postgresql://postgres:PASSWORD@localhost:5432/sewain_db` | `backend/.env` |
+| 4 | Buat `backend/.env.example` | Template `.env` tanpa password asli | `backend/.env.example` |
+| 5 | Buat `database.py` | `create_engine`, `SessionLocal`, `Base`, fungsi `get_db()` | `backend/database.py` |
+| 6 | Rancang & buat model `Item` (Barang Sewa) Sewain | Kolom: `id`, `nama`, `deskripsi`, `harga_per_hari`, `kategori`, `status` (available/rented), `pemilik_id`, `foto_url`, `created_at` | `backend/models.py` |
+| 7 | Buat `schemas.py` untuk barang Sewain | `BarangCreate`, `BarangUpdate`, `BarangResponse`, `BarangListResponse` | `backend/schemas.py` |
+| 8 | Buat `crud.py` untuk operasi barang | `create_barang`, `get_barangs`, `get_barang`, `update_barang`, `delete_barang`, dengan support pagination & search | `backend/crud.py` |
+| 9 | Update `main.py` dengan endpoint CRUD | `POST /barang`, `GET /barang`, `GET /barang/{id}`, `PUT /barang/{id}`, `DELETE /barang/{id}` | `backend/main.py` |
+| 10 | Tambah seed data | Buat 5-10 contoh barang sewa (tenda, kamera, sepeda, dll.) di `docs/seed-data.sql` | `docs/seed-data.sql` |
+| 11 | Test semua endpoint via Swagger | Pastikan 200/201/204/404 sesuai | — |
+| 12 | Commit & push | `git commit -m "feat: add barang CRUD endpoints for sewain"` | — |
+
+**Output:** 5 endpoint CRUD barang sewa berjalan, PostgreSQL terhubung, Swagger docs lengkap
+
+---
+
+### 🎨 Lead Frontend — Week 2
+
+**Fokus:** Observasi & pahami format API response Sewain untuk persiapan Week 3
+
+| # | Task | Detail | File |
+|---|------|--------|------|
+| 1 | Ikuti workshop bersama Lead Backend, setup PostgreSQL | Install PostgreSQL, buat database `sewain_db` | — |
+| 2 | Test semua endpoint via Swagger UI | Pelajari format request/response untuk barang sewa | — |
+| 3 | Dokumentasikan format API | Gambarkan/catat format JSON barang sewa untuk dipake di frontend | `docs/api-notes.md` |
+| 4 | Riset komponen UI yang dibutuhkan Sewain | List komponen: KatalogCard, FormSewa, SearchBar, dll. | `docs/ui-plan.md` |
+| 5 | Commit & push | `git commit -m "docs: document sewain API format and UI plan"` | — |
+
+---
+
+### ⚙️ Lead DevOps — Week 2
+
+**Fokus:** Setup PostgreSQL, konfigurasi `.env`, environment management
+
+| # | Task | Detail | File |
+|---|------|--------|------|
+| 1 | Install & konfigurasi PostgreSQL | Buat database `sewain_db`, buat user jika perlu | — |
+| 2 | Buat `backend/.env` dengan `DATABASE_URL` yang benar | Pastikan format URL PostgreSQL tepat | `backend/.env` |
+| 3 | Buat `backend/.env.example` | Template untuk anggota lain | `backend/.env.example` |
+| 4 | Verifikasi `.env` ada di `.gitignore` | `cat .gitignore | grep .env` | — |
+| 5 | Bantu anggota tim yang error saat koneksi DB | Troubleshoot koneksi PostgreSQL | — |
+| 6 | Dokumentasikan cara setup DB di `docs/setup-guide.md` | Langkah install PostgreSQL, buat DB, setup `.env` | `docs/setup-guide.md` |
+| 7 | Commit & push | `git commit -m "docs: add database setup guide for sewain"` | — |
+
+---
+
+### 📋 Lead QA & Docs — Week 2
+
+**Fokus:** Testing semua endpoint CRUD, dokumentasi API
+
+| # | Task | Detail | File |
+|---|------|--------|------|
+| 1 | Test `POST /barang` (create) | Tes buat barang baru, validasi field wajib | — |
+| 2 | Test `GET /barang` (list) | Tes pagination (skip, limit), search by nama | — |
+| 3 | Test `GET /barang/{id}` (detail) | Tes ID valid & ID tidak ada (404) | — |
+| 4 | Test `PUT /barang/{id}` (update) | Tes update partial & full | — |
+| 5 | Test `DELETE /barang/{id}` | Tes hapus & verifikasi 204 | — |
+| 6 | Catat semua bug/issues di `docs/bug-log.md` | Format: endpoint, expected, actual, status | `docs/bug-log.md` |
+| 7 | Update `README.md` | Tambahkan section "API Endpoints" dengan tabel endpoint | `README.md` |
+| 8 | Commit & push | `git commit -m "docs: add api testing results and bug log"` | — |
+
+---
+
+### ✅ Checklist Week 2 (Semua Anggota)
+
+- [ ] PostgreSQL terinstall dan database `sewain_db` ada
+- [ ] `backend/.env` terbuat (tidak ter-commit di Git)
+- [ ] `backend/.env.example` ter-commit
+- [ ] Minimal 5 endpoint CRUD barang berjalan dan ditest
+- [ ] Swagger UI menampilkan dokumentasi lengkap
+- [ ] Setiap anggota punya minimal 1 commit minggu ini
+
+---
+
+## 📅 WEEK 3 — Frontend React Sewain (UI & API Integration)
+
+**Modul: 03 — Frontend React**  
+**Milestone:** Frontend Sewain menampilkan katalog barang, bisa tambah/edit/hapus via UI.
+
+---
+
+### 🎯 Lead Backend — Week 3
+
+**Fokus:** Ensure API berjalan, tambah endpoint jika frontend membutuhkan
+
+| # | Task | Detail | File |
+|---|------|--------|------|
+| 1 | Pastikan backend berjalan saat workshop | `uvicorn main:app --reload --port 8000` | — |
+| 2 | Bantu debug format API response | Pastikan response format sesuai dengan yang dibutuhkan frontend | `backend/main.py` |
+| 3 | Tambah endpoint `GET /barang/kategori` | Endpoint untuk list kategori barang yang ada | `backend/main.py` |
+| 4 | Tambah filter kategori di `GET /barang` | Query param `?kategori=elektronik` | `backend/crud.py` |
+| 5 | Verifikasi CORS | Pastikan `allow_origins` include `localhost:5173` | `backend/main.py` |
+| 6 | Commit & push | `git commit -m "feat: add kategori filter and kategori endpoint"` | — |
+
+---
+
+### 🎨 Lead Frontend — Week 3
+
+**Fokus:** Bangun seluruh UI Sewain — katalog, form, search
+
+| # | Task | Detail | File |
+|---|------|--------|------|
+| 1 | Buat struktur folder `src/components/` dan `src/services/` | `mkdir -p src/components src/services` | — |
+| 2 | Buat `api.js` — API service untuk Sewain | Fungsi: `fetchBarangs(search, kategori)`, `createBarang`, `updateBarang`, `deleteBarang`, `checkHealth` | `frontend/src/services/api.js` |
+| 3 | Buat komponen `Header.jsx` Sewain | Logo "Sewain 🛵", total barang, status API connected/disconnected | `frontend/src/components/Header.jsx` |
+| 4 | Buat komponen `SearchBar.jsx` | Input search + filter kategori (select dropdown) | `frontend/src/components/SearchBar.jsx` |
+| 5 | Buat komponen `BarangCard.jsx` | Card per barang: foto placeholder, nama, harga/hari, kategori, status, tombol Edit & Hapus | `frontend/src/components/BarangCard.jsx` |
+| 6 | Buat komponen `BarangList.jsx` | Grid/list dari `BarangCard`, handle kosong & loading state | `frontend/src/components/BarangList.jsx` |
+| 7 | Buat komponen `BarangForm.jsx` | Form tambah/edit barang: nama, deskripsi, harga_per_hari, kategori, foto_url | `frontend/src/components/BarangForm.jsx` |
+| 8 | Update `App.jsx` — integrasi semua komponen | State: `barangs`, `editingBarang`, `searchQuery`, `selectedKategori` | `frontend/src/App.jsx` |
+| 9 | Tambahkan CSS dasar Sewain | Styling: card grid, warna Sewain (oranye/biru), font Inter | `frontend/src/App.css` |
+| 10 | Test semua operasi CRUD via UI | Tambah > Edit > Hapus > Search | — |
+| 11 | Commit & push | `git commit -m "feat: build sewain catalog UI with CRUD"` | — |
+
+**Output:** Frontend Sewain menampilkan katalog barang dengan UI yang rapi dan fungsional
+
+---
+
+### ⚙️ Lead DevOps — Week 3
+
+**Fokus:** Setup environment frontend, konfigurasi proxy/env vars
+
+| # | Task | Detail | File |
+|---|------|--------|------|
+| 1 | Setup `frontend/.env` | `VITE_API_URL=http://localhost:8000` | `frontend/.env` |
+| 2 | Buat `frontend/.env.example` | Template env frontend | `frontend/.env.example` |
+| 3 | Verifikasi env variable bisa dibaca di React | Gunakan `import.meta.env.VITE_API_URL` | — |
+| 4 | Test cross-browser | Coba di Chrome dan Firefox | — |
+| 5 | Update `docs/setup-guide.md` | Tambahkan cara setup frontend (npm install, env, npm run dev) | `docs/setup-guide.md` |
+| 6 | Buat `docs/ui-test-results.md` | Screenshot setiap fitur + status PASS/FAIL | `docs/ui-test-results.md` |
+| 7 | Commit & push | `git commit -m "docs: add frontend setup and ui test results"` | — |
+
+---
+
+### 📋 Lead QA & Docs — Week 3
+
+**Fokus:** Testing semua fitur CRUD via UI, dokumentasi UI
+
+| # | Task | Detail | File |
+|---|------|--------|------|
+| 1 | Test fitur tambah barang via form | Input semua field, validasi field wajib | — |
+| 2 | Test fitur edit barang | Klik edit, ubah data, submit | — |
+| 3 | Test fitur hapus barang | Klik hapus, verifikasi hilang dari list | — |
+| 4 | Test fitur search | Coba search nama barang, filter kategori | — |
+| 5 | Test edge cases | Form kosong, harga negatif, nama terlalu panjang | — |
+| 6 | Catat bug di `docs/bug-log.md` | Update log dengan bug baru yang ditemukan | `docs/bug-log.md` |
+| 7 | Update `README.md` | Tambah section "Frontend" dengan cara running dan screenshots deskripsi | `README.md` |
+| 8 | Commit & push | `git commit -m "docs: update readme with frontend section"` | — |
+
+---
+
+### ✅ Checklist Week 3 (Semua Anggota)
+
+- [ ] Frontend React Sewain berjalan di `localhost:5173`
+- [ ] Katalog barang tampil dari backend API
+- [ ] Bisa tambah, edit, hapus barang via UI
+- [ ] Search & filter kategori berfungsi
+- [ ] Minimal 3 komponen terpisah (Header, BarangCard, BarangForm)
+- [ ] `frontend/.env` ada dan tidak ter-commit
+
+---
+
+## 📅 WEEK 4 — Full-Stack Integration: CORS, ENV & JWT Auth Sewain
+
+**Modul: 04 — Integrasi Full-Stack**  
+**Milestone:** Sewain memiliki autentikasi JWT lengkap. User bisa register, login, dan akes CRUD dengan proteksi token.
+
+---
+
+### 🎯 Lead Backend — Week 4
+
+**Fokus:** Implementasi JWT auth untuk Sewain (register, login, protected endpoints)
+
+| # | Task | Detail | File |
+|---|------|--------|------|
+| 1 | Update `requirements.txt` | Tambah: `python-jose[cryptography]==3.3.0`, `passlib[bcrypt]==1.7.4`, `bcrypt==4.0.1` | `backend/requirements.txt` |
+| 2 | Update `backend/.env` | Tambah: `SECRET_KEY`, `ALGORITHM=HS256`, `ACCESS_TOKEN_EXPIRE_MINUTES=60`, `ALLOWED_ORIGINS=http://localhost:5173` | `backend/.env` |
+| 3 | Buat model `User` Sewain | Kolom: `id`, `email`, `nama`, `hashed_password`, `is_active`, `role` (penyewa/pemilik), `created_at` | `backend/models.py` |
+| 4 | Buat `auth.py` | `hash_password`, `verify_password`, `create_access_token`, `decode_token`, `get_current_user` | `backend/auth.py` |
+| 5 | Update `schemas.py` — auth schemas | `UserCreate`, `UserResponse`, `LoginRequest`, `TokenResponse` | `backend/schemas.py` |
+| 6 | Update `crud.py` — user CRUD | `create_user`, `authenticate_user`, `get_user_by_email` | `backend/crud.py` |
+| 7 | Update `main.py` — auth endpoints | `POST /auth/register`, `POST /auth/login`, `GET /auth/me` | `backend/main.py` |
+| 8 | Proteksi CRUD barang dengan JWT | Tambahkan `current_user: User = Depends(get_current_user)` ke semua endpoint `/barang` | `backend/main.py` |
+| 9 | Perbaiki CORS | Gunakan whitelist dari `.env` (`ALLOWED_ORIGINS`) | `backend/main.py` |
+| 10 | Tambahkan validasi email format & password strength | Gunakan Pydantic validator | `backend/schemas.py` |
+| 11 | Test auth flow di Swagger | Register → Login → copy token → Authorize → akses `/barang` | — |
+| 12 | Commit & push | `git commit -m "feat: implement JWT auth for sewain"` | — |
+
+**Output:** Auth Sewain berjalan: `POST /auth/register`, `POST /auth/login`, semua `/barang` diprotect
+
+---
+
+### 🎨 Lead Frontend — Week 4
+
+**Fokus:** Implementasi halaman login/register Sewain + token storage + protected routes
+
+| # | Task | Detail | File |
+|---|------|--------|------|
+| 1 | Update `frontend/.env` | Pastikan `VITE_API_URL=http://localhost:8000` | `frontend/.env` |
+| 2 | Update `api.js` — auth functions | Tambah: `register()`, `login()`, `getMe()`, token management (`setToken`, `getToken`, `clearToken`, `authHeaders`) | `frontend/src/services/api.js` |
+| 3 | Buat `LoginPage.jsx` Sewain | Halaman login/register dengan branding Sewain (ikon 🛵, oranye), tab Login/Register | `frontend/src/components/LoginPage.jsx` |
+| 4 | Update `Header.jsx` — user info & logout | Tampilkan nama user yang login, tombol logout | `frontend/src/components/Header.jsx` |
+| 5 | Update `App.jsx` — conditional auth rendering | Jika tidak ada token → tampilkan `LoginPage`, jika ada token → tampilkan main app | `frontend/src/App.jsx` |
+| 6 | Update semua API calls — sertakan auth header | Semua fetch ke `/barang` harus kirim `Authorization: Bearer {token}` | `frontend/src/services/api.js` |
+| 7 | Handle 401 Unauthorized | Jika response 401 → hapus token → redirect ke login | `frontend/src/services/api.js` |
+| 8 | Test end-to-end auth flow | Register → login → CRUD → logout → kembali ke login | — |
+| 9 | Commit & push | `git commit -m "feat: add login/register UI and JWT frontend integration"` | — |
+
+---
+
+### ⚙️ Lead DevOps — Week 4
+
+**Fokus:** Konfigurasi CORS, manajemen env vars, buat setup guide lengkap
+
+| # | Task | Detail | File |
+|---|------|--------|------|
+| 1 | Update `backend/.env` lengkap | Tambah semua variable: DB_URL, SECRET_KEY, ALGORITHM, TOKEN_EXPIRE, ALLOWED_ORIGINS | `backend/.env` |
+| 2 | Update `backend/.env.example` | Template lengkap dengan komentar penjelasan tiap variable | `backend/.env.example` |
+| 3 | Update `frontend/.env.example` | `VITE_API_URL=http://localhost:8000` | `frontend/.env.example` |
+| 4 | Generate `SECRET_KEY` | `python -c "import secrets; print(secrets.token_hex(32))"` | — |
+| 5 | Verifikasi CORS fix | Pastikan frontend bisa akses backend tanpa CORS error | — |
+| 6 | Buat `docs/setup-guide.md` LENGKAP | Clone → install deps → setup PostgreSQL → buat `.env` → running backend & frontend. Harus bisa diikuti orang baru. | `docs/setup-guide.md` |
+| 7 | Commit & push | `git commit -m "docs: add complete setup guide for sewain"` | — |
+
+---
+
+### 📋 Lead QA & Docs — Week 4
+
+**Fokus:** Testing auth flow end-to-end, update README, buat API docs
+
+| # | Task | Detail | File |
+|---|------|--------|------|
+| 1 | Test register user baru | Coba register, verifikasi data tersimpan di DB | — |
+| 2 | Test login dengan kredensial benar | Dapatkan JWT token | — |
+| 3 | Test login dengan kredensial salah | Harus return 401 | — |
+| 4 | Test akses endpoint tanpa token | Harus return 401 | — |
+| 5 | Test akses endpoint dengan token valid | Harus berhasil | — |
+| 6 | Test token expired (jika bisa) | Import `datetime` ubah expiry, atau tunggu | — |
+| 7 | Buat `docs/api-documentation.md` | Semua endpoint: method, URL, auth required?, request body, response, contoh `curl` | `docs/api-documentation.md` |
+| 8 | Update `README.md` | Tambah section "Authentication" dengan flow diagram sederhana | `README.md` |
+| 9 | Commit & push | `git commit -m "docs: add api documentation and auth section in readme"` | — |
+
+---
+
+### ✅ Checklist Week 4 (Semua Anggota)
+
+- [ ] `POST /auth/register` berfungsi
+- [ ] `POST /auth/login` mengembalikan JWT token
+- [ ] Semua endpoint `/barang` diprotect (401 tanpa token)
+- [ ] Frontend Sewain menampilkan halaman login/register
+- [ ] Login berhasil → tampil katalog → logout → kembali ke login
+- [ ] CORS dikonfigurasi dengan whitelist (bukan `*`)
+- [ ] Semua secrets ada di `.env`, tidak hardcoded
+
+---
+
+## 📅 WEEK 5 — Docker: Containerisasi Backend Sewain
+
+**Modul: 05 — Docker Fundamentals**  
+**Milestone:** Backend Sewain berjalan di dalam Docker container dan image ter-push ke Docker Hub.
+
+---
+
+### 🎯 Lead Backend — Week 5
+
+**Fokus:** Pastikan app Sewain berjalan di container, tambahkan healthcheck
+
+| # | Task | Detail | File |
+|---|------|--------|------|
+| 1 | Verifikasi backend berjalan sempurna sebelum Docker | Tes semua endpoint di `localhost:8000` | — |
+| 2 | Tambahkan healthcheck endpoint yang lebih informatif | Update `GET /health` agar return info versi, database status | `backend/main.py` |
+| 3 | Tambahkan `HEALTHCHECK` di Dockerfile | `HEALTHCHECK CMD curl -f http://localhost:8000/health || exit 1` | `backend/Dockerfile` |
+| 4 | Review Dockerfile yang dibuat DevOps | Pastikan backend bisa konek ke PostgreSQL dari dalam container | — |
+| 5 | Fix `DATABASE_URL` untuk Docker | Ganti `localhost` dengan `host.docker.internal` (Mac/Windows) | `backend/.env` |
+| 6 | Test API dari container | `docker run -p 8000:8000 --env-file .env sewain-backend:v1` | — |
+| 7 | Verifikasi register + login dari container | Test auth flow saat running di Docker | — |
+| 8 | Commit & push | `git commit -m "feat: add healthcheck and docker compatibility"` | — |
+
+---
+
+### 🎨 Lead Frontend — Week 5
+
+**Fokus:** Riset Docker untuk frontend (Multi-stage build), buat dokumentasi cheatsheet
+
+| # | Task | Detail | File |
+|---|------|--------|------|
+| 1 | Pelajari konsep Docker (container vs VM, image, dockerfile) | Baca modul 5, tonton video Docker | — |
+| 2 | Riset multi-stage build untuk React | React perlu `npm run build` → hasilkan static files → serve dengan Nginx | — |
+| 3 | Draft `frontend/Dockerfile` (preview untuk Week 6) | Stage 1: build, Stage 2: nginx serve | `frontend/Dockerfile` (draft) |
+| 4 | Buat `docs/docker-cheatsheet.md` | Commands: `build`, `run`, `ps`, `logs`, `exec`, `stop`, `rm`, `push`, `pull` + contoh spesifik Sewain | `docs/docker-cheatsheet.md` |
+| 5 | Commit & push | `git commit -m "docs: add docker cheatsheet with sewain examples"` | — |
+
+---
+
+### ⚙️ Lead DevOps — Week 5
+
+**Fokus:** Tulis Dockerfile backend Sewain, build image, push ke Docker Hub
+
+| # | Task | Detail | File |
+|---|------|--------|------|
+| 1 | Verifikasi Docker Desktop berjalan | `docker --version`, `docker compose version`, `docker run hello-world` | — |
+| 2 | Buat akun Docker Hub | Login: `docker login` | — |
+| 3 | Buat `backend/.dockerignore` | Exclude: `venv/`, `.env`, `__pycache__/`, `*.pyc`, `.git/`, `*.md`, `docs/` | `backend/.dockerignore` |
+| 4 | Buat `backend/Dockerfile` | Base: `python:3.12-slim`, WORKDIR `/app`, COPY requirements dulu, RUN pip install, COPY kode, EXPOSE 8000, CMD uvicorn | `backend/Dockerfile` |
+| 5 | Optimasi Dockerfile: non-root user | Tambahkan `RUN useradd -m appuser` dan `USER appuser` | `backend/Dockerfile` |
+| 6 | Build image Sewain | `docker build -t sewain-backend:v1 .` | — |
+| 7 | Test container berjalan | `docker run -p 8000:8000 --env-file .env sewain-backend:v1` | — |
+| 8 | Jalankan di background | `docker run -d -p 8000:8000 --env-file .env --name sewain-backend sewain-backend:v1` | — |
+| 9 | Demonstrasikan layer caching | Build pertama vs build kedua setelah ubah kode | — |
+| 10 | Tag dan push ke Docker Hub | `docker tag sewain-backend:v1 USERNAME/sewain-backend:v1`, `docker push USERNAME/sewain-backend:v1` | — |
+| 11 | Verifikasi image di Docker Hub | Buka hub.docker.com, pastikan image ada | — |
+| 12 | Buat `Makefile` atau `scripts/docker.sh` | Commands: `make build`, `make run`, `make push`, `make clean` | `Makefile` / `scripts/docker.sh` |
+| 13 | Commit & push | `git commit -m "feat: add dockerized backend for sewain"` | — |
+
+**Output:** `sewain-backend:v1` ter-push ke Docker Hub, backend berjalan di container
+
+---
+
+### 📋 Lead QA & Docs — Week 5
+
+**Fokus:** Testing container, dokumentasi Docker, bandingkan ukuran image
+
+| # | Task | Detail | File |
+|---|------|--------|------|
+| 1 | Test container berjalan dengan baik | `GET /health` return `healthy` dari dalam container | — |
+| 2 | Verifikasi healthcheck status | `docker inspect --format='{{.State.Health.Status}}' sewain-backend` | — |
+| 3 | Test API via container | Register + login + CRUD barang melalui container | — |
+| 4 | Bandingkan ukuran image | `python:3.12` vs `python:3.12-slim` vs `python:3.12-alpine` | `docs/image-comparison.md` |
+| 5 | Buat `docs/image-comparison.md` | Tabel perbandingan ukuran + catatan pro/con | `docs/image-comparison.md` |
+| 6 | Update README — tambah section Docker | Cara `docker build`, `docker run`, link Docker Hub image | `README.md` |
+| 7 | Commit & push | `git commit -m "docs: add docker testing results and image comparison"` | — |
+
+---
+
+### ✅ Checklist Week 5 (Semua Anggota)
+
+- [ ] `backend/Dockerfile` ada dan ter-commit
+- [ ] `backend/.dockerignore` ada (`.env` di-exclude!)
+- [ ] `docker build -t sewain-backend:v1 .` berhasil
+- [ ] Container berjalan dan API bisa diakses di `localhost:8000`
+- [ ] Auth (register + login) berjalan dari dalam container
+- [ ] Image ter-push ke Docker Hub
+- [ ] Setiap anggota punya kontribusi (commit) minggu ini
+
+---
+
+## 📊 Ringkasan Deliverable per Week
+
+| Week | Deliverable Utama | Lead PJ |
+|------|-------------------|---------|
+| **W1** | Hello World FastAPI + React berjalan, semua anggota bisa push | DevOps |
+| **W2** | Backend CRUD barang sewa (5 endpoint), PostgreSQL terhubung | Backend |
+| **W3** | Frontend katalog Sewain, CRUD via UI, search & filter | Frontend |
+| **W4** | JWT Auth (register/login/protected), CORS whitelist | Backend + Frontend |
+| **W5** | Docker image backend ter-push ke Docker Hub | DevOps |
+
+---
+
+## 📦 Struktur Folder Final Sewain (After Week 5)
+
+```
+cc-kelompok-harahetta-2/
+├── backend/
+│   ├── Dockerfile              ← Week 5
+│   ├── .dockerignore           ← Week 5
+│   ├── main.py                 ← Week 2→4 (CRUD + auth)
+│   ├── auth.py                 ← Week 4 (JWT)
+│   ├── database.py             ← Week 2 (DB connection)
+│   ├── models.py               ← Week 2→4 (Item + User)
+│   ├── schemas.py              ← Week 2→4 (CRUD + auth schemas)
+│   ├── crud.py                 ← Week 2→4 (CRUD + user)
+│   ├── requirements.txt        ← Week 1→4 (deps)
+│   ├── .env                    ← Week 2 (TIDAK di-commit!)
+│   └── .env.example            ← Week 2 (di-commit)
+├── frontend/
+│   ├── src/
+│   │   ├── App.jsx             ← Week 3→4 (main + auth)
+│   │   ├── App.css             ← Week 3 (styling)
+│   │   ├── components/
+│   │   │   ├── Header.jsx      ← Week 3→4 (+user/logout)
+│   │   │   ├── SearchBar.jsx   ← Week 3
+│   │   │   ├── BarangForm.jsx  ← Week 3 (create/edit)
+│   │   │   ├── BarangList.jsx  ← Week 3
+│   │   │   ├── BarangCard.jsx  ← Week 3
+│   │   │   └── LoginPage.jsx   ← Week 4
+│   │   └── services/
+│   │       └── api.js          ← Week 3→4 (+auth)
+│   ├── .env                    ← Week 3 (TIDAK di-commit!)
+│   └── .env.example            ← Week 3 (di-commit)
+├── docs/
+│   ├── setup-guide.md          ← Week 2→4 (update bertahap)
+│   ├── api-documentation.md    ← Week 4
+│   ├── docker-cheatsheet.md    ← Week 5
+│   ├── image-comparison.md     ← Week 5
+│   ├── bug-log.md              ← Week 2→5 (update terus)
+│   ├── seed-data.sql           ← Week 2
+│   └── member-[NAMA].md        ← Week 1
+├── Makefile                    ← Week 5 (opsional)
+├── .gitignore
+└── README.md                   ← Week 1→5 (update terus)
+```
+
+---
+
+## 🔑 Entitas Database Sewain
+
+### Tabel `items` (Barang Sewa)
+
+| Kolom | Tipe | Keterangan |
+|-------|------|------------|
+| `id` | Integer PK | Auto-increment |
+| `nama` | String(100) | Nama barang (wajib) |
+| `deskripsi` | Text | Deskripsi barang |
+| `harga_per_hari` | Float | Harga sewa per hari (wajib, > 0) |
+| `kategori` | String(50) | Misal: elektronik, outdoor, kendaraan |
+| `status` | Enum | `available` / `rented` |
+| `foto_url` | String | URL foto barang |
+| `pemilik_id` | Integer FK | Foreign key ke tabel users |
+| `created_at` | DateTime | Auto-filled |
+| `updated_at` | DateTime | Auto-updated |
+
+### Tabel `users` (Pengguna Sewain)
+
+| Kolom | Tipe | Keterangan |
+|-------|------|------------|
+| `id` | Integer PK | Auto-increment |
+| `email` | String(255) | Unique, wajib |
+| `nama` | String(100) | Nama lengkap |
+| `hashed_password` | String(255) | bcrypt hash |
+| `is_active` | Boolean | Default True |
+| `role` | String | `penyewa` / `pemilik` |
+| `created_at` | DateTime | Auto-filled |
+
+---
+
+## 🛣️ API Endpoints Sewain (Target Week 4)
+
+### Auth Endpoints (Public)
+| Method | Endpoint | Deskripsi |
+|--------|----------|-----------|
+| POST | `/auth/register` | Daftar akun baru |
+| POST | `/auth/login` | Login, dapatkan JWT token |
+| GET | `/auth/me` | Info user yang login (protected) |
+
+### Barang Endpoints (Protected - butuh JWT)
+| Method | Endpoint | Deskripsi |
+|--------|----------|-----------|
+| GET | `/barang` | List semua barang (pagination, search, filter kategori) |
+| POST | `/barang` | Tambah barang baru |
+| GET | `/barang/{id}` | Detail satu barang |
+| PUT | `/barang/{id}` | Update barang |
+| DELETE | `/barang/{id}` | Hapus barang |
+| GET | `/barang/kategori` | List semua kategori |
+
+### Utility Endpoints (Public)
+| Method | Endpoint | Deskripsi |
+|--------|----------|-----------|
+| GET | `/health` | Status API + DB |
+| GET | `/team` | Info tim Sewain |
+
+---
+
+> 📌 **Catatan:** Planning ini hanya mencakup Week 1–5 sesuai permintaan.  
+> Week 6–15 akan mencakup Docker Compose, CI/CD (GitHub Actions), Cloud Deploy (Railway/Render), Microservices, API Gateway (Nginx), Monitoring, dan Final Polish.
