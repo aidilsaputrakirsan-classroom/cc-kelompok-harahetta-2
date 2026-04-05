@@ -6,12 +6,242 @@
 
 ---
 
-## Gambaran Proyek Sewain
+## 📌 Gambaran Aplikasi Sewain
 
-**Sewain** adalah platform sewa barang berbasis web di mana:
-- Pemilik barang bisa mendaftarkan barang untuk disewakan (nama, deskripsi, harga sewa/hari, kategori, dll.)
-- Penyewa bisa melihat katalog, mencari, dan menyewa barang
-- Sistem mengelola status ketersediaan dan riwayat sewa
+**SEWAIN** adalah platform berbasis web yang memfasilitasi proses penyewaan barang secara online secara lebih mudah, aman, dan terstruktur. Melalui sistem ini, penyedia dapat menampilkan dan mengelola barang yang disewakan, sementara pengguna dapat mencari barang, melihat detail, menentukan periode sewa, serta mengajukan permintaan penyewaan secara langsung. Platform ini juga dilengkapi dengan pengelolaan status transaksi secara real-time dan fitur verifikasi identitas penyewa untuk meningkatkan keamanan selama proses penyewaan.
+
+SEWAIN ditujukan untuk pelaku usaha penyewaan (khususnya UMKM) serta masyarakat yang membutuhkan barang tanpa harus membelinya. Aplikasi ini membantu mengatasi berbagai kendala dalam sistem penyewaan manual, seperti pencatatan yang tidak rapi, jangkauan pelanggan yang terbatas, kesulitan dalam promosi, serta risiko penyalahgunaan barang.
+
+---
+
+## 👥 Tim Kelompok Harahetta-2
+
+| Nama | NIM | Peran |
+|------|-----|-------|
+| **Djaky Abbyyu Fauzan Timumum** | 10231032 | Lead Backend |
+| **Achmad Zaki Zaidan** | 10231002 | Lead Frontend |
+| **Muhammad Alif Setiawan** | 10231056 | Lead DevOps |
+| **Riqqah Khalda Karina** | 10231082 | Lead QA & Docs |
+
+---
+
+## 🎭 Fitur Sistem — 3 Peran Pengguna
+
+SEWAIN memiliki **3 peran utama** dalam sistem:
+
+### 1. 🛡️ Super Admin
+
+Super Admin bertugas mengelola keseluruhan sistem dan penyedia layanan.
+
+| Fitur | Deskripsi |
+|-------|-----------|
+| Login sebagai Super Admin | Akses eksklusif dashboard super admin |
+| Lihat daftar seluruh Admin | Monitor semua penyedia yang terdaftar |
+| Tambah Admin baru | Onboarding penyedia/UMKM baru |
+| Edit data Admin | Ubah info penyedia |
+| Hapus Admin | Nonaktifkan penyedia |
+| Kelola kategori barang | Tambah/edit/hapus kategori sewa |
+| Lihat seluruh aktivitas penyewaan | Monitor transaksi seluruh platform |
+| Monitoring keseluruhan platform | Dashboard statistik |
+
+---
+
+### 2. 🏪 Admin (Penyedia Barang)
+
+Admin merupakan pemilik usaha atau penyedia jasa penyewaan (UMKM).
+
+| Fitur | Deskripsi |
+|-------|-----------|
+| Login sebagai Admin | Akses dashboard penyedia |
+| Kelola profil usaha | Edit nama, alamat, kontak usaha |
+| Tambah barang yang disewakan | Input nama, deskripsi, foto, harga, stok |
+| Edit data barang | Update info barang |
+| Hapus barang | Hapus listing barang |
+| Atur harga sewa | Set harga per hari/jam |
+| Atur stok barang | Kelola jumlah unit tersedia |
+| Lihat permintaan sewa dari User | Daftar request masuk |
+| Setujui / tolak permintaan sewa | Decision management |
+| Ubah status penyewaan | `Pending` → `Disetujui` → `Sedang Disewa` → `Selesai` |
+
+---
+
+### 3. 👤 User (Penyewa)
+
+User adalah pelanggan yang menyewa barang melalui platform SEWAIN.
+
+#### A. Registrasi & Profil
+| Fitur | Deskripsi |
+|-------|-----------|
+| Registrasi akun | Buat akun dengan email & password |
+| Login | Masuk ke akun |
+| Lengkapi data diri | Nama lengkap, nama orang tua, alamat tempat tinggal |
+| Share location | Berbagi lokasi via peta/koordinat GPS |
+
+#### B. Verifikasi Identitas
+| Fitur | Deskripsi |
+|-------|-----------|
+| Upload foto KTP | Bukti identitas pengguna |
+| Upload foto selfie dengan KTP | Verifikasi kecocokan wajah & KTP |
+| Status verifikasi | `Menunggu Verifikasi` / `Disetujui` / `Ditolak` |
+
+> ⚠️ **Aturan Sistem:** User **hanya dapat melakukan penyewaan** jika data diri lengkap dan verifikasi identitas telah disetujui oleh Admin.
+
+#### C. Penyewaan
+| Fitur | Deskripsi |
+|-------|-----------|
+| Lihat katalog barang | Browsing barang dari berbagai penyedia |
+| Lihat detail barang | Info lengkap: foto, deskripsi, harga, ketersediaan |
+| Cari barang | Search by nama/kategori |
+| Ajukan penyewaan | Pilih tanggal mulai & tanggal selesai sewa |
+
+#### D. Monitoring
+| Fitur | Deskripsi |
+|-------|-----------|
+| Lihat status penyewaan | `Pending` / `Disetujui` / `Sedang Disewa` / `Selesai` |
+| Lihat riwayat penyewaan | Histori semua transaksi sewa |
+
+---
+
+## 🛠️ Tech Stack
+
+| Teknologi | Fungsi | Mulai Dipakai |
+|-----------|--------|---------------|
+| **FastAPI** (Python) | Backend REST API | Week 1 |
+| **React + Vite** | Frontend SPA | Week 1 |
+| **PostgreSQL** | Database relasional | Week 2 |
+| **SQLAlchemy** | ORM Python → SQL | Week 2 |
+| **JWT (python-jose)** | Autentikasi token | Week 4 |
+| **bcrypt (passlib)** | Hash password | Week 4 |
+| **Docker** | Containerization | Week 5 |
+| **GitHub Actions** | CI/CD pipeline | Week 9–11 |
+| **Railway / Render** | Cloud Deployment | Week 11 |
+
+---
+
+## 🗄️ Rancangan Database Sewain (Lengkap)
+
+### Tabel `users` — Semua Pengguna Platform
+
+| Kolom | Tipe | Keterangan |
+|-------|------|------------|
+| `id` | Integer PK | Auto-increment |
+| `email` | String(255) | Unique, wajib |
+| `nama` | String(100) | Nama lengkap |
+| `hashed_password` | String(255) | bcrypt hash |
+| `role` | Enum | `super_admin` / `admin` / `user` |
+| `is_active` | Boolean | Default True |
+| `is_verified` | Boolean | Status verifikasi identitas (untuk role `user`) |
+| `created_at` | DateTime | Auto-filled |
+
+### Tabel `admins` — Profil Penyedia Barang
+
+| Kolom | Tipe | Keterangan |
+|-------|------|------------|
+| `id` | Integer PK | Auto-increment |
+| `user_id` | Integer FK | Foreign key ke `users` |
+| `nama_usaha` | String(100) | Nama toko/usaha |
+| `alamat_usaha` | Text | Alamat lengkap |
+| `nomor_telepon` | String(20) | Kontak penyedia |
+| `created_at` | DateTime | Auto-filled |
+
+### Tabel `user_profiles` — Data Lengkap Penyewa
+
+| Kolom | Tipe | Keterangan |
+|-------|------|------------|
+| `id` | Integer PK | Auto-increment |
+| `user_id` | Integer FK | Foreign key ke `users` |
+| `nama_orang_tua` | String(100) | Nama orang tua |
+| `alamat` | Text | Alamat tempat tinggal |
+| `latitude` | Float | Koordinat GPS lokasi |
+| `longitude` | Float | Koordinat GPS lokasi |
+| `foto_ktp` | String | URL foto KTP |
+| `foto_selfie_ktp` | String | URL foto selfie + KTP |
+| `status_verifikasi` | Enum | `menunggu` / `disetujui` / `ditolak` |
+| `updated_at` | DateTime | Auto-updated |
+
+### Tabel `categories` — Kategori Barang
+
+| Kolom | Tipe | Keterangan |
+|-------|------|------------|
+| `id` | Integer PK | Auto-increment |
+| `nama` | String(50) | Nama kategori (Elektronik, Outdoor, Kendaraan, dll.) |
+| `deskripsi` | Text | Opsional |
+| `created_at` | DateTime | Auto-filled |
+
+### Tabel `items` — Barang Sewa (Utama)
+
+| Kolom | Tipe | Keterangan |
+|-------|------|------------|
+| `id` | Integer PK | Auto-increment |
+| `admin_id` | Integer FK | Penyedia barang (FK ke `admins`) |
+| `category_id` | Integer FK | Kategori barang (FK ke `categories`) |
+| `nama` | String(100) | Nama barang (wajib) |
+| `deskripsi` | Text | Deskripsi detail barang |
+| `harga_per_hari` | Float | Harga sewa per hari (wajib, > 0) |
+| `stok` | Integer | Jumlah unit tersedia |
+| `foto_url` | String | URL foto barang |
+| `status` | Enum | `available` / `rented` / `unavailable` |
+| `created_at` | DateTime | Auto-filled |
+| `updated_at` | DateTime | Auto-updated |
+
+### Tabel `rentals` — Transaksi Penyewaan
+
+| Kolom | Tipe | Keterangan |
+|-------|------|------------|
+| `id` | Integer PK | Auto-increment |
+| `user_id` | Integer FK | Penyewa (FK ke `users`) |
+| `item_id` | Integer FK | Barang yang disewa (FK ke `items`) |
+| `tanggal_mulai` | Date | Tanggal mulai sewa |
+| `tanggal_selesai` | Date | Tanggal selesai sewa |
+| `total_harga` | Float | Kalkulasi otomatis (harga × durasi) |
+| `status` | Enum | `pending` / `disetujui` / `sedang_disewa` / `selesai` / `ditolak` |
+| `catatan` | Text | Catatan dari user atau admin |
+| `created_at` | DateTime | Auto-filled |
+| `updated_at` | DateTime | Auto-updated |
+
+### Relasi Antar Tabel
+
+```
+users ─────────────┬──── user_profiles (1:1)
+                   ├──── admins (1:1, jika role = admin)
+                   └──── rentals (1:N, sebagai penyewa)
+
+admins ─────────────── items (1:N, barang milik admin)
+
+categories ──────────── items (1:N, kategori barang)
+
+items ───────────────── rentals (1:N, transaksi sewa)
+```
+
+---
+
+## 🏗️ Arsitektur Sistem
+
+```
+[React Frontend :5173] <─HTTP/REST─> [FastAPI Backend :8000] <─SQL─> [PostgreSQL :5432]
+                                              │
+                                    JWT Auth (python-jose)
+                                    Password Hash (bcrypt)
+                                    CORS Whitelist
+```
+
+*(Arsitektur ini akan berkembang di Week 5+ menjadi Docker Container, kemudian Week 9+ CI/CD Pipeline)*
+
+---
+
+## 📅 Roadmap Sewain (16 Minggu)
+
+| Fase | Minggu | Target | Status |
+|------|--------|--------|--------|
+| 🟢 **Foundation** | 1 | Setup & Hello World | ✅ |
+| 🟢 **Foundation** | 2 | REST API + Database | ✅ |
+| 🟢 **Foundation** | 3 | React Frontend | ✅ |
+| 🟢 **Foundation** | 4 | Full-Stack + JWT Auth | ✅ |
+| 🔵 **Container** | 5–7 | Docker & Compose | ⬜ |
+| 🟡 **UTS** | 8 | Demo Milestone 1 | ⬜ |
+| 🟣 **CI/CD** | 9–11 | GitHub Actions + Deploy | ⬜ |
+| 🟠 **Architecture** | 12–14 | Microservices + Gateway | ⬜ |
+| 🔴 **Final** | 15–16 | Polish + Security + UAS | ⬜ |
 
 ---
 
