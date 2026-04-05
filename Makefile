@@ -2,7 +2,7 @@
 
 IMAGE_NAME   = sewain-backend
 IMAGE_TAG    = v1
-DOCKER_USER  = alifstwn
+DOCKER_USER  = alif10231056
 CONTAINER_NAME = sewain-backend
 PORT         = 8000
 ENV_FILE     = ./backend/.env
