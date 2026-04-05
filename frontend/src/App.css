@@ -1,57 +1,8 @@
-/* Reset default Vite styles */
-* {
-  box-sizing: border-box;
-}
+/* App.css — overrides & component-level styles */
 
-body {
-  margin: 0;
-  padding: 0;
-}
-
-input:focus {
-  border-color: #2E75B6 !important;
-}
-
-button:hover {
-  opacity: 0.9;
-  transform: translateY(-1px);
-  transition: all 0.15s;
-}
-
-select:focus {
-  border-color: #2E75B6 !important;
-  outline: none;
-}
-
-select:hover {
-  border-color: #aaa;
-}
-
-@keyframes slideIn {
-  from {
-    transform: translateX(100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
-}
-
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+/* Fix NavLink active state styling */
+a[aria-current="page"] {
+  background: rgba(99, 102, 241, 0.15) !important;
+  color: #f1f5f9 !important;
+  border-color: rgba(99, 102, 241, 0.25) !important;
 }

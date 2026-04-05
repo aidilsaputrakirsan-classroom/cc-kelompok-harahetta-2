@@ -1,78 +1,21 @@
-function Spinner({ size = 20, color = "#1F4E79" }) {
-  return (
-    <span
-      style={{
-        display: "inline-block",
-        width: size,
-        height: size,
-        border: `3px solid ${color}20`,
-        borderTopColor: color,
-        borderRadius: "50%",
-        animation: "spin 0.8s linear infinite",
-      }}
-    />
-  )
-}
+export default function Spinner({ size = "md", color = "#6366f1", center = false }) {
+  const sizes = { sm: 20, md: 32, lg: 48, xl: 64 }
+  const px = sizes[size] || sizes.md
 
-function LoadingOverlay({ message = "Memuat..." }) {
-  return (
-    <div style={styles.overlay}>
-      <div style={styles.content}>
-        <Spinner size={40} />
-        <p style={styles.message}>{message}</p>
-      </div>
+  const el = (
+    <div style={{
+      width: px, height: px,
+      borderRadius: "50%",
+      border: `${px / 10}px solid rgba(99,102,241,0.2)`,
+      borderTopColor: color,
+      animation: "spin 0.75s linear infinite",
+    }} />
+  )
+
+  if (center) return (
+    <div style={{ display: "flex", justifyContent: "center", alignItems: "center", padding: "48px" }}>
+      {el}
     </div>
   )
+  return el
 }
-
-function LoadingSpinner({ size = 40, message = "Memuat data..." }) {
-  return (
-    <div style={styles.container}>
-      <Spinner size={size} />
-      {message && <p style={styles.text}>{message}</p>}
-    </div>
-  )
-}
-
-const styles = {
-  container: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "3rem",
-    gap: "1rem",
-  },
-  text: {
-    margin: 0,
-    color: "#888",
-    fontSize: "1rem",
-  },
-  overlay: {
-    position: "fixed",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(255, 255, 255, 0.85)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: 999,
-  },
-  content: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: "1rem",
-  },
-  message: {
-    margin: 0,
-    color: "#1F4E79",
-    fontSize: "1.1rem",
-    fontWeight: "500",
-  },
-}
-
-export { Spinner, LoadingOverlay, LoadingSpinner }
-export default Spinner

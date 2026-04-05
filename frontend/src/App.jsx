@@ -1,232 +1,126 @@
-import { useState, useEffect, useCallback, useMemo } from "react"
-import Header from "./components/Header"
-import SearchBar from "./components/SearchBar"
-import SortDropdown from "./components/SortDropdown"
-import ItemForm from "./components/ItemForm"
-import ItemList from "./components/ItemList"
-import LoginPage from "./components/LoginPage"
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
+import { useState, useCallback } from "react"
+import { AuthProvider, useAuth } from "./context/AuthContext"
+import Sidebar from "./components/Layout/Sidebar"
 import ToastContainer from "./components/Toast"
-import {
-  fetchItems, createItem, updateItem, deleteItem,
-  checkHealth, login, register, clearToken,
-} from "./services/api"
+import Spinner from "./components/Spinner"
 
-function App() {
-  // ==================== AUTH STATE ====================
-  const [user, setUser] = useState(null)
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
+// Pages
+import LoginPage from "./pages/LoginPage"
+import DashboardPage from "./pages/DashboardPage"
+import RentalPage from "./pages/RentalPage"
+import MyRentalsPage from "./pages/MyRentalsPage"
+import ProfilePage from "./pages/ProfilePage"
+import AdminDashboard from "./pages/AdminDashboard"
+import SuperAdminPanel from "./pages/SuperAdminPanel"
 
-  // ==================== APP STATE ====================
-  const [items, setItems] = useState([])
-  const [totalItems, setTotalItems] = useState(0)
-  const [loading, setLoading] = useState(true)
-  const [isConnected, setIsConnected] = useState(false)
-  const [editingItem, setEditingItem] = useState(null)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [sortBy, setSortBy] = useState("newest")
-  const [deletingId, setDeletingId] = useState(null)
-
-  // ==================== TOAST STATE ====================
+// ==================== TOAST HOOK ====================
+function useToast() {
   const [toasts, setToasts] = useState([])
-
-  const addToast = (message, type = "info") => {
-    const id = Date.now()
-    setToasts((prev) => [...prev, { id, message, type }])
-  }
-
-  const removeToast = (id) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id))
-  }
-
-  // ==================== LOAD DATA ====================
-  const loadItems = useCallback(async (search = "") => {
-    setLoading(true)
-    try {
-      const data = await fetchItems(search)
-      setItems(data.items)
-      setTotalItems(data.total)
-    } catch (err) {
-      if (err.message === "UNAUTHORIZED") {
-        handleLogout()
-        addToast("Sesi berakhir, silakan login kembali", "error")
-      } else {
-        console.error("Error loading items:", err)
-      }
-    } finally {
-      setLoading(false)
-    }
+  const addToast = useCallback((message, type = "info") => {
+    const id = Date.now() + Math.random()
+    setToasts(prev => [...prev, { id, message, type }])
   }, [])
-
-  useEffect(() => {
-    checkHealth().then(setIsConnected)
+  const removeToast = useCallback((id) => {
+    setToasts(prev => prev.filter(t => t.id !== id))
   }, [])
+  return { toasts, addToast, removeToast }
+}
 
-  useEffect(() => {
-    if (isAuthenticated) {
-      loadItems()
-    }
-  }, [isAuthenticated, loadItems])
+// ==================== PROTECTED ROUTES ====================
+function RequireAuth({ children }) {
+  const { isAuthenticated, loading } = useAuth()
+  if (loading) return <Spinner center size="lg" />
+  if (!isAuthenticated) return <Navigate to="/login" replace />
+  return children
+}
 
-  // ==================== AUTH HANDLERS ====================
+function RequireAdmin({ children }) {
+  const { isAdmin, isSuperAdmin, loading } = useAuth()
+  if (loading) return <Spinner center size="lg" />
+  if (!isAdmin && !isSuperAdmin) return <Navigate to="/dashboard" replace />
+  return children
+}
 
-  const handleLogin = async (email, password) => {
-    const data = await login(email, password)
-    setUser(data.user)
-    setIsAuthenticated(true)
-    addToast(`Selamat datang, ${data.user.name}!`, "success")
-  }
+function RequireSuperAdmin({ children }) {
+  const { isSuperAdmin, loading } = useAuth()
+  if (loading) return <Spinner center size="lg" />
+  if (!isSuperAdmin) return <Navigate to="/dashboard" replace />
+  return children
+}
 
-  const handleRegister = async (userData) => {
-    await register(userData)
-    await handleLogin(userData.email, userData.password)
-    addToast("Registrasi berhasil!", "success")
-  }
+// ==================== APP LAYOUT ====================
+function AppLayout({ addToast }) {
+  const { isAuthenticated } = useAuth()
 
-  const handleLogout = () => {
-    clearToken()
-    setUser(null)
-    setIsAuthenticated(false)
-    setItems([])
-    setTotalItems(0)
-    setEditingItem(null)
-    setSearchQuery("")
-  }
-
-  // ==================== ITEM HANDLERS ====================
-
-  const handleSubmit = async (itemData, editId) => {
-    try {
-      if (editId) {
-        await updateItem(editId, itemData)
-        setEditingItem(null)
-        addToast("Item berhasil diupdate!", "success")
-      } else {
-        await createItem(itemData)
-        addToast("Item berhasil ditambahkan!", "success")
-      }
-      loadItems(searchQuery)
-    } catch (err) {
-      if (err.message === "UNAUTHORIZED") {
-        handleLogout()
-        addToast("Sesi berakhir, silakan login kembali", "error")
-      } else {
-        addToast(err.message || "Gagal menyimpan item", "error")
-        throw err
-      }
-    }
-  }
-
-  const handleEdit = (item) => {
-    setEditingItem(item)
-    window.scrollTo({ top: 0, behavior: "smooth" })
-  }
-
-  const handleDelete = async (id) => {
-    const item = items.find((i) => i.id === id)
-    if (!window.confirm(`Yakin ingin menghapus "${item?.name}"?`)) return
-
-    setDeletingId(id)
-    try {
-      await deleteItem(id)
-      addToast("Item berhasil dihapus!", "success")
-      loadItems(searchQuery)
-    } catch (err) {
-      if (err.message === "UNAUTHORIZED") {
-        handleLogout()
-        addToast("Sesi berakhir, silakan login kembali", "error")
-      } else {
-        addToast("Gagal menghapus: " + err.message, "error")
-      }
-    } finally {
-      setDeletingId(null)
-    }
-  }
-
-  const handleSearch = (query) => {
-    setSearchQuery(query)
-    loadItems(query)
-  }
-
-  const handleCancelEdit = () => {
-    setEditingItem(null)
-  }
-
-  const handleSortChange = (newSortBy) => {
-    setSortBy(newSortBy)
-  }
-
-  // ==================== SORTED ITEMS ====================
-  const sortedItems = useMemo(() => {
-    const itemsCopy = [...items]
-
-    switch (sortBy) {
-      case "name_asc":
-        return itemsCopy.sort((a, b) => a.name.localeCompare(b.name))
-      case "name_desc":
-        return itemsCopy.sort((a, b) => b.name.localeCompare(a.name))
-      case "price_asc":
-        return itemsCopy.sort((a, b) => a.price - b.price)
-      case "price_desc":
-        return itemsCopy.sort((a, b) => b.price - a.price)
-      case "oldest":
-        return itemsCopy.sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
-      case "newest":
-      default:
-        return itemsCopy.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-    }
-  }, [items, sortBy])
-
-  // ==================== RENDER ====================
-
-  if (!isAuthenticated) {
-    return (
-      <>
-        <ToastContainer toasts={toasts} removeToast={removeToast} />
-        <LoginPage onLogin={handleLogin} onRegister={handleRegister} />
-      </>
-    )
-  }
+  if (!isAuthenticated) return null
 
   return (
-    <div style={styles.app}>
-      <ToastContainer toasts={toasts} removeToast={removeToast} />
-      <div style={styles.container}>
-        <Header
-          totalItems={totalItems}
-          isConnected={isConnected}
-          user={user}
-          onLogout={handleLogout}
-        />
-        <ItemForm
-          onSubmit={handleSubmit}
-          editingItem={editingItem}
-          onCancelEdit={handleCancelEdit}
-        />
-        <SearchBar onSearch={handleSearch} />
-        <SortDropdown sortBy={sortBy} onSortChange={handleSortChange} />
-        <ItemList
-          items={sortedItems}
-          onEdit={handleEdit}
-          onDelete={handleDelete}
-          loading={loading}
-          deletingId={deletingId}
-        />
-      </div>
+    <div className="app-layout">
+      <Sidebar />
+      <main className="main-content">
+        <Routes>
+          {/* User routes */}
+          <Route path="/dashboard" element={<DashboardPage addToast={addToast} />} />
+          <Route path="/rentals/new" element={<RequireAuth><RentalPage addToast={addToast} /></RequireAuth>} />
+          <Route path="/rentals/my" element={<RequireAuth><MyRentalsPage addToast={addToast} /></RequireAuth>} />
+          <Route path="/profile" element={<RequireAuth><ProfilePage addToast={addToast} /></RequireAuth>} />
+
+          {/* Admin routes */}
+          <Route path="/admin/dashboard" element={<RequireAdmin><AdminDashboard addToast={addToast} /></RequireAdmin>} />
+          <Route path="/admin/rentals" element={<RequireAdmin><AdminDashboard addToast={addToast} /></RequireAdmin>} />
+          <Route path="/admin/profile" element={<RequireAdmin><AdminDashboard addToast={addToast} /></RequireAdmin>} />
+
+          {/* Super Admin routes */}
+          <Route path="/superadmin" element={<RequireSuperAdmin><SuperAdminPanel addToast={addToast} /></RequireSuperAdmin>} />
+          <Route path="/superadmin/users" element={<RequireSuperAdmin><SuperAdminPanel addToast={addToast} /></RequireSuperAdmin>} />
+          <Route path="/superadmin/categories" element={<RequireSuperAdmin><SuperAdminPanel addToast={addToast} /></RequireSuperAdmin>} />
+          <Route path="/superadmin/verifications" element={<RequireSuperAdmin><SuperAdminPanel addToast={addToast} /></RequireSuperAdmin>} />
+          <Route path="/superadmin/rentals" element={<RequireSuperAdmin><SuperAdminPanel addToast={addToast} /></RequireSuperAdmin>} />
+
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        </Routes>
+      </main>
     </div>
   )
 }
 
-const styles = {
-  app: {
-    minHeight: "100vh",
-    backgroundColor: "#f0f2f5",
-    padding: "2rem",
-    fontFamily: "'Segoe UI', Arial, sans-serif",
-  },
-  container: {
-    maxWidth: "900px",
-    margin: "0 auto",
-  },
+// ==================== ROOT ====================
+function AppContent() {
+  const { toasts, addToast, removeToast } = useToast()
+  const { isAuthenticated, loading } = useAuth()
+
+  if (loading) {
+    return (
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#0f172a" }}>
+        <Spinner size="xl" />
+      </div>
+    )
+  }
+
+  return (
+    <>
+      <ToastContainer toasts={toasts} removeToast={removeToast} />
+      <Routes>
+        <Route path="/login" element={
+          isAuthenticated ? <Navigate to="/dashboard" replace /> : <LoginPage addToast={addToast} />
+        } />
+        <Route path="/*" element={
+          isAuthenticated
+            ? <AppLayout addToast={addToast} />
+            : <Navigate to="/login" replace />
+        } />
+      </Routes>
+    </>
+  )
 }
 
-export default App
+export default function App() {
+  return (
+    <BrowserRouter>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </BrowserRouter>
+  )
+}
