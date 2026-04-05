@@ -14,6 +14,7 @@ class ItemBase(BaseModel):
     description: Optional[str] = Field(None, examples=["Laptop untuk cloud computing"])
     price: float = Field(..., gt=0, examples=[15000000])
     quantity: int = Field(0, ge=0, examples=[10])
+    category: Optional[str] = Field(None, max_length=50, examples=["elektronik"])
 
 
 class ItemCreate(ItemBase):
@@ -30,6 +31,7 @@ class ItemUpdate(BaseModel):
     description: Optional[str] = None
     price: Optional[float] = Field(None, gt=0)
     quantity: Optional[int] = Field(None, ge=0)
+    category: Optional[str] = Field(None, max_length=50)
 
 
 class ItemResponse(ItemBase):

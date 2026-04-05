@@ -23,7 +23,7 @@ app = FastAPI(
     title="Cloud App API",
     description="REST API untuk mata kuliah Komputasi Awan — SI ITK",
     version="0.5.0",
-)
+)  
 
 # ==================== CORS (FIXED) ====================
 allowed_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173")
@@ -107,11 +107,22 @@ def list_items(
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
     search: str = Query(None),
+    category: str = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Ambil daftar items. *Membutuhkan autentikasi.*"""
-    return crud.get_items(db=db, skip=skip, limit=limit, search=search)
+    """Ambil daftar items dengan search & filter kategori. *Membutuhkan autentikasi.*"""
+    return crud.get_items(db=db, skip=skip, limit=limit, search=search, category=category)
+
+
+@app.get("/items/categories")
+def get_categories(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Ambil daftar semua kategori barang yang tersedia. *Membutuhkan autentikasi.*"""
+    categories = crud.get_categories(db)
+    return {"categories": categories}
 
 
 # ==================== ITEMS STATS ====================

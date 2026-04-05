@@ -18,9 +18,9 @@ def create_item(db: Session, item_data: ItemCreate) -> Item:
     return db_item
 
 
-def get_items(db: Session, skip: int = 0, limit: int = 20, search: str = None):
+def get_items(db: Session, skip: int = 0, limit: int = 20, search: str = None, category: str = None):
     """
-    Ambil daftar items dengan pagination & search.
+    Ambil daftar items dengan pagination, search, dan filter kategori.
     """
     query = db.query(Item)
 
@@ -32,6 +32,9 @@ def get_items(db: Session, skip: int = 0, limit: int = 20, search: str = None):
                 Item.description.ilike(search_term)
             )
         )
+    
+    if category:
+        query = query.filter(Item.category.ilike(f"%{category}%"))
 
     total = query.count()
 
@@ -155,6 +158,14 @@ def get_items_stats(db: Session) -> dict:
         "total_stock": stats["total_quantity"],
         "total_inventory_value": stats["total_value"],
     }
+
+
+def get_categories(db: Session) -> list:
+    """
+    Ambil semua kategori barang yang unik dari database.
+    """
+    categories = db.query(Item.category).distinct().filter(Item.category.isnot(None)).all()
+    return [cat[0] for cat in categories]
 
 
 # =========================================================

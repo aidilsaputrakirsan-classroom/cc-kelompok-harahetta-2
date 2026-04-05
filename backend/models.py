@@ -15,13 +15,12 @@ class Item(Base):
     description = Column(Text, nullable=True)
     price = Column(Float, nullable=False)
     quantity = Column(Integer, nullable=False, default=0)
-    # is_active = Column(Boolean, nullable=False, default=True)
+    category = Column(String(50), nullable=True, index=True)  # Kategori barang (elektronik, outdoor, dll)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     def __repr__(self):
-        # return f"<Item(id={self.id}, name='{self.name}', price={self.price}, is_active={self.is_active})>"
-        return f"<Item(id={self.id}, name='{self.name}', price={self.price})>"
+        return f"<Item(id={self.id}, name='{self.name}', price={self.price}, category='{self.category}')>"
 
 
 class User(Base):
