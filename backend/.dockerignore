@@ -1,4 +1,4 @@
-6++6+++# Virtual environment
+# Virtual environment
 venv/
 .venv/
 
@@ -9,6 +9,7 @@ venv/
 __pycache__/
 *.pyc
 *.pyo
+*.pyd
 
 # IDE
 .vscode/
@@ -29,3 +30,6 @@ tests/
 # Documentation
 *.md
 docs/
+
+# Setup scripts
+setup.sh
