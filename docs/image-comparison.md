@@ -1,89 +1,49 @@
-# 🐳 Perbandingan Ukuran Docker Base Image — Sewain Backend
+# 🐳 Perbandingan Ukuran Docker Base Image — Sewain 
 
-> **Konteks:** Pemilihan base image Python yang tepat sangat mempengaruhi ukuran image Docker,  
-> keamanan, dan kecepatan pull/push ke registry.
+> **Konteks:** Laporan ini disusun untuk menganalisis perbedaan ukuran pada beberapa varian Docker image Python 3.12 yang digunakan dalam pengembangan backend. Analisis ini bertujuan untuk memahami efisiensi penggunaan storage serta menentukan base image yang paling sesuai untuk kebutuhan project.
 
 ---
 
 ## 📊 Hasil Perbandingan
 
-| Base Image | Ukuran Image | Keterangan |
-|------------|-------------|------------|
-| `python:3.12` | ~1.02 GB | Full Debian — semua tools tersedia |
-| `python:3.12-slim` | ~130 MB | Debian minimal — pilihan seimbang ✅ |
-| `python:3.12-alpine` | ~65 MB | Alpine Linux — paling kecil, tapi berisiko |
+Berdasarkan hasil pengecekan pada terminal tim, berikut perbandingan ukuran beberapa varian base image Python 3.12:
 
-> ⚠️ Ukuran di atas adalah ukuran **base image** sebelum install dependencies.  
-> Setelah `pip install -r requirements.txt`, ukuran final image Sewain dengan `slim` ≈ **~190 MB**.
-
----
-
-## 🔍 Detail Perbandingan
-
-### `python:3.12` (Full Debian)
-- **Ukuran:** ~1.02 GB
-- **OS:** Debian Bookworm (full)
-- ✅ Semua library C tersedia (gcc, build-essential, etc.)
-- ✅ Tidak ada masalah kompilasi package
-- ❌ Sangat besar — lambat di-pull, boros storage
-- ❌ Tidak cocok untuk production
-- **Use case:** Development lokal sementara
+| Repository / Tag    | Disk Usage       | Content Size |
+|---------------------|------------------|--------------|
+| python:3.12         | 1.62 GB          | 428 MB       |
+| python:3.12-slim    | 179 MB           | 45.4 MB      |
+| python:3.12-alpine  | 75 MB            | 18.7 MB      |
 
 ---
 
-### `python:3.12-slim` (Debian Minimal) ← **DIPAKAI DI SEWAIN**
-- **Ukuran:** ~130 MB
-- **OS:** Debian minimal (hanya runtime essentials)
-- ✅ Jauh lebih kecil dari full image
-- ✅ Masih bisa install package via `apt-get`
-- ✅ Kompatibel dengan `psycopg2-binary` dan semua deps Sewain
-- ✅ Aman dan stabil untuk production
-- ❌ Lebih besar dari Alpine
-- **Use case:** ✅ **Production backend FastAPI** — pilihan terbaik untuk Sewain
+## 🔍 Analisis Perbandingan
+
+Berdasarkan data di atas, terlihat bahwa varian `python:3.12` memiliki ukuran paling besar. Meskipun ukuran saat diunduh sebesar 428 MB, setelah diekstrak ukurannya meningkat menjadi 1.62 GB. Hal ini menunjukkan bahwa image tersebut mengandung banyak library dan tools tambahan.
+
+Sementara itu, varian `python:3.12-slim` dan `python:3.12-alpine` lebih efisien, baik dari segi ukuran unduhan maupun penggunaan ruang penyimpanan. Varian slim memiliki ukuran yang lebih kecil dengan stabilitas yang tetap terjaga, sedangkan alpine merupakan varian dengan ukuran paling ringan.
+
+Jika dibandingkan dengan image standar, penggunaan `python:3.12-slim` mampu menghemat ruang penyimpanan secara signifikan, yaitu sekitar 89%.
+
+Selain itu, selisih antara content size dan disk usage menunjukkan adanya proses ekstraksi layer Docker yang cukup besar. Hal ini berarti semakin besar image, semakin besar pula penggunaan resource pada saat container dijalankan.
+
+Ukuran yang lebih kecil tidak hanya menghemat storage, tetapi juga dapat meningkatkan efisiensi dalam proses deployment dan pengelolaan container.
+
+Selain faktor ukuran, pemilihan base image juga berpengaruh terhadap kompatibilitas sistem. Varian alpine menggunakan sistem berbasis musl libc, sehingga beberapa library Python dapat mengalami kendala saat instalasi. Hal ini menjadi salah satu alasan mengapa varian slim lebih sering digunakan dalam pengembangan aplikasi.
 
 ---
 
-### `python:3.12-alpine` (Alpine Linux)
-- **Ukuran:** ~65 MB
-- **OS:** Alpine Linux (musl libc)
-- ✅ Paling kecil dari ketiganya
-- ✅ Security-focused (attack surface minimal)
-- ❌ `psycopg2-binary` **tidak kompatibel** dengan musl libc Alpine
-- ❌ Harus pakai `psycopg2` (build from source) → butuh `gcc`, `musl-dev`, dll.
-- ❌ Build time jauh lebih lama
-- ❌ Banyak edge case saat install Python package dengan C extension
-- **Use case:** Hanya untuk app Python murni tanpa C extension
+## ⚙️ Analisis Efisiensi dan Dampak Cloud
+
+Ukuran Docker image yang lebih kecil memberikan dampak langsung terhadap performa sistem, khususnya dalam lingkungan cloud. Image yang lebih ringan akan mempercepat proses *pull image* dari registry ke server, sehingga waktu deployment menjadi lebih singkat.
+
+Selain itu, penggunaan storage pada layanan cloud juga menjadi lebih hemat. Hal ini penting terutama jika aplikasi di-deploy dalam jumlah container yang banyak atau menggunakan sistem autoscaling.
+
+Dari sisi keamanan, image yang lebih kecil cenderung memiliki lebih sedikit komponen yang tidak diperlukan, sehingga dapat mengurangi potensi celah keamanan (*attack surface*).
 
 ---
 
 ## 🏆 Kesimpulan
 
-**Pilihan untuk Sewain: `python:3.12-slim`** ✅
+Berdasarkan analisis yang dilakukan, penggunaan `python:3.12-slim` merupakan pilihan yang paling tepat. Meskipun varian alpine memiliki ukuran yang lebih kecil, varian slim lebih stabil dan kompatibel dengan berbagai library Python tanpa memerlukan konfigurasi tambahan yang kompleks.
 
-```
-Base image dipilih: python:3.12-slim
-Alasan:
-  1. Ukuran optimal (~130MB base, ~190MB final)
-  2. Kompatibel penuh dengan psycopg2-binary (PostgreSQL driver)
-  3. Bisa install curl via apt-get untuk HEALTHCHECK
-  4. Stabil dan teruji untuk production FastAPI apps
-  5. Layer caching efisien (requirements.txt di-copy dulu)
-```
-
----
-
-## 📑 Cara Melihat Ukuran Image Sendiri
-
-```bash
-# Lihat semua image lokal beserta ukurannya
-docker images
-
-# Filter spesifik image Sewain
-docker images | grep sewain
-
-# Inspect detail image
-docker inspect sewain-backend:v1 --format='{{.Size}}' | awk '{printf "%.2f MB\n", $1/1024/1024}'
-```
-
----
-
+Penggunaan image yang lebih kecil memberikan beberapa keuntungan, seperti mempercepat proses deployment, menghemat penggunaan penyimpanan di cloud, serta mengurangi risiko keamanan.
