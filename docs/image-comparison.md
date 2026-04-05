@@ -6,7 +6,7 @@
 
 ## 📝 Dokumentasi
 
-![Hasil Docker Images](img/imgw5/ukuranimage.jpeg)
+![Hasil Docker Images](img/ukuranimage.jpeg)
 
 Perintah yang digunakan dalam proses dokumentasi antara lain:
 
@@ -16,6 +16,7 @@ docker pull python:3.12-slim
 docker pull python:3.12-alpine
 
 docker images
+```
 
 ---
 
