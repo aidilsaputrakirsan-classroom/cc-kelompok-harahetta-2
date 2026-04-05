@@ -1019,7 +1019,7 @@ Berikut adalah hasil pengujian yang telah dilakukan:
 | auth1 | Register User | Mengisi semua field dan klik register | User berhasil dibuat dan masuk ke dashboard | ✅ Sesuai |
 | auth2 | Validasi Register | Mengosongkan field | Muncul pesan error dan data tidak dikirim | ✅ Sesuai |
 | auth3 | Login Berhasil | Login dengan email & password yang benar | User berhasil masuk ke dashboard | ✅ Sesuai |
-| auth44 | Login Gagal | Input email/password salah | Muncul error login gagal | ✅ Sesuai |
+| auth4 | Login Gagal | Input email/password salah | Muncul error login gagal | ✅ Sesuai |
 | auth5 | Logout | Klik tombol logout | Kembali ke halaman login | ✅ Sesuai |
 
 ### CRUD Testing 
