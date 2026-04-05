@@ -1,4 +1,4 @@
-# 📖 Setup Guide — Cloud App (Kelompok Harahetta)
+# 📖 Setup Guide — Sewain Platform (Kelompok Harahetta-2)
 
 > **Panduan ini ditujukan untuk siapapun yang belum pernah melihat proyek ini sebelumnya.**  
 > Ikuti setiap langkah secara berurutan dari atas ke bawah.
@@ -84,7 +84,7 @@ Buka terminal PostgreSQL (psql) atau GUI seperti pgAdmin / DBeaver.
 psql -U postgres
 
 # Di dalam psql, buat database baru
-CREATE DATABASE cloudapp;
+CREATE DATABASE sewain_db;
 
 # Verifikasi database berhasil dibuat
 \l
@@ -96,7 +96,7 @@ CREATE DATABASE cloudapp;
 **Via pgAdmin / DBeaver:**
 1. Buka pgAdmin / DBeaver
 2. Klik kanan pada *Databases* → *Create* → *Database*
-3. Isi nama database: `cloudapp`
+3. Isi nama database: `sewain_db`
 4. Klik *Save / OK*
 
 ### 3.2 Catat Kredensial Database
@@ -109,7 +109,7 @@ Catat informasi koneksi Anda:
 | Port | `5432` | _(isi di sini)_ |
 | Username | `postgres` | _(isi di sini)_ |
 | Password | _(sesuai install)_ | _(isi di sini)_ |
-| Database | `cloudapp` | `cloudapp` |
+| Database | `sewain_db` | `sewain_db` |
 
 > 💡 **Informasi ini akan diisi ke file `.env` di langkah berikutnya.**
 
@@ -179,7 +179,7 @@ Buka file `.env` dengan teks editor dan isi sesuai kondisi lokal Anda:
 ```env
 # --- Database Configuration ---
 # Format: postgresql://USERNAME:PASSWORD@HOST:PORT/DATABASE_NAME
-DATABASE_URL=postgresql://postgres:PASSWORD_ANDA@localhost:5432/cloudapp
+DATABASE_URL=postgresql://postgres:PASSWORD_ANDA@localhost:5432/sewain_db
 
 # JWT
 SECRET_KEY=ganti-dengan-random-string-panjang-minimal-32-karakter
@@ -209,7 +209,7 @@ Salin output perintah tersebut dan tempel sebagai nilai `SECRET_KEY`.
 
 **Contoh `.env` yang sudah diisi dengan benar:**
 ```env
-DATABASE_URL=postgresql://postgres:mypassword123@localhost:5432/cloudapp
+DATABASE_URL=postgresql://postgres:mypassword123@localhost:5432/sewain_db
 SECRET_KEY=a3f8b2c1d9e4f7a0b5c8d1e6f3a9b2c5d8e1f4a7b0c3d6e9f2a5b8c1d4e7f0a
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=60
@@ -485,8 +485,12 @@ Setelah backend pertama kali dijalankan, tabel berikut dibuat otomatis oleh SQLA
 
 | Tabel | Kolom Utama |
 |-------|-------------|
-| `items` | id, name, description, price, quantity, created_at, updated_at |
-| `users` | id, email, name, hashed_password, is_active, created_at |
+| `users` | id, email, nama, hashed_password, role, is_active, is_verified, created_at |
+| `admins` | id, user_id, nama_usaha, alamat_usaha, nomor_telepon, created_at |
+| `user_profiles` | id, user_id, nama_orang_tua, alamat, foto_ktp, foto_selfie_ktp, status_verifikasi |
+| `categories` | id, nama, deskripsi, created_at |
+| `items` | id, admin_id, category_id, nama, deskripsi, harga_per_hari, stok, status, created_at |
+| `rentals` | id, user_id, item_id, tanggal_mulai, tanggal_selesai, total_harga, status, created_at |
 
 > ⚠️ **Jangan edit tabel secara manual** kecuali Anda memahami migrasi database.
 
@@ -506,5 +510,3 @@ Setelah backend pertama kali dijalankan, tabel berikut dibuat otomatis oleh SQLA
 
 ---
 
-*Dibuat oleh Lead DevOps — Kelompok Harahetta, Komputasi Awan SI ITK.*  
-*Terakhir diperbarui: Maret 2026*
