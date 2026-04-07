@@ -1,7 +1,7 @@
 # ============================================================
 # Stage 1: Build — Compile React app menjadi static files
 # ============================================================
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 
 # Set working directory
 WORKDIR /app
@@ -11,7 +11,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 
 # Install dependencies
-RUN npm ci --only=production
+RUN npm ci
 
 # Copy seluruh source code
 COPY . .
@@ -39,7 +39,7 @@ EXPOSE 80
 
 # Healthcheck Nginx
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
-    CMD wget -q -O /dev/null http://localhost:80 || exit 1
+    CMD curl -f http://localhost:80 || exit 1
 
 # Nginx berjalan di foreground
 CMD ["nginx", "-g", "daemon off;"]
