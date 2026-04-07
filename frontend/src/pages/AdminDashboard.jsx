@@ -4,6 +4,7 @@ import ItemCard from "../components/ItemCard"
 import RentalCard from "../components/RentalCard"
 import Modal from "../components/ui/Modal"
 import Button from "../components/ui/Button"
+import ImageUpload from "../components/ui/ImageUpload"
 import Spinner from "../components/Spinner"
 import Badge from "../components/ui/Badge"
 import {
@@ -65,7 +66,17 @@ export default function AdminDashboard({ addToast }) {
 
   useEffect(() => { if (tab === "rentals") loadRentals() }, [tab, loadRentals])
 
-  const openAdd = () => { setEditingItem(null); setForm(defaultItem); setModalOpen(true) }
+  const openAdd = () => {
+    if (!profile) {
+      addToast?.("⚠️ Buat profil usaha terlebih dahulu sebelum menambah barang", "error")
+      setTab("profile")
+      return
+    }
+    setEditingItem(null)
+    setForm(defaultItem)
+    setModalOpen(true)
+  }
+  
   const openEdit = (item) => {
     setEditingItem(item)
     setForm({
@@ -96,6 +107,7 @@ export default function AdminDashboard({ addToast }) {
         stok: parseInt(form.stok),
         category_id: form.category_id ? parseInt(form.category_id) : null,
       }
+      // foto_url bisa berupa Data URL (base64) atau null
       if (!payload.foto_url) delete payload.foto_url
       if (!payload.deskripsi) delete payload.deskripsi
       if (!payload.category_id) delete payload.category_id
@@ -109,7 +121,16 @@ export default function AdminDashboard({ addToast }) {
       }
       setModalOpen(false)
       loadItems()
-    } catch (err) { addToast?.(err.message, "error") }
+    } catch (err) {
+      const errorMsg = err.message || "Terjadi kesalahan"
+      if (errorMsg.includes("profil usaha")) {
+        addToast?.("⚠️ " + errorMsg + ". Buat profil usaha terlebih dahulu.", "error")
+        setModalOpen(false)
+        setTab("profile")
+      } else {
+        addToast?.(errorMsg, "error")
+      }
+    }
     finally { setSaving(false) }
   }
 
@@ -125,11 +146,18 @@ export default function AdminDashboard({ addToast }) {
     e.preventDefault()
     setSavingProfile(true)
     try {
+      const isNewProfile = !profile
       if (profile) await updateAdminProfile(profileForm)
       else await createAdminProfile(profileForm)
       const updated = await fetchAdminProfile()
       setProfile(updated)
-      addToast?.("Profil usaha tersimpan ✓", "success")
+      setProfileForm({ nama_usaha: updated.nama_usaha || "", alamat_usaha: updated.alamat_usaha || "", nomor_telepon: updated.nomor_telepon || "" })
+      if (isNewProfile) {
+        addToast?.("✅ Profil usaha berhasil dibuat! Sekarang Anda bisa menambah barang.", "success")
+        setTimeout(() => setTab("items"), 1500)
+      } else {
+        addToast?.("Profil usaha tersimpan ✓", "success")
+      }
     } catch (err) { addToast?.(err.message, "error") }
     finally { setSavingProfile(false) }
   }
@@ -168,19 +196,39 @@ export default function AdminDashboard({ addToast }) {
       </div>
 
       {tab === "items" && (
-        items.length === 0 ? (
-          <div className="empty-state">
-            <div className="empty-state-icon">📦</div>
-            <h3>Belum ada barang</h3>
-            <p>Tambah barang pertama Anda untuk mulai berjualan sewa</p>
-          </div>
-        ) : (
-          <div className="grid-auto">
-            {items.map(item => (
-              <ItemCard key={item.id} item={item} role={user?.role} onEdit={openEdit} onDelete={handleDelete} deletingId={deletingId} />
-            ))}
-          </div>
-        )
+        <>
+          {!profile && (
+            <div style={{
+              padding: "16px 20px", marginBottom: "20px",
+              background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)",
+              borderRadius: "12px", color: "#fca5a5",
+            }}>
+              <strong>⚠️ Profil Usaha Belum Dibuat</strong>
+              <p style={{ margin: "8px 0 0 0", fontSize: "0.875rem", color: "#fecaca" }}>
+                Anda harus membuat profil usaha terlebih dahulu sebelum bisa menambah barang.{" "}
+                <button onClick={() => setTab("profile")} style={{
+                  background: "none", border: "none", color: "#fca5a5",
+                  textDecoration: "underline", cursor: "pointer", fontWeight: 600,
+                }}>
+                  Buat profil sekarang →
+                </button>
+              </p>
+            </div>
+          )}
+          {items.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-state-icon">📦</div>
+              <h3>Belum ada barang</h3>
+              <p>Tambah barang pertama Anda untuk mulai berjualan sewa</p>
+            </div>
+          ) : (
+            <div className="grid-auto">
+              {items.map(item => (
+                <ItemCard key={item.id} item={item} role={user?.role} onEdit={openEdit} onDelete={handleDelete} deletingId={deletingId} />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {tab === "rentals" && (
@@ -266,10 +314,15 @@ export default function AdminDashboard({ addToast }) {
               {categories.map(c => <option key={c.id} value={c.id}>{c.nama}</option>)}
             </select>
           </div>
-          <div className="form-group" style={{ margin: 0 }}>
-            <label className="form-label">URL Foto</label>
-            <input id="item-foto" type="url" className="form-input" placeholder="https://..." value={form.foto_url} onChange={e => setForm(p => ({ ...p, foto_url: e.target.value }))} />
-          </div>
+          <ImageUpload
+            label="Foto Barang"
+            placeholder="📦"
+            helpText="JPG, PNG, WEBP · Maks 2MB · Drag & drop atau klik"
+            value={form.foto_url || null}
+            onChange={(dataUrl) => setForm(p => ({ ...p, foto_url: dataUrl || "" }))}
+            onError={(msg) => addToast?.(msg, "error")}
+            previewHeight={180}
+          />
         </form>
       </Modal>
     </div>

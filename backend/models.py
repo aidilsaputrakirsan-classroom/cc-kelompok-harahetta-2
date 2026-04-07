@@ -172,7 +172,7 @@ class Item(Base):
     deskripsi = Column(Text, nullable=True)
     harga_per_hari = Column(Float, nullable=False)
     stok = Column(Integer, nullable=False, default=1)
-    foto_url = Column(String(500), nullable=True)
+    foto_url = Column(Text, nullable=True)  # Changed from String(500) to Text for base64 images
     status = Column(SAEnum(ItemStatus), nullable=False, default=ItemStatus.available)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
