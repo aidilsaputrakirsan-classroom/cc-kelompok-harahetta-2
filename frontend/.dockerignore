@@ -5,6 +5,5 @@ dist/
 .gitignore
 *.md
 README.md
-nginx.conf
 Dockerfile
 .dockerignore
