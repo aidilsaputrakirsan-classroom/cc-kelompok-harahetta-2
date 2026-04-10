@@ -1,8 +1,0 @@
-/* App.css — overrides & component-level styles */
-
-/* Fix NavLink active state styling */
-a[aria-current="page"] {
-  background: rgba(99, 102, 241, 0.15) !important;
-  color: #f1f5f9 !important;
-  border-color: rgba(99, 102, 241, 0.25) !important;
-}
