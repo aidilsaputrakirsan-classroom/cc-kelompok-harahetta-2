@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Server Error | Sewain</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { 
+      box-sizing: border-box; 
+      margin: 0; 
+      padding: 0; 
+    }
+
+    body {
+      font-family: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: hsl(150 10% 97%);
+      color: hsl(200 25% 10%);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    .container {
+      text-align: center;
+      padding: 2rem;
+      max-width: 520px;
+    }
+
+    .logo-wrapper {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 3.5rem;
+      height: 3.5rem;
+      border-radius: 0.75rem;
+      background: hsl(168 65% 38%);
+      margin-bottom: 1.5rem;
+    }
+
+    .logo-icon {
+      width: 2rem;
+      height: 2rem;
+      color: white;
+    }
+
+    .error-code {
+      font-size: 8rem;
+      font-weight: 800;
+      line-height: 1;
+      background: linear-gradient(135deg, #ef4444, #f97316);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 1rem;
+    }
+
+    .title {
+      font-size: 1.75rem;
+      font-weight: 700;
+      margin-bottom: 0.75rem;
+      color: hsl(200 25% 10%);
+    }
+
+    .description {
+      color: hsl(200 10% 45%);
+      line-height: 1.7;
+      margin-bottom: 2rem;
+      font-size: 1rem;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.75rem 2rem;
+      background: hsl(168 65% 38%);
+      color: white;
+      text-decoration: none;
+      border-radius: 0.5rem;
+      font-weight: 600;
+      font-size: 0.95rem;
+      transition: all 0.2s;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .btn:hover {
+      background: hsl(168 65% 32%);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px hsla(168 65% 38% / 0.3);
+    }
+
+    .btn:active {
+      transform: translateY(0);
+    }
+
+    .arrow-icon {
+      width: 1rem;
+      height: 1rem;
+    }
+
+    .brand {
+      margin-top: 3rem;
+      font-size: 0.75rem;
+      color: hsl(200 10% 55%);
+    }
+
+    .brand-name {
+      font-weight: 600;
+      color: hsl(200 25% 10%);
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      background: hsl(0 72% 51% / 0.1);
+      border: 1px solid hsl(0 72% 51% / 0.2);
+      border-radius: 0.5rem;
+      color: hsl(0 72% 45%);
+      font-size: 0.875rem;
+      font-weight: 600;
+      margin-bottom: 1.5rem;
+    }
+
+    .pulse-dot {
+      width: 0.5rem;
+      height: 0.5rem;
+      background: hsl(0 72% 51%);
+      border-radius: 50%;
+      animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% {
+        opacity: 1;
+      }
+      50% {
+        opacity: 0.5;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- <div class="logo-wrapper">
+      <svg class="logo-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+      </svg>
+    </div> -->
+    
+    <div class="status-badge">
+      <span class="pulse-dot"></span>
+      Server Bermasalah
+    </div>
+    
+    <div class="error-code">500</div>
+    <h1 class="title">Terjadi Kesalahan Server</h1>
+    <p class="description">
+      Maaf, server sedang mengalami gangguan. Tim kami sedang menangani masalah ini.
+      Silakan coba beberapa saat lagi.
+    </p>
+    
+    <a href="/" class="btn">
+      Kembali ke Beranda
+      <svg class="arrow-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+      </svg>
+    </a>
+    
+    <p class="brand">
+      <span class="brand-name">Sewain</span> &mdash; Platform sewa barang terpercaya
+    </p>
+  </div>
+</body>
+</html>
