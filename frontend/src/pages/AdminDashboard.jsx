@@ -1,24 +1,77 @@
 import { useState, useEffect, useCallback } from "react"
 import { useAuth } from "../context/AuthContext"
-import ItemCard from "../components/ItemCard"
-import RentalCard from "../components/RentalCard"
-import Modal from "../components/ui/Modal"
-import Button from "../components/ui/Button"
-import ImageUpload from "../components/ui/ImageUpload"
-import Spinner from "../components/Spinner"
-import Badge from "../components/ui/Badge"
+import { formatPrice } from "../lib/utils"
 import {
   fetchMyItems, createItem, updateItem, deleteItem,
   fetchAdminRentals, updateRentalStatus,
   fetchAdminProfile, createAdminProfile, updateAdminProfile,
   fetchCategories,
 } from "../services/api"
+import { Button } from "../components/ui/button"
+import { Input } from "../components/ui/input"
+import { Label } from "../components/ui/label"
+import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card"
+import { StatusBadge } from "../components/ui/badge"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs"
+import { Skeleton } from "../components/ui/skeleton"
+import { Separator } from "../components/ui/separator"
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
+} from "../components/ui/dialog"
+import {
+  Package, ClipboardList, Store, Plus, Pencil, Trash2,
+  Calendar, CheckCircle, XCircle, Save, AlertTriangle,
+} from "lucide-react"
 
 const defaultItem = { nama: "", deskripsi: "", harga_per_hari: "", stok: 1, foto_url: "", category_id: "" }
 
+function AdminRentalCard({ rental, onUpdateStatus }) {
+  const item = rental.item
+  return (
+    <Card className="hover:shadow-md transition-shadow">
+      <CardContent className="p-4">
+        <div className="flex flex-col sm:flex-row gap-4 items-start">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <h3 className="font-bold text-foreground">{item?.nama || `Item #${rental.item_id}`}</h3>
+                <div className="text-sm text-muted-foreground mt-0.5">
+                  Penyewa: {rental.user?.nama || `User #${rental.user_id}`}
+                </div>
+                <div className="flex items-center gap-1 mt-1 text-sm text-muted-foreground">
+                  <Calendar className="w-3.5 h-3.5" />
+                  {new Date(rental.tanggal_mulai).toLocaleDateString("id-ID")} — {new Date(rental.tanggal_selesai).toLocaleDateString("id-ID")}
+                </div>
+              </div>
+              <StatusBadge status={rental.status} />
+            </div>
+            <div className="text-lg font-bold text-primary mt-2">{formatPrice(rental.total_harga)}</div>
+            {rental.catatan && <p className="text-xs text-muted-foreground mt-1">{rental.catatan}</p>}
+          </div>
+          {rental.status === "pending" && (
+            <div className="flex gap-2 flex-shrink-0">
+              <Button size="sm" variant="success" onClick={() => onUpdateStatus(rental.id, "disetujui")}>
+                <CheckCircle className="w-3.5 h-3.5 mr-1" /> Setujui
+              </Button>
+              <Button size="sm" variant="destructive" onClick={() => onUpdateStatus(rental.id, "ditolak")}>
+                <XCircle className="w-3.5 h-3.5 mr-1" /> Tolak
+              </Button>
+            </div>
+          )}
+          {rental.status === "disetujui" && (
+            <Button size="sm" onClick={() => onUpdateStatus(rental.id, "sedang_disewa")}>Proses Sewa</Button>
+          )}
+          {rental.status === "sedang_disewa" && (
+            <Button size="sm" variant="secondary" onClick={() => onUpdateStatus(rental.id, "selesai")}>Selesai</Button>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
 export default function AdminDashboard({ addToast }) {
   const { user } = useAuth()
-  const [tab, setTab] = useState("items") // items | rentals | profile
   const [items, setItems] = useState([])
   const [rentals, setRentals] = useState([])
   const [profile, setProfile] = useState(null)
@@ -26,29 +79,19 @@ export default function AdminDashboard({ addToast }) {
   const [loading, setLoading] = useState(true)
   const [deletingId, setDeletingId] = useState(null)
   const [rentalFilter, setRentalFilter] = useState("")
-
-  // Form modal
   const [modalOpen, setModalOpen] = useState(false)
   const [editingItem, setEditingItem] = useState(null)
   const [form, setForm] = useState(defaultItem)
   const [saving, setSaving] = useState(false)
-
-  // Profile form
   const [profileForm, setProfileForm] = useState({ nama_usaha: "", alamat_usaha: "", nomor_telepon: "" })
   const [savingProfile, setSavingProfile] = useState(false)
 
   const loadItems = useCallback(async () => {
-    try {
-      const data = await fetchMyItems()
-      setItems(data.items)
-    } catch {}
+    try { const data = await fetchMyItems(); setItems(data.items) } catch {}
   }, [])
 
   const loadRentals = useCallback(async () => {
-    try {
-      const data = await fetchAdminRentals({ status: rentalFilter || undefined })
-      setRentals(data.rentals)
-    } catch {}
+    try { const data = await fetchAdminRentals({ status: rentalFilter || undefined }); setRentals(data.rentals) } catch {}
   }, [rentalFilter])
 
   useEffect(() => {
@@ -64,24 +107,20 @@ export default function AdminDashboard({ addToast }) {
     ]).finally(() => setLoading(false))
   }, [])
 
-  useEffect(() => { if (tab === "rentals") loadRentals() }, [tab, loadRentals])
-
   const openAdd = () => {
     if (!profile) {
-      addToast?.("⚠️ Buat profil usaha terlebih dahulu sebelum menambah barang", "error")
-      setTab("profile")
+      addToast?.("Buat profil usaha terlebih dahulu", "error")
       return
     }
-    setEditingItem(null)
-    setForm(defaultItem)
-    setModalOpen(true)
+    setEditingItem(null); setForm(defaultItem); setModalOpen(true)
   }
-  
+
   const openEdit = (item) => {
     setEditingItem(item)
     setForm({
-      nama: item.nama, deskripsi: item.deskripsi || "", harga_per_hari: item.harga_per_hari,
-      stok: item.stok, foto_url: item.foto_url || "", category_id: item.category_id || "",
+      nama: item.nama, deskripsi: item.deskripsi || "",
+      harga_per_hari: item.harga_per_hari, stok: item.stok,
+      foto_url: item.foto_url || "", category_id: item.category_id || "",
     })
     setModalOpen(true)
   }
@@ -89,11 +128,8 @@ export default function AdminDashboard({ addToast }) {
   const handleDelete = async (id) => {
     if (!confirm("Yakin hapus barang ini?")) return
     setDeletingId(id)
-    try {
-      await deleteItem(id)
-      addToast?.("Barang dihapus ✓", "success")
-      loadItems()
-    } catch (err) { addToast?.(err.message, "error") }
+    try { await deleteItem(id); addToast?.("Barang dihapus", "success"); loadItems() }
+    catch (err) { addToast?.(err.message, "error") }
     finally { setDeletingId(null) }
   }
 
@@ -107,37 +143,27 @@ export default function AdminDashboard({ addToast }) {
         stok: parseInt(form.stok),
         category_id: form.category_id ? parseInt(form.category_id) : null,
       }
-      // foto_url bisa berupa Data URL (base64) atau null
       if (!payload.foto_url) delete payload.foto_url
       if (!payload.deskripsi) delete payload.deskripsi
       if (!payload.category_id) delete payload.category_id
 
       if (editingItem) {
         await updateItem(editingItem.id, payload)
-        addToast?.("Barang berhasil diupdate ✓", "success")
+        addToast?.("Barang berhasil diupdate", "success")
       } else {
         await createItem(payload)
-        addToast?.("Barang berhasil ditambahkan ✓", "success")
+        addToast?.("Barang ditambahkan (demo)", "success")
       }
-      setModalOpen(false)
-      loadItems()
+      setModalOpen(false); loadItems()
     } catch (err) {
-      const errorMsg = err.message || "Terjadi kesalahan"
-      if (errorMsg.includes("profil usaha")) {
-        addToast?.("⚠️ " + errorMsg + ". Buat profil usaha terlebih dahulu.", "error")
-        setModalOpen(false)
-        setTab("profile")
-      } else {
-        addToast?.(errorMsg, "error")
-      }
-    }
-    finally { setSaving(false) }
+      addToast?.(err.message, "error")
+    } finally { setSaving(false) }
   }
 
   const handleUpdateRentalStatus = async (rentalId, status) => {
     try {
       await updateRentalStatus(rentalId, { status })
-      addToast?.(`Status diubah ke "${status}" ✓`, "success")
+      addToast?.(`Status diubah ke "${status}"`, "success")
       loadRentals()
     } catch (err) { addToast?.(err.message, "error") }
   }
@@ -146,185 +172,217 @@ export default function AdminDashboard({ addToast }) {
     e.preventDefault()
     setSavingProfile(true)
     try {
-      const isNewProfile = !profile
       if (profile) await updateAdminProfile(profileForm)
       else await createAdminProfile(profileForm)
       const updated = await fetchAdminProfile()
       setProfile(updated)
       setProfileForm({ nama_usaha: updated.nama_usaha || "", alamat_usaha: updated.alamat_usaha || "", nomor_telepon: updated.nomor_telepon || "" })
-      if (isNewProfile) {
-        addToast?.("✅ Profil usaha berhasil dibuat! Sekarang Anda bisa menambah barang.", "success")
-        setTimeout(() => setTab("items"), 1500)
-      } else {
-        addToast?.("Profil usaha tersimpan ✓", "success")
-      }
+      addToast?.("Profil usaha disimpan", "success")
     } catch (err) { addToast?.(err.message, "error") }
     finally { setSavingProfile(false) }
   }
 
-  if (loading) return <Spinner center size="lg" />
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-8 w-60" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-40" />)}
+        </div>
+      </div>
+    )
+  }
 
-  const TABS = [
-    { id: "items", label: `📦 Barang (${items.length})` },
-    { id: "rentals", label: `📋 Sewa Masuk (${rentals.length})` },
-    { id: "profile", label: "🏪 Profil Usaha" },
-  ]
+  const imgFallback = (name) => `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=1b7e6a&color=fff&size=400&bold=true`
 
   return (
-    <div className="page-container">
-      <div className="page-header">
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "16px" }}>
-          <div>
-            <h1 className="page-title">🏪 Dashboard Admin</h1>
-            <p className="page-subtitle">Kelola barang sewa dan permintaan penyewaan Anda</p>
-          </div>
-          {tab === "items" && <Button variant="primary" onClick={openAdd}>➕ Tambah Barang</Button>}
+    <div className="space-y-6">
+      <div className="flex items-start justify-between flex-wrap gap-4">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Admin Dashboard</h1>
+          <p className="text-muted-foreground mt-1">Kelola barang sewa dan permintaan penyewaan</p>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div style={{ display: "flex", gap: "4px", background: "rgba(15,23,42,0.6)", borderRadius: "14px", padding: "4px", marginBottom: "24px", width: "fit-content" }}>
-        {TABS.map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)} style={{
-            padding: "9px 18px", borderRadius: "10px", border: "none", cursor: "pointer",
-            background: tab === t.id ? "linear-gradient(135deg, #6366f1, #8b5cf6)" : "transparent",
-            color: tab === t.id ? "#fff" : "#64748b",
-            fontSize: "0.875rem", fontWeight: 600, transition: "all 0.2s ease",
-            boxShadow: tab === t.id ? "0 4px 14px rgba(99,102,241,0.3)" : "none",
-          }}>{t.label}</button>
-        ))}
-      </div>
+      <Tabs defaultValue="items">
+        <TabsList>
+          <TabsTrigger value="items"><Package className="w-4 h-4 mr-1" /> Barang ({items.length})</TabsTrigger>
+          <TabsTrigger value="rentals" onClick={loadRentals}><ClipboardList className="w-4 h-4 mr-1" /> Sewa Masuk</TabsTrigger>
+          <TabsTrigger value="profile"><Store className="w-4 h-4 mr-1" /> Profil Usaha</TabsTrigger>
+        </TabsList>
 
-      {tab === "items" && (
-        <>
+        {/* === ITEMS === */}
+        <TabsContent value="items" className="space-y-4 mt-4">
+          <div className="flex justify-between items-center">
+            <h2 className="text-lg font-semibold">Daftar Barang Saya</h2>
+            <Button onClick={openAdd}><Plus className="w-4 h-4 mr-1" /> Tambah Barang Baru</Button>
+          </div>
+
           {!profile && (
-            <div style={{
-              padding: "16px 20px", marginBottom: "20px",
-              background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)",
-              borderRadius: "12px", color: "#fca5a5",
-            }}>
-              <strong>⚠️ Profil Usaha Belum Dibuat</strong>
-              <p style={{ margin: "8px 0 0 0", fontSize: "0.875rem", color: "#fecaca" }}>
-                Anda harus membuat profil usaha terlebih dahulu sebelum bisa menambah barang.{" "}
-                <button onClick={() => setTab("profile")} style={{
-                  background: "none", border: "none", color: "#fca5a5",
-                  textDecoration: "underline", cursor: "pointer", fontWeight: 600,
-                }}>
-                  Buat profil sekarang →
-                </button>
-              </p>
+            <div className="p-4 rounded-lg bg-destructive/10 border border-destructive/30 flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
+              <div>
+                <div className="font-semibold text-destructive">Profil Usaha Belum Dibuat</div>
+                <div className="text-sm text-muted-foreground">Buat profil usaha terlebih dahulu di tab "Profil Usaha"</div>
+              </div>
             </div>
           )}
+
           {items.length === 0 ? (
-            <div className="empty-state">
-              <div className="empty-state-icon">📦</div>
-              <h3>Belum ada barang</h3>
-              <p>Tambah barang pertama Anda untuk mulai berjualan sewa</p>
+            <div className="text-center py-16">
+              <Package className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-foreground">Belum ada barang</h3>
+              <p className="text-sm text-muted-foreground mt-1">Tambah barang pertama untuk mulai sewakan</p>
             </div>
           ) : (
-            <div className="grid-auto">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {items.map(item => (
-                <ItemCard key={item.id} item={item} role={user?.role} onEdit={openEdit} onDelete={handleDelete} deletingId={deletingId} />
+                <Card key={item.id} className="overflow-hidden">
+                  <div className="aspect-[4/3] overflow-hidden relative">
+                    <img
+                      src={item.foto_url || imgFallback(item.nama)}
+                      alt={item.nama}
+                      className="w-full h-full object-cover"
+                      onError={(e) => { e.target.src = imgFallback(item.nama) }}
+                    />
+                    <div className="absolute top-2 right-2"><StatusBadge status={item.status} /></div>
+                  </div>
+                  <CardContent className="p-4">
+                    <h3 className="font-bold text-foreground line-clamp-1">{item.nama}</h3>
+                    <div className="text-lg font-extrabold text-primary mt-1">{formatPrice(item.harga_per_hari)}<span className="text-xs font-normal text-muted-foreground">/hari</span></div>
+                    <div className="text-xs text-muted-foreground mt-1">Stok: {item.stok}</div>
+                    <div className="flex gap-2 mt-3">
+                      <Button size="sm" variant="outline" className="flex-1" onClick={() => openEdit(item)}>
+                        <Pencil className="w-3.5 h-3.5 mr-1" /> Edit
+                      </Button>
+                      <Button size="sm" variant="destructive" onClick={() => handleDelete(item.id)} loading={deletingId === item.id}>
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
               ))}
             </div>
           )}
-        </>
-      )}
+        </TabsContent>
 
-      {tab === "rentals" && (
-        <>
-          <div style={{ display: "flex", gap: "8px", marginBottom: "16px", flexWrap: "wrap" }}>
+        {/* === RENTALS === */}
+        <TabsContent value="rentals" className="space-y-4 mt-4">
+          <div className="flex gap-2 flex-wrap">
             {["", "pending", "disetujui", "sedang_disewa", "selesai", "ditolak"].map(s => (
-              <button key={s} onClick={() => setRentalFilter(s)} style={{
-                padding: "6px 14px", borderRadius: "9999px", border: "none", cursor: "pointer",
-                background: rentalFilter === s ? "linear-gradient(135deg, #6366f1, #8b5cf6)" : "rgba(30,41,59,0.8)",
-                color: rentalFilter === s ? "#fff" : "#64748b", fontSize: "0.8rem", fontWeight: 600,
-                transition: "all 0.15s ease",
-              }}>{s || "Semua"}</button>
+              <Button key={s} variant={rentalFilter === s ? "default" : "outline"} size="sm" className="rounded-full"
+                onClick={() => setRentalFilter(s)}
+              >
+                {s || "Semua"}
+              </Button>
             ))}
           </div>
           {rentals.length === 0 ? (
-            <div className="empty-state">
-              <div className="empty-state-icon">📋</div>
-              <h3>Tidak ada permintaan sewa</h3>
+            <div className="text-center py-16">
+              <ClipboardList className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold">Tidak ada permintaan sewa</h3>
             </div>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-              {rentals.map(r => <RentalCard key={r.id} rental={r} isAdmin onUpdateStatus={handleUpdateRentalStatus} />)}
+            <div className="space-y-3">
+              {rentals.map(r => (
+                <AdminRentalCard key={r.id} rental={r} onUpdateStatus={handleUpdateRentalStatus} />
+              ))}
             </div>
           )}
-        </>
-      )}
+        </TabsContent>
 
-      {tab === "profile" && (
-        <div className="card" style={{ maxWidth: "560px" }}>
-          <h3 style={{ marginBottom: "20px" }}>Profil Usaha</h3>
-          <form onSubmit={handleSaveProfile} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-            <div className="form-group" style={{ margin: 0 }}>
-              <label className="form-label">Nama Usaha *</label>
-              <input id="admin-store-name" className="form-input" placeholder="Toko Sewa Jaya" value={profileForm.nama_usaha} onChange={e => setProfileForm(p => ({ ...p, nama_usaha: e.target.value }))} required />
+        {/* === PROFILE === */}
+        <TabsContent value="profile" className="mt-4">
+          <Card className="max-w-lg">
+            <CardHeader>
+              <CardTitle>Profil Usaha</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSaveProfile} className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Nama Usaha *</Label>
+                  <Input placeholder="Sewa Jaya" value={profileForm.nama_usaha}
+                    onChange={(e) => setProfileForm(p => ({ ...p, nama_usaha: e.target.value }))} required />
+                </div>
+                <div className="space-y-2">
+                  <Label>Alamat Usaha</Label>
+                  <Input placeholder="Jl. Soekarno-Hatta No.1" value={profileForm.alamat_usaha}
+                    onChange={(e) => setProfileForm(p => ({ ...p, alamat_usaha: e.target.value }))} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Nomor Telepon</Label>
+                  <Input placeholder="08123456789" value={profileForm.nomor_telepon}
+                    onChange={(e) => setProfileForm(p => ({ ...p, nomor_telepon: e.target.value }))} />
+                </div>
+                <Button type="submit" loading={savingProfile}>
+                  <Save className="w-4 h-4 mr-2" /> Simpan
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Item Dialog */}
+      <Dialog open={modalOpen} onOpenChange={setModalOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>{editingItem ? "Edit Barang" : "Tambah Barang Baru"}</DialogTitle>
+            <DialogDescription>
+              {editingItem ? "Ubah detail barang sewa" : "Isi detail barang yang ingin disewakan"}
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSaveItem} className="space-y-4">
+            <div className="space-y-2">
+              <Label>Nama Barang *</Label>
+              <Input placeholder="Kamera Sony A7III" value={form.nama}
+                onChange={(e) => setForm(p => ({ ...p, nama: e.target.value }))} required />
             </div>
-            <div className="form-group" style={{ margin: 0 }}>
-              <label className="form-label">Alamat Usaha</label>
-              <input id="admin-address" className="form-input" placeholder="Jl. Soekarno-Hatta No.1" value={profileForm.alamat_usaha} onChange={e => setProfileForm(p => ({ ...p, alamat_usaha: e.target.value }))} />
+            <div className="space-y-2">
+              <Label>Deskripsi</Label>
+              <textarea
+                className="flex min-h-[80px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                placeholder="Jelaskan kondisi dan fitur barang..."
+                value={form.deskripsi}
+                onChange={(e) => setForm(p => ({ ...p, deskripsi: e.target.value }))}
+              />
             </div>
-            <div className="form-group" style={{ margin: 0 }}>
-              <label className="form-label">Nomor Telepon</label>
-              <input id="admin-phone" className="form-input" placeholder="08123456789" value={profileForm.nomor_telepon} onChange={e => setProfileForm(p => ({ ...p, nomor_telepon: e.target.value }))} />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Harga per Hari (Rp) *</Label>
+                <Input type="number" min="0" placeholder="250000" value={form.harga_per_hari}
+                  onChange={(e) => setForm(p => ({ ...p, harga_per_hari: e.target.value }))} required />
+              </div>
+              <div className="space-y-2">
+                <Label>Stok</Label>
+                <Input type="number" min="0" placeholder="1" value={form.stok}
+                  onChange={(e) => setForm(p => ({ ...p, stok: e.target.value }))} />
+              </div>
             </div>
-            <Button type="submit" variant="primary" loading={savingProfile}>💾 Simpan Profil Usaha</Button>
+            <div className="space-y-2">
+              <Label>Kategori</Label>
+              <select className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                value={form.category_id}
+                onChange={(e) => setForm(p => ({ ...p, category_id: e.target.value }))}
+              >
+                <option value="">Tanpa Kategori</option>
+                {categories.map(c => <option key={c.id} value={c.id}>{c.nama}</option>)}
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label>URL Foto Barang</Label>
+              <Input type="url" placeholder="https://..." value={form.foto_url}
+                onChange={(e) => setForm(p => ({ ...p, foto_url: e.target.value }))} />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setModalOpen(false)}>Batal</Button>
+              <Button type="submit" loading={saving}>
+                {editingItem ? "Simpan" : "Tambah Barang"}
+              </Button>
+            </DialogFooter>
           </form>
-        </div>
-      )}
-
-      {/* Item Modal */}
-      <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title={editingItem ? "Edit Barang" : "Tambah Barang Baru"} size="md"
-        footer={
-          <>
-            <Button variant="ghost" onClick={() => setModalOpen(false)}>Batal</Button>
-            <Button variant="primary" loading={saving} onClick={handleSaveItem}>
-              {editingItem ? "Simpan Perubahan" : "Tambah Barang"}
-            </Button>
-          </>
-        }
-      >
-        <form onSubmit={handleSaveItem} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-          <div className="form-group" style={{ margin: 0 }}>
-            <label className="form-label">Nama Barang *</label>
-            <input id="item-name" className="form-input" placeholder="Kamera Sony A7III" value={form.nama} onChange={e => setForm(p => ({ ...p, nama: e.target.value }))} required />
-          </div>
-          <div className="form-group" style={{ margin: 0 }}>
-            <label className="form-label">Deskripsi</label>
-            <textarea id="item-desc" className="form-textarea" placeholder="Jelaskan kondisi dan fitur barang..." value={form.deskripsi} onChange={e => setForm(p => ({ ...p, deskripsi: e.target.value }))} style={{ minHeight: "80px" }} />
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
-            <div className="form-group" style={{ margin: 0 }}>
-              <label className="form-label">Harga/Hari (Rp) *</label>
-              <input id="item-price" type="number" min="0" className="form-input" placeholder="250000" value={form.harga_per_hari} onChange={e => setForm(p => ({ ...p, harga_per_hari: e.target.value }))} required />
-            </div>
-            <div className="form-group" style={{ margin: 0 }}>
-              <label className="form-label">Stok</label>
-              <input id="item-stok" type="number" min="0" className="form-input" placeholder="1" value={form.stok} onChange={e => setForm(p => ({ ...p, stok: e.target.value }))} />
-            </div>
-          </div>
-          <div className="form-group" style={{ margin: 0 }}>
-            <label className="form-label">Kategori</label>
-            <select id="item-category" className="form-select" value={form.category_id} onChange={e => setForm(p => ({ ...p, category_id: e.target.value }))}>
-              <option value="">Tanpa Kategori</option>
-              {categories.map(c => <option key={c.id} value={c.id}>{c.nama}</option>)}
-            </select>
-          </div>
-          <ImageUpload
-            label="Foto Barang"
-            placeholder="📦"
-            helpText="JPG, PNG, WEBP · Maks 2MB · Drag & drop atau klik"
-            value={form.foto_url || null}
-            onChange={(dataUrl) => setForm(p => ({ ...p, foto_url: dataUrl || "" }))}
-            onError={(msg) => addToast?.(msg, "error")}
-            previewHeight={180}
-          />
-        </form>
-      </Modal>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -31,6 +31,10 @@ FROM nginx:alpine
 # Copy hasil build dari stage 1
 COPY --from=builder /app/dist /usr/share/nginx/html
 
+# Copy custom error pages (fallback jika Vite tidak include dari public/)
+COPY --from=builder /app/public/404.html /usr/share/nginx/html/404.html
+COPY --from=builder /app/public/50x.html /usr/share/nginx/html/50x.html
+
 # Copy custom Nginx config untuk handle React Router (SPA)
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 

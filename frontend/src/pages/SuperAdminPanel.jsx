@@ -1,32 +1,57 @@
 import { useState, useEffect, useCallback } from "react"
-import StatCard from "../components/StatCard"
-import Badge from "../components/ui/Badge"
-import Button from "../components/ui/Button"
-import Modal from "../components/ui/Modal"
-import Spinner from "../components/Spinner"
-import RentalCard from "../components/RentalCard"
+import { formatPrice } from "../lib/utils"
 import {
   fetchPlatformStats, fetchAllUsers, updateUser, deleteUser,
   fetchCategories, createCategory, deleteCategory,
   fetchPendingVerifications, verifyUser,
   fetchAllRentals,
 } from "../services/api"
+import { Button } from "../components/ui/button"
+import { Input } from "../components/ui/input"
+import { Label } from "../components/ui/label"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card"
+import { StatusBadge } from "../components/ui/badge"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table"
+import { Skeleton } from "../components/ui/skeleton"
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
+} from "../components/ui/dialog"
+import {
+  Users, Package, ClipboardList, FolderOpen, ShieldCheck, Crown,
+  BarChart3, Plus, Trash2, UserCheck, UserX, CheckCircle, XCircle,
+  Calendar, ExternalLink, DollarSign, Eye,
+} from "lucide-react"
+
+function StatCard({ icon: Icon, label, value, description }) {
+  return (
+    <Card>
+      <CardContent className="p-5">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm text-muted-foreground">{label}</p>
+            <p className="text-2xl font-bold text-foreground mt-1">{value}</p>
+            {description && <p className="text-xs text-muted-foreground mt-0.5">{description}</p>}
+          </div>
+          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+            <Icon className="w-5 h-5 text-primary" />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
 
 export default function SuperAdminPanel({ addToast }) {
-  const [tab, setTab] = useState("stats")
   const [stats, setStats] = useState(null)
   const [users, setUsers] = useState([])
   const [categories, setCategories] = useState([])
   const [verifications, setVerifications] = useState([])
   const [rentals, setRentals] = useState([])
   const [loading, setLoading] = useState(true)
-
-  // Category modal
   const [catModalOpen, setCatModalOpen] = useState(false)
   const [catForm, setCatForm] = useState({ nama: "", deskripsi: "" })
   const [savingCat, setSavingCat] = useState(false)
-
-  // User filter
   const [userRoleFilter, setUserRoleFilter] = useState("")
   const [rentalStatusFilter, setRentalStatusFilter] = useState("")
 
@@ -58,29 +83,26 @@ export default function SuperAdminPanel({ addToast }) {
   }, [rentalStatusFilter])
 
   useEffect(() => { load() }, [load])
-  useEffect(() => { if (tab === "rentals") loadRentals() }, [tab, loadRentals])
+  useEffect(() => { loadRentals() }, [loadRentals])
 
-  const handleToggleActive = async (user) => {
+  const handleToggleActive = async (u) => {
     try {
-      await updateUser(user.id, { is_active: !user.is_active })
-      addToast?.(`User ${!user.is_active ? "diaktifkan" : "dinonaktifkan"} ✓`, "success")
+      await updateUser(u.id, { is_active: !u.is_active })
+      addToast?.(`User ${!u.is_active ? "diaktifkan" : "dinonaktifkan"}`, "success")
       load()
     } catch (err) { addToast?.(err.message, "error") }
   }
 
   const handleDeleteUser = async (id) => {
-    if (!confirm("Yakin hapus user ini? Tindakan tidak bisa dibatalkan.")) return
-    try {
-      await deleteUser(id)
-      addToast?.("User dihapus ✓", "success")
-      load()
-    } catch (err) { addToast?.(err.message, "error") }
+    if (!confirm("Yakin hapus user ini?")) return
+    try { await deleteUser(id); addToast?.("User dihapus", "success"); load() }
+    catch (err) { addToast?.(err.message, "error") }
   }
 
   const handleVerify = async (userId, status) => {
     try {
       await verifyUser(userId, { status })
-      addToast?.(`Identitas ${status} ✓`, "success")
+      addToast?.(`Verifikasi ${status}`, "success")
       load()
     } catch (err) { addToast?.(err.message, "error") }
   }
@@ -90,228 +112,270 @@ export default function SuperAdminPanel({ addToast }) {
     setSavingCat(true)
     try {
       await createCategory(catForm)
-      addToast?.("Kategori ditambahkan ✓", "success")
-      setCatModalOpen(false)
-      setCatForm({ nama: "", deskripsi: "" })
-      load()
+      addToast?.("Kategori ditambahkan", "success")
+      setCatModalOpen(false); setCatForm({ nama: "", deskripsi: "" }); load()
     } catch (err) { addToast?.(err.message, "error") }
     finally { setSavingCat(false) }
   }
 
   const handleDeleteCategory = async (id) => {
     if (!confirm("Yakin hapus kategori ini?")) return
-    try {
-      await deleteCategory(id)
-      addToast?.("Kategori dihapus ✓", "success")
-      load()
-    } catch (err) { addToast?.(err.message, "error") }
+    try { await deleteCategory(id); addToast?.("Kategori dihapus", "success"); load() }
+    catch (err) { addToast?.(err.message, "error") }
   }
 
-  if (loading && tab === "stats") return <Spinner center size="lg" />
-
-  const TABS = [
-    { id: "stats", label: "📊 Statistik" },
-    { id: "users", label: `👥 Users (${users.length})` },
-    { id: "categories", label: `📂 Kategori (${categories.length})` },
-    { id: "verifications", label: `🔍 Verifikasi (${verifications.length})` },
-    { id: "rentals", label: "💳 Transaksi" },
-  ]
+  if (loading && !stats) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-8 w-60" />
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-24" />)}
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <div className="page-container">
-      <div className="page-header">
-        <h1 className="page-title">👑 Super Admin Panel</h1>
-        <p className="page-subtitle">Kelola seluruh platform Sewain</p>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl md:text-3xl font-bold text-foreground flex items-center gap-2">
+          <Crown className="w-7 h-7 text-primary" /> Super Admin Panel
+        </h1>
+        <p className="text-muted-foreground mt-1">Kelola seluruh platform Sewain</p>
       </div>
 
-      {/* Tabs */}
-      <div style={{ display: "flex", gap: "4px", background: "rgba(15,23,42,0.6)", borderRadius: "14px", padding: "4px", marginBottom: "24px", flexWrap: "wrap" }}>
-        {TABS.map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)} style={{
-            padding: "9px 16px", borderRadius: "10px", border: "none", cursor: "pointer",
-            background: tab === t.id ? "linear-gradient(135deg, #6366f1, #8b5cf6)" : "transparent",
-            color: tab === t.id ? "#fff" : "#64748b", fontSize: "0.825rem", fontWeight: 600, transition: "all 0.2s ease",
-          }}>{t.label}</button>
-        ))}
-      </div>
+      <Tabs defaultValue="stats">
+        <TabsList className="flex-wrap">
+          <TabsTrigger value="stats"><BarChart3 className="w-4 h-4 mr-1" /> Statistik</TabsTrigger>
+          <TabsTrigger value="users"><Users className="w-4 h-4 mr-1" /> Semua Pengguna</TabsTrigger>
+          <TabsTrigger value="categories"><FolderOpen className="w-4 h-4 mr-1" /> Kategori</TabsTrigger>
+          <TabsTrigger value="verifications"><ShieldCheck className="w-4 h-4 mr-1" /> Verifikasi</TabsTrigger>
+          <TabsTrigger value="rentals" onClick={loadRentals}><ClipboardList className="w-4 h-4 mr-1" /> Semua Transaksi</TabsTrigger>
+        </TabsList>
 
-      {/* ====== STATS ====== */}
-      {tab === "stats" && stats && (
-        <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-          <div className="grid-4" style={{ gap: "16px" }}>
-            <StatCard icon="👥" label="Total User" value={stats.total_users || 0} color="#6366f1" />
-            <StatCard icon="📦" label="Total Barang" value={stats.total_items || 0} color="#10b981" />
-            <StatCard icon="📋" label="Total Sewa" value={stats.total_rentals || 0} color="#f59e0b" />
-            <StatCard icon="🏪" label="Admin Aktif" value={stats.total_admins || 0} color="#3b82f6" />
+        {/* === STATS === */}
+        <TabsContent value="stats" className="space-y-4 mt-4">
+          {stats && (
+            <>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <StatCard icon={Users} label="Total Users" value={stats.total_users || 0} />
+                <StatCard icon={Package} label="Total Barang" value={stats.total_items || 0} />
+                <StatCard icon={ClipboardList} label="Total Transaksi" value={stats.total_rentals || 0} />
+                <StatCard icon={Crown} label="Admin Aktif" value={stats.total_admins || 0} />
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <StatCard icon={CheckCircle} label="Barang Tersedia" value={stats.items_available || 0} />
+                <StatCard icon={Package} label="Sedang Disewa" value={stats.items_rented || 0} />
+                <StatCard icon={ClipboardList} label="Sewa Pending" value={stats.rentals_pending || 0} />
+                <StatCard icon={ShieldCheck} label="KTP Menunggu" value={stats.users_pending_verification || 0} />
+              </div>
+              {stats.revenue_total !== undefined && (
+                <StatCard icon={DollarSign} label="Total Revenue Platform" value={formatPrice(stats.revenue_total || 0)} />
+              )}
+            </>
+          )}
+        </TabsContent>
+
+        {/* === USERS === */}
+        <TabsContent value="users" className="space-y-4 mt-4">
+          <div className="flex gap-2 flex-wrap">
+            {["", "user", "admin", "super_admin"].map(r => (
+              <Button key={r} variant={userRoleFilter === r ? "default" : "outline"} size="sm" className="rounded-full"
+                onClick={() => setUserRoleFilter(r)}
+              >
+                {r || "Semua"}
+              </Button>
+            ))}
           </div>
-          <div className="grid-4" style={{ gap: "16px" }}>
-            <StatCard icon="✅" label="Barang Tersedia" value={stats.items_available || 0} color="#10b981" />
-            <StatCard icon="🔄" label="Sedang Disewa" value={stats.items_rented || 0} color="#f59e0b" />
-            <StatCard icon="⏳" label="Sewa Pending" value={stats.rentals_pending || 0} color="#f59e0b" />
-            <StatCard icon="🪪" label="KTP Menunggu" value={stats.users_pending_verification || 0} color="#a78bfa" />
+          <Card>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>ID</TableHead>
+                  <TableHead>Nama</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Role</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Verifikasi</TableHead>
+                  <TableHead>Aksi</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {users.map(u => (
+                  <TableRow key={u.id}>
+                    <TableCell className="text-muted-foreground">#{u.id}</TableCell>
+                    <TableCell className="font-semibold">{u.nama}</TableCell>
+                    <TableCell className="text-sm">{u.email}</TableCell>
+                    <TableCell><StatusBadge status={u.role} /></TableCell>
+                    <TableCell><StatusBadge status={String(u.is_active)} label={u.is_active ? "Aktif" : "Nonaktif"} /></TableCell>
+                    <TableCell><StatusBadge status={u.is_verified ? "disetujui" : "menunggu"} label={u.is_verified ? "Verified" : "Unverified"} /></TableCell>
+                    <TableCell>
+                      <div className="flex gap-1.5">
+                        <Button size="sm" variant={u.is_active ? "destructive" : "success"} onClick={() => handleToggleActive(u)}>
+                          {u.is_active ? <UserX className="w-3.5 h-3.5" /> : <UserCheck className="w-3.5 h-3.5" />}
+                        </Button>
+                        <Button size="sm" variant="destructive" onClick={() => handleDeleteUser(u.id)}>
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Card>
+        </TabsContent>
+
+        {/* === CATEGORIES === */}
+        <TabsContent value="categories" className="space-y-4 mt-4">
+          <div className="flex justify-between items-center">
+            <h2 className="text-lg font-semibold">Kategori Barang</h2>
+            <Button onClick={() => setCatModalOpen(true)}><Plus className="w-4 h-4 mr-1" /> Kategori Baru</Button>
           </div>
-          {stats.revenue_total !== undefined && (
-            <div>
-              <StatCard
-                icon="💰" label="Total Revenue Platform"
-                value={new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(stats.revenue_total || 0)}
-                color="#10b981"
-              />
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {categories.map(c => (
+              <Card key={c.id}>
+                <CardContent className="p-4">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="font-bold text-foreground flex items-center gap-1">
+                        <FolderOpen className="w-4 h-4 text-primary" /> {c.nama}
+                      </h3>
+                      {c.deskripsi && <p className="text-sm text-muted-foreground mt-1">{c.deskripsi}</p>}
+                    </div>
+                    <Button size="icon" variant="destructive" className="h-8 w-8 flex-shrink-0" onClick={() => handleDeleteCategory(c.id)}>
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    ID: {c.id} &middot; {new Date(c.created_at).toLocaleDateString("id-ID")}
+                  </p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+
+        {/* === VERIFICATIONS === */}
+        <TabsContent value="verifications" className="space-y-4 mt-4">
+          <h2 className="text-lg font-semibold">Verifikasi KTP Pengguna</h2>
+          {verifications.length === 0 ? (
+            <div className="text-center py-16">
+              <CheckCircle className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold">Tidak ada yang menunggu verifikasi</h3>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {verifications.map(p => (
+                <Card key={p.id}>
+                  <CardContent className="p-4 flex flex-col sm:flex-row gap-4 items-start">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-bold text-foreground">User #{p.user_id}</h3>
+                      <div className="text-sm text-muted-foreground mt-1 space-y-0.5">
+                        {p.alamat && <div>Alamat: {p.alamat}</div>}
+                        {p.nama_orang_tua && <div>Orang Tua: {p.nama_orang_tua}</div>}
+                      </div>
+                      <div className="mt-2"><StatusBadge status={p.status_verifikasi} /></div>
+                      <div className="flex gap-3 mt-2">
+                        {p.foto_ktp && (
+                          <a href={p.foto_ktp} target="_blank" rel="noreferrer" className="text-xs text-primary flex items-center gap-1 hover:underline">
+                            <Eye className="w-3.5 h-3.5" /> Lihat KTP
+                          </a>
+                        )}
+                        {p.foto_selfie_ktp && (
+                          <a href={p.foto_selfie_ktp} target="_blank" rel="noreferrer" className="text-xs text-primary flex items-center gap-1 hover:underline">
+                            <ExternalLink className="w-3.5 h-3.5" /> Lihat Selfie
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-2 flex-shrink-0">
+                      <Button size="sm" variant="success" onClick={() => handleVerify(p.user_id, "disetujui")}>
+                        <CheckCircle className="w-3.5 h-3.5 mr-1" /> Setujui
+                      </Button>
+                      <Button size="sm" variant="destructive" onClick={() => handleVerify(p.user_id, "ditolak")}>
+                        <XCircle className="w-3.5 h-3.5 mr-1" /> Tolak
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
           )}
-        </div>
-      )}
+        </TabsContent>
 
-      {/* ====== USERS ====== */}
-      {tab === "users" && (
-        <>
-          <div style={{ display: "flex", gap: "8px", marginBottom: "16px" }}>
-            {["", "user", "admin", "super_admin"].map(r => (
-              <button key={r} onClick={() => setUserRoleFilter(r)} style={{
-                padding: "6px 14px", borderRadius: "9999px", border: "none", cursor: "pointer",
-                background: userRoleFilter === r ? "linear-gradient(135deg,#6366f1,#8b5cf6)" : "rgba(30,41,59,0.8)",
-                color: userRoleFilter === r ? "#fff" : "#64748b", fontSize: "0.8rem", fontWeight: 600,
-              }}>{r || "Semua"}</button>
-            ))}
-          </div>
-          <div className="table-wrapper">
-            <table>
-              <thead>
-                <tr>
-                  <th>ID</th><th>Nama</th><th>Email</th><th>Role</th><th>Status</th><th>Verifikasi</th><th>Aksi</th>
-                </tr>
-              </thead>
-              <tbody>
-                {users.map(u => (
-                  <tr key={u.id}>
-                    <td style={{ color: "#475569" }}>#{u.id}</td>
-                    <td style={{ fontWeight: 600, color: "#e2e8f0" }}>{u.nama}</td>
-                    <td style={{ fontSize: "0.82rem" }}>{u.email}</td>
-                    <td><Badge status={u.role} size="xs" /></td>
-                    <td><Badge status={String(u.is_active)} label={u.is_active ? "Aktif" : "Nonaktif"} size="xs" /></td>
-                    <td><Badge status={u.is_verified ? "disetujui" : "menunggu"} label={u.is_verified ? "Verified" : "Unverified"} size="xs" /></td>
-                    <td>
-                      <div style={{ display: "flex", gap: "6px" }}>
-                        <button onClick={() => handleToggleActive(u)} style={{
-                          padding: "4px 10px", borderRadius: "6px", border: "none", cursor: "pointer",
-                          background: u.is_active ? "rgba(239,68,68,0.1)" : "rgba(16,185,129,0.1)",
-                          color: u.is_active ? "#ef4444" : "#10b981", fontSize: "0.75rem", fontWeight: 600,
-                        }}>
-                          {u.is_active ? "Nonaktifkan" : "Aktifkan"}
-                        </button>
-                        <button onClick={() => handleDeleteUser(u.id)} style={{
-                          padding: "4px 8px", borderRadius: "6px", border: "none", cursor: "pointer",
-                          background: "rgba(239,68,68,0.1)", color: "#ef4444", fontSize: "0.75rem",
-                        }}>🗑</button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
-
-      {/* ====== CATEGORIES ====== */}
-      {tab === "categories" && (
-        <>
-          <div style={{ marginBottom: "16px" }}>
-            <Button variant="primary" onClick={() => setCatModalOpen(true)}>➕ Tambah Kategori</Button>
-          </div>
-          <div className="grid-3" style={{ gap: "16px" }}>
-            {categories.map(c => (
-              <div key={c.id} className="card" style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                  <div>
-                    <div style={{ fontWeight: 700, color: "#e2e8f0", fontSize: "0.95rem" }}>📂 {c.nama}</div>
-                    {c.deskripsi && <div style={{ fontSize: "0.8rem", color: "#64748b", marginTop: "4px" }}>{c.deskripsi}</div>}
-                  </div>
-                  <button onClick={() => handleDeleteCategory(c.id)} style={{
-                    background: "rgba(239,68,68,0.1)", border: "none", color: "#ef4444",
-                    borderRadius: "8px", width: 32, height: 32, cursor: "pointer", fontSize: "0.9rem",
-                  }}>🗑</button>
-                </div>
-                <div style={{ fontSize: "0.75rem", color: "#475569" }}>
-                  ID: {c.id} · {new Date(c.created_at).toLocaleDateString("id-ID")}
-                </div>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
-
-      {/* ====== VERIFICATIONS ====== */}
-      {tab === "verifications" && (
-        verifications.length === 0 ? (
-          <div className="empty-state">
-            <div className="empty-state-icon">🎉</div>
-            <h3>Tidak ada yang menunggu verifikasi</h3>
-          </div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-            {verifications.map(p => (
-              <div key={p.id} className="card" style={{ display: "flex", gap: "16px", alignItems: "center", flexWrap: "wrap" }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 700, color: "#e2e8f0" }}>User #{p.user_id}</div>
-                  <div style={{ fontSize: "0.8rem", color: "#64748b", marginTop: "4px" }}>
-                    {p.alamat && `📍 ${p.alamat}`}
-                    {p.nama_orang_tua && ` · 👨‍👩‍👦 ${p.nama_orang_tua}`}
-                  </div>
-                  <Badge status={p.status_verifikasi} style={{ marginTop: "6px" }} />
-                  <div style={{ display: "flex", gap: "8px", marginTop: "8px", flexWrap: "wrap" }}>
-                    {p.foto_ktp && <a href={p.foto_ktp} target="_blank" rel="noreferrer" style={{ fontSize: "0.78rem", color: "#6366f1" }}>🪪 Lihat KTP</a>}
-                    {p.foto_selfie_ktp && <a href={p.foto_selfie_ktp} target="_blank" rel="noreferrer" style={{ fontSize: "0.78rem", color: "#6366f1" }}>🤳 Lihat Selfie</a>}
-                  </div>
-                </div>
-                <div style={{ display: "flex", gap: "8px", flexShrink: 0 }}>
-                  <Button variant="success" size="sm" onClick={() => handleVerify(p.user_id, "disetujui")}>✓ Setujui</Button>
-                  <Button variant="danger" size="sm" onClick={() => handleVerify(p.user_id, "ditolak")}>✕ Tolak</Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )
-      )}
-
-      {/* ====== RENTALS ====== */}
-      {tab === "rentals" && (
-        <>
-          <div style={{ display: "flex", gap: "8px", marginBottom: "16px", flexWrap: "wrap" }}>
+        {/* === RENTALS === */}
+        <TabsContent value="rentals" className="space-y-4 mt-4">
+          <div className="flex gap-2 flex-wrap">
             {["", "pending", "disetujui", "sedang_disewa", "selesai", "ditolak"].map(s => (
-              <button key={s} onClick={() => setRentalStatusFilter(s)} style={{
-                padding: "6px 14px", borderRadius: "9999px", border: "none", cursor: "pointer",
-                background: rentalStatusFilter === s ? "linear-gradient(135deg, #6366f1, #8b5cf6)" : "rgba(30,41,59,0.8)",
-                color: rentalStatusFilter === s ? "#fff" : "#64748b", fontSize: "0.8rem", fontWeight: 600,
-              }}>{s || "Semua"}</button>
+              <Button key={s} variant={rentalStatusFilter === s ? "default" : "outline"} size="sm" className="rounded-full"
+                onClick={() => setRentalStatusFilter(s)}
+              >
+                {s || "Semua"}
+              </Button>
             ))}
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-            {rentals.map(r => <RentalCard key={r.id} rental={r} isAdmin={false} />)}
-          </div>
-        </>
-      )}
+          {rentals.length === 0 ? (
+            <div className="text-center py-16">
+              <ClipboardList className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold">Tidak ada transaksi</h3>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {rentals.map(r => (
+                <Card key={r.id} className="hover:shadow-md transition-shadow">
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <h3 className="font-bold text-foreground">{r.item?.nama || `Item #${r.item_id}`}</h3>
+                        <div className="text-sm text-muted-foreground mt-0.5">
+                          Penyewa: {r.user?.nama || `User #${r.user_id}`}
+                        </div>
+                        <div className="flex items-center gap-1 mt-1 text-sm text-muted-foreground">
+                          <Calendar className="w-3.5 h-3.5" />
+                          {new Date(r.tanggal_mulai).toLocaleDateString("id-ID")} — {new Date(r.tanggal_selesai).toLocaleDateString("id-ID")}
+                        </div>
+                        <div className="text-lg font-bold text-primary mt-2">{formatPrice(r.total_harga)}</div>
+                      </div>
+                      <StatusBadge status={r.status} />
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
 
-      {/* Add Category Modal */}
-      <Modal isOpen={catModalOpen} onClose={() => setCatModalOpen(false)} title="Tambah Kategori Baru" size="sm"
-        footer={
-          <>
-            <Button variant="ghost" onClick={() => setCatModalOpen(false)}>Batal</Button>
-            <Button variant="primary" loading={savingCat} onClick={handleAddCategory}>Tambah</Button>
-          </>
-        }
-      >
-        <form onSubmit={handleAddCategory} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-          <div className="form-group" style={{ margin: 0 }}>
-            <label className="form-label">Nama Kategori *</label>
-            <input id="cat-name" className="form-input" placeholder="Elektronik" value={catForm.nama} onChange={e => setCatForm(p => ({ ...p, nama: e.target.value }))} required minLength={2} />
-          </div>
-          <div className="form-group" style={{ margin: 0 }}>
-            <label className="form-label">Deskripsi</label>
-            <textarea id="cat-desc" className="form-textarea" placeholder="Deskripsi kategori..." value={catForm.deskripsi} onChange={e => setCatForm(p => ({ ...p, deskripsi: e.target.value }))} style={{ minHeight: "80px" }} />
-          </div>
-        </form>
-      </Modal>
+      {/* Add Category Dialog */}
+      <Dialog open={catModalOpen} onOpenChange={setCatModalOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Tambah Kategori Baru</DialogTitle>
+            <DialogDescription>Buat kategori untuk mengelompokkan barang sewa</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleAddCategory} className="space-y-4">
+            <div className="space-y-2">
+              <Label>Nama Kategori *</Label>
+              <Input placeholder="Elektronik" value={catForm.nama}
+                onChange={(e) => setCatForm(p => ({ ...p, nama: e.target.value }))} required minLength={2} />
+            </div>
+            <div className="space-y-2">
+              <Label>Deskripsi</Label>
+              <textarea
+                className="flex min-h-[80px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                placeholder="Deskripsi kategori..."
+                value={catForm.deskripsi}
+                onChange={(e) => setCatForm(p => ({ ...p, deskripsi: e.target.value }))}
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setCatModalOpen(false)}>Batal</Button>
+              <Button type="submit" loading={savingCat}>Tambah</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

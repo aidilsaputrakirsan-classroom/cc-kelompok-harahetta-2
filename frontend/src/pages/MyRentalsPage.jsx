@@ -1,17 +1,51 @@
 import { useState, useEffect, useCallback } from "react"
-import RentalCard from "../components/RentalCard"
-import Spinner from "../components/Spinner"
-import Button from "../components/ui/Button"
 import { fetchMyRentals } from "../services/api"
+import { formatPrice } from "../lib/utils"
+import { Button } from "../components/ui/button"
+import { Card, CardContent } from "../components/ui/card"
+import { StatusBadge } from "../components/ui/badge"
+import { Skeleton } from "../components/ui/skeleton"
+import { ClipboardList, ArrowLeft, ArrowRight, Calendar, Package } from "lucide-react"
 
 const STATUS_FILTERS = [
   { value: "", label: "Semua" },
-  { value: "pending", label: "⏳ Menunggu" },
-  { value: "disetujui", label: "✅ Disetujui" },
-  { value: "sedang_disewa", label: "🔄 Berlangsung" },
-  { value: "selesai", label: "✓ Selesai" },
-  { value: "ditolak", label: "✕ Ditolak" },
+  { value: "pending", label: "Menunggu" },
+  { value: "disetujui", label: "Disetujui" },
+  { value: "sedang_disewa", label: "Berlangsung" },
+  { value: "selesai", label: "Selesai" },
+  { value: "ditolak", label: "Ditolak" },
 ]
+
+function RentalCard({ rental }) {
+  const item = rental.item
+  return (
+    <Card className="hover:shadow-md transition-shadow">
+      <CardContent className="p-4">
+        <div className="flex flex-col sm:flex-row gap-4">
+          {item?.foto_url && (
+            <img src={item.foto_url} alt={item.nama} className="w-20 h-20 rounded-lg object-cover flex-shrink-0" onError={(e) => { e.target.style.display = "none" }} />
+          )}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <h3 className="font-bold text-foreground">{item?.nama || `Item #${rental.item_id}`}</h3>
+                <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
+                  <Calendar className="w-3.5 h-3.5" />
+                  {new Date(rental.tanggal_mulai).toLocaleDateString("id-ID")} — {new Date(rental.tanggal_selesai).toLocaleDateString("id-ID")}
+                </div>
+              </div>
+              <StatusBadge status={rental.status} />
+            </div>
+            <div className="flex items-center justify-between mt-3">
+              <span className="text-lg font-bold text-primary">{formatPrice(rental.total_harga)}</span>
+              {rental.catatan && <span className="text-xs text-muted-foreground truncate max-w-[200px]">{rental.catatan}</span>}
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
 
 export default function MyRentalsPage({ addToast }) {
   const [rentals, setRentals] = useState([])
@@ -37,48 +71,57 @@ export default function MyRentalsPage({ addToast }) {
   useEffect(() => { load() }, [load])
 
   return (
-    <div className="page-container">
-      <div className="page-header">
-        <h1 className="page-title">📋 Riwayat Sewa Saya</h1>
-        <p className="page-subtitle">Pantau semua transaksi penyewaan Anda</p>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl md:text-3xl font-bold text-foreground">Sewa Saya</h1>
+        <p className="text-muted-foreground mt-1">Pantau semua transaksi penyewaan Anda</p>
       </div>
 
-      {/* Status filter tabs */}
-      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "24px" }}>
+      {/* Status filter */}
+      <div className="flex gap-2 flex-wrap">
         {STATUS_FILTERS.map(f => (
-          <button key={f.value} onClick={() => { setStatusFilter(f.value); setPage(0) }} style={{
-            padding: "7px 16px", borderRadius: "9999px",
-            background: statusFilter === f.value ? "linear-gradient(135deg, #6366f1, #8b5cf6)" : "rgba(30,41,59,0.8)",
-            border: statusFilter === f.value ? "1px solid rgba(99,102,241,0.5)" : "1px solid rgba(148,163,184,0.12)",
-            color: statusFilter === f.value ? "#fff" : "#64748b",
-            fontSize: "0.825rem", fontWeight: 600, cursor: "pointer",
-            transition: "all 0.2s ease",
-            boxShadow: statusFilter === f.value ? "0 4px 14px rgba(99,102,241,0.3)" : "none",
-          }}>
+          <Button
+            key={f.value}
+            variant={statusFilter === f.value ? "default" : "outline"}
+            size="sm"
+            onClick={() => { setStatusFilter(f.value); setPage(0) }}
+            className="rounded-full"
+          >
             {f.label}
-          </button>
+          </Button>
         ))}
       </div>
 
       {loading ? (
-        <Spinner center size="lg" />
+        <div className="space-y-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Card key={i}><CardContent className="p-4"><Skeleton className="h-20" /></CardContent></Card>
+          ))}
+        </div>
       ) : rentals.length === 0 ? (
-        <div className="empty-state">
-          <div className="empty-state-icon">📋</div>
-          <h3>Belum ada transaksi sewa</h3>
-          <p>{statusFilter ? `Tidak ada sewa dengan status "${statusFilter}"` : "Mulai sewa barang dari katalog!"}</p>
+        <div className="text-center py-16">
+          <ClipboardList className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-foreground">Belum ada transaksi sewa</h3>
+          <p className="text-sm text-muted-foreground mt-1">
+            {statusFilter ? `Tidak ada sewa dengan status "${statusFilter}"` : "Mulai sewa barang dari katalog!"}
+          </p>
         </div>
       ) : (
         <>
-          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-            {rentals.map(r => <RentalCard key={r.id} rental={r} isAdmin={false} />)}
+          <div className="space-y-3">
+            {rentals.map(r => <RentalCard key={r.id} rental={r} />)}
           </div>
-
           {total > LIMIT && (
-            <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: "12px", marginTop: "24px" }}>
-              <Button variant="secondary" size="sm" disabled={page === 0} onClick={() => setPage(p => p - 1)}>← Sebelumnya</Button>
-              <span style={{ color: "#64748b", fontSize: "0.875rem" }}>Hal. {page + 1} / {Math.ceil(total / LIMIT)}</span>
-              <Button variant="secondary" size="sm" disabled={(page + 1) * LIMIT >= total} onClick={() => setPage(p => p + 1)}>Selanjutnya →</Button>
+            <div className="flex justify-center items-center gap-3 pt-4">
+              <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage(p => p - 1)}>
+                <ArrowLeft className="w-4 h-4 mr-1" /> Sebelumnya
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                Hal. {page + 1} / {Math.ceil(total / LIMIT)}
+              </span>
+              <Button variant="outline" size="sm" disabled={(page + 1) * LIMIT >= total} onClick={() => setPage(p => p + 1)}>
+                Selanjutnya <ArrowRight className="w-4 h-4 ml-1" />
+              </Button>
             </div>
           )}
         </>

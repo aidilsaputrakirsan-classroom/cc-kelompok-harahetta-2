@@ -1,138 +1,186 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
-import Button from "../components/ui/Button"
 import { useAuth } from "../context/AuthContext"
+import { Button } from "../components/ui/button"
+import { Input } from "../components/ui/input"
+import { Label } from "../components/ui/label"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs"
+import { Info } from "lucide-react"
 
 export default function LoginPage({ addToast }) {
-  const [mode, setMode] = useState("login") // "login" | "register"
   const [loading, setLoading] = useState(false)
-  const [form, setForm] = useState({ email: "", password: "", nama: "", role: "user" })
+  const [loginForm, setLoginForm] = useState({ email: "", password: "" })
+  const [registerForm, setRegisterForm] = useState({ email: "", password: "", nama: "", role: "user" })
   const { login, register } = useAuth()
   const navigate = useNavigate()
 
-  const handleChange = (e) => setForm(p => ({ ...p, [e.target.name]: e.target.value }))
-
-  const handleSubmit = async (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault()
+    if (!loginForm.email || !loginForm.password) {
+      addToast?.("Email dan password harus diisi", "error")
+      return
+    }
     setLoading(true)
     try {
-      if (mode === "login") {
-        await login(form.email, form.password)
-        addToast?.("Selamat datang kembali! 👋", "success")
-      } else {
-        await register({ email: form.email, password: form.password, nama: form.nama, role: form.role })
-        addToast?.("Registrasi berhasil! Selamat datang 🎉", "success")
-      }
+      await login(loginForm.email, loginForm.password)
+      addToast?.("Selamat datang kembali!", "success")
       navigate("/dashboard")
     } catch (err) {
-      addToast?.(err.message || "Terjadi kesalahan", "error")
+      addToast?.(err.message === "UNAUTHORIZED" ? "Email atau password salah" : err.message, "error")
     } finally {
       setLoading(false)
     }
   }
 
+  const handleRegister = async (e) => {
+    e.preventDefault()
+    setLoading(true)
+    try {
+      await register(registerForm)
+      addToast?.("Registrasi berhasil! Selamat datang", "success")
+      navigate("/dashboard")
+    } catch (err) {
+      addToast?.(err.message, "error")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const fillDemo = (email) => {
+    setLoginForm({ email, password: "Password123" })
+  }
+
   return (
-    <div style={{
-      minHeight: "100vh",
-      background: "linear-gradient(135deg, #0f172a 0%, #1a1040 50%, #0f172a 100%)",
-      display: "flex", alignItems: "center", justifyContent: "center",
-      padding: "24px",
-      position: "relative",
-      overflow: "hidden",
-    }}>
-      {/* Background orbs */}
-      <div style={{ position: "absolute", top: "10%", left: "15%", width: 400, height: 400, borderRadius: "50%", background: "rgba(99,102,241,0.07)", filter: "blur(80px)", pointerEvents: "none" }} />
-      <div style={{ position: "absolute", bottom: "10%", right: "15%", width: 350, height: 350, borderRadius: "50%", background: "rgba(139,92,246,0.06)", filter: "blur(80px)", pointerEvents: "none" }} />
-      <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 600, height: 600, borderRadius: "50%", background: "rgba(99,102,241,0.03)", filter: "blur(100px)", pointerEvents: "none" }} />
-
-      <div style={{ width: "100%", maxWidth: "440px", animation: "scaleIn 0.4s ease" }}>
+    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <div className="w-full max-w-md">
         {/* Logo */}
-        <div style={{ textAlign: "center", marginBottom: "32px" }}>
-          <div style={{
-            width: 72, height: 72, borderRadius: "20px",
-            background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: "2.2rem", margin: "0 auto 16px",
-            boxShadow: "0 8px 32px rgba(99,102,241,0.4)",
-          }}>🛵</div>
-          <h1 style={{ fontSize: "2rem", fontWeight: 900, marginBottom: "6px" }}>
-            <span style={{ background: "linear-gradient(135deg, #6366f1, #a78bfa)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Sewain</span>
-          </h1>
-          <p style={{ color: "#475569", fontSize: "0.875rem" }}>Platform Sewa Barang Online — Kelompok Harahetta</p>
+        <div className="text-center mb-8">
+          <img src="/sewainLogo.webp" alt="Sewain" className="w-12 h-12 rounded-xl object-cover mx-auto mb-3" />
+          <h1 className="text-2xl font-bold text-foreground">Sewain</h1>
+          <p className="text-sm text-muted-foreground">Platform sewa barang terpercaya</p>
         </div>
 
-        {/* Card */}
-        <div style={{
-          background: "rgba(30,41,59,0.8)", backdropFilter: "blur(24px)",
-          border: "1px solid rgba(148,163,184,0.12)", borderRadius: "24px",
-          padding: "32px", boxShadow: "0 24px 64px rgba(0,0,0,0.5)",
-        }}>
-          {/* Tab */}
-          <div style={{
-            display: "flex", background: "rgba(15,23,42,0.6)", borderRadius: "12px",
-            padding: "4px", marginBottom: "28px",
-          }}>
-            {["login", "register"].map(m => (
-              <button key={m} onClick={() => setMode(m)} style={{
-                flex: 1, padding: "9px",
-                background: mode === m ? "linear-gradient(135deg, #6366f1, #8b5cf6)" : "transparent",
-                border: "none", borderRadius: "10px",
-                color: mode === m ? "#fff" : "#64748b",
-                fontSize: "0.875rem", fontWeight: 600, cursor: "pointer",
-                transition: "all 0.2s ease",
-                boxShadow: mode === m ? "0 4px 14px rgba(99,102,241,0.35)" : "none",
-              }}>
-                {m === "login" ? "Masuk" : "Daftar"}
-              </button>
-            ))}
-          </div>
+        <Card>
+          <Tabs defaultValue="login">
+            <CardHeader className="pb-3">
+              <TabsList className="w-full">
+                <TabsTrigger value="login" className="flex-1">Masuk</TabsTrigger>
+                <TabsTrigger value="register" className="flex-1">Daftar</TabsTrigger>
+              </TabsList>
+            </CardHeader>
 
-          <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-            {mode === "register" && (
-              <>
-                <div className="form-group" style={{ margin: 0 }}>
-                  <label className="form-label">Nama Lengkap</label>
-                  <input id="reg-nama" name="nama" className="form-input" placeholder="Masukkan nama lengkap" value={form.nama} onChange={handleChange} required minLength={2} />
+            <CardContent>
+              {/* Login Tab */}
+              <TabsContent value="login" className="mt-0">
+                <CardTitle className="text-lg mb-1">Selamat Datang!</CardTitle>
+                <CardDescription className="mb-4">Masuk ke akun Sewain Anda</CardDescription>
+
+                <form onSubmit={handleLogin} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="login-email">Email</Label>
+                    <Input
+                      id="login-email"
+                      type="email"
+                      placeholder="nama@email.com"
+                      value={loginForm.email}
+                      onChange={(e) => setLoginForm(p => ({ ...p, email: e.target.value }))}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="login-password">Password</Label>
+                    <Input
+                      id="login-password"
+                      type="password"
+                      placeholder="Masukkan password"
+                      value={loginForm.password}
+                      onChange={(e) => setLoginForm(p => ({ ...p, password: e.target.value }))}
+                      required
+                    />
+                  </div>
+                  <Button type="submit" className="w-full" loading={loading}>Masuk</Button>
+                </form>
+
+                <div className="mt-4 p-3 rounded-lg bg-muted border text-xs space-y-1">
+                  <div className="flex items-center gap-1.5 font-semibold text-foreground mb-2">
+                    <Info className="w-3.5 h-3.5" /> Demo Akun:
+                  </div>
+                  <button onClick={() => fillDemo("user@sewain.id")} className="block w-full text-left hover:text-primary transition-colors">
+                    User: <span className="font-medium">user@sewain.id</span>
+                  </button>
+                  <button onClick={() => fillDemo("admin@sewain.id")} className="block w-full text-left hover:text-primary transition-colors">
+                    Admin: <span className="font-medium">admin@sewain.id</span>
+                  </button>
+                  <button onClick={() => fillDemo("super@sewain.id")} className="block w-full text-left hover:text-primary transition-colors">
+                    Super Admin: <span className="font-medium">super@sewain.id</span>
+                  </button>
+                  <p className="text-muted-foreground">Password: apapun</p>
                 </div>
-                <div className="form-group" style={{ margin: 0 }}>
-                  <label className="form-label">Daftar Sebagai</label>
-                  <select id="reg-role" name="role" className="form-select" value={form.role} onChange={handleChange}>
-                    <option value="user">👤 User (Penyewa)</option>
-                    <option value="admin">🏪 Admin (Penyedia Barang)</option>
-                  </select>
-                </div>
-              </>
-            )}
+              </TabsContent>
 
-            <div className="form-group" style={{ margin: 0 }}>
-              <label className="form-label">Email</label>
-              <input id="auth-email" name="email" type="email" className="form-input" placeholder="nama@email.com" value={form.email} onChange={handleChange} required />
-            </div>
+              {/* Register Tab */}
+              <TabsContent value="register" className="mt-0">
+                <CardTitle className="text-lg mb-1">Buat Akun Baru</CardTitle>
+                <CardDescription className="mb-4">Daftar dan mulai sewa barang</CardDescription>
 
-            <div className="form-group" style={{ margin: 0 }}>
-              <label className="form-label">Password</label>
-              <input id="auth-password" name="password" type="password" className="form-input" placeholder="Minimal 8 karakter (huruf besar, kecil, angka)" value={form.password} onChange={handleChange} required minLength={8} />
-            </div>
+                <form onSubmit={handleRegister} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="reg-nama">Nama Lengkap</Label>
+                    <Input
+                      id="reg-nama"
+                      placeholder="Masukkan nama lengkap"
+                      value={registerForm.nama}
+                      onChange={(e) => setRegisterForm(p => ({ ...p, nama: e.target.value }))}
+                      required
+                      minLength={2}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="reg-role">Daftar Sebagai</Label>
+                    <select
+                      id="reg-role"
+                      className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      value={registerForm.role}
+                      onChange={(e) => setRegisterForm(p => ({ ...p, role: e.target.value }))}
+                    >
+                      <option value="user">Penyewa</option>
+                      <option value="admin">Penyedia Barang</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="reg-email">Email</Label>
+                    <Input
+                      id="reg-email"
+                      type="email"
+                      placeholder="nama@email.com"
+                      value={registerForm.email}
+                      onChange={(e) => setRegisterForm(p => ({ ...p, email: e.target.value }))}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="reg-password">Password</Label>
+                    <Input
+                      id="reg-password"
+                      type="password"
+                      placeholder="Min 8 karakter (huruf besar, kecil, angka)"
+                      value={registerForm.password}
+                      onChange={(e) => setRegisterForm(p => ({ ...p, password: e.target.value }))}
+                      required
+                      minLength={8}
+                    />
+                  </div>
+                  <Button type="submit" className="w-full" loading={loading}>Buat Akun</Button>
+                </form>
+              </TabsContent>
+            </CardContent>
+          </Tabs>
+        </Card>
 
-            <Button type="submit" variant="primary" size="lg" fullWidth loading={loading} style={{ marginTop: "8px" }}>
-              {mode === "login" ? "Masuk" : "Buat Akun"}
-            </Button>
-          </form>
-
-          {mode === "login" && (
-            <div style={{
-              marginTop: "20px", padding: "12px 14px",
-              background: "rgba(99,102,241,0.08)", borderRadius: "10px",
-              border: "1px solid rgba(99,102,241,0.15)", fontSize: "0.8rem", color: "#6366f1",
-            }}>
-              💡 <strong>Demo:</strong> Gunakan akun yang tersedia di backend atau daftar akun baru
-            </div>
-          )}
-        </div>
-
-        <div style={{ textAlign: "center", marginTop: "20px", fontSize: "0.78rem", color: "#334155" }}>
-          Kelompok Harahetta-2 · Komputasi Awan · ITK
-        </div>
+        <p className="text-center text-xs text-muted-foreground mt-4">
+          Kelompok Harahetta-2 &middot; Komputasi Awan &middot; ITK
+        </p>
       </div>
     </div>
   )
