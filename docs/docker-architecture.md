@@ -10,16 +10,29 @@ Sistem ini terdiri dari tiga layanan utama. Seluruh layanan dijalankan di dalam 
 
 ```mermaid
 graph TD
-    User((User Browser)) -- port 3000 --> Frontend[Frontend Container]
-    Frontend -- port 8000 --> Backend[Backend Container]
-    Backend -- port 5432 --> Database[(PostgreSQL DB)]
-    Database --- Volume[[Docker Volume: pgdata]]
+    User([User / Browser])
+    
+    subgraph Docker_Network [Custom Network: cloudnet]
+        FE[Frontend React Container]
+        BE[Backend FastAPI Container]
+        DB[(PostgreSQL Container)]
+    end
 
-    style User fill:#F3E8FF,stroke:#7C3AED,stroke-width:2px
-    style Frontend fill:#EDE9FE,stroke:#6D28D9,stroke-width:2px
-    style Backend fill:#EDE9FE,stroke:#6D28D9,stroke-width:2px
-    style Database fill:#EDE9FE,stroke:#6D28D9,stroke-width:2px
-    style Volume fill:#F5F3FF,stroke:#8B5CF6,stroke-dasharray:5 5
+    Vol[(Docker Volume: pgdata)]
+
+    %% Aliran Data
+    User -- port 3000 --> FE
+    FE -- API Request --> BE
+    BE -- Connect: db:5432 --> DB
+    
+    %% Relasi ke Volume
+    DB --- Vol
+
+    %% Styling (Opsional untuk mempercantik)
+    style FE fill:#f9f,stroke:#333,stroke-width:2px
+    style BE fill:#bbf,stroke:#333,stroke-width:2px
+    style DB fill:#dfd,stroke:#333,stroke-width:2px
+    style Docker_Network fill:#fff,stroke:#333,stroke-dasharray: 5 5
 ```
 
 ---
