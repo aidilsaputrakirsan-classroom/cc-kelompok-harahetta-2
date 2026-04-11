@@ -1,0 +1,86 @@
+# 📑 Laporan Docker Architecture : Modul 6
+
+---
+
+## 1. Arsitektur Sistem (Docker Network)
+
+Sistem ini terdiri dari tiga layanan utama. Seluruh layanan dijalankan di dalam Docker Custom Network bernama cloudnet untuk memastikan isolasi dan keamanan komunikasi.
+
+### Diagram Arsitektur (Mermaid)
+
+```mermaid
+graph TD
+    User((User Browser)) -- port 3000 --> Frontend[Frontend Container]
+    Frontend -- port 8000 --> Backend[Backend Container]
+    Backend -- port 5432 --> Database[(PostgreSQL DB)]
+    Database --- Volume[[Docker Volume: pgdata]]
+
+    style User fill:#F3E8FF,stroke:#7C3AED,stroke-width:2px
+    style Frontend fill:#EDE9FE,stroke:#6D28D9,stroke-width:2px
+    style Backend fill:#EDE9FE,stroke:#6D28D9,stroke-width:2px
+    style Database fill:#EDE9FE,stroke:#6D28D9,stroke-width:2px
+    style Volume fill:#F5F3FF,stroke:#8B5CF6,stroke-dasharray:5 5
+```
+
+---
+
+## 2. Detail Konfigurasi Container
+
+| Komponen   | Image Name           | Port (Host:Cont) | Network   | Env Vars Kunci |
+|------------|----------------------|------------------|-----------|---------|
+| Frontend   | `sewain-frontend:v1` | 3000:80          | cloudnet  | -       |
+| Backend    | `sewain-backend:v2`  | 8000:8000        | cloudnet  | `DATABASE_URL=postgresql://postgres:postgres@db:5432/cloudapp` |
+| Database   | `postgres:16-alpine` | 15432:5432       | cloudnet  | `POSTGRES_PASSWORD=postgres, POSTGRES_DB=cloudapp` |
+
+---
+
+## 3. Docker Volumes
+
+Data database PostgreSQL disimpan di dalam named volume pgdata.
+
+- Path di Container: `/var/lib/postgresql/data`
+- Keuntungan: Data tidak hilang meskipun container di-restart atau dihapus (`docker rm`).
+
+---
+
+## 4. Cara Menjalankan (Quick Start)
+
+Gunakan urutan perintah berikut untuk menjalankan sistem secara keseluruhan:
+
+```bash
+# 1. Persiapan Jaringan & Volume
+docker network create cloudnet
+docker volume create pgdata
+
+# 2. Menjalankan Database
+docker run -d --name db --network cloudnet -v pgdata:/var/lib/postgresql/data \
+-e POSTGRES_PASSWORD=postgres \
+-e POSTGRES_DB=cloudapp \
+-p 5433:5432 postgres:16-alpine
+
+# 3. Menjalankan Backend
+docker run -d --name backend --network cloudnet \
+--env-file .env \
+-p 8000:8000 cloudapp-backend:v1
+
+# 4. Menjalankan Frontend
+docker run -d --name frontend --network cloudnet \
+-p 3000:80 cloudapp-frontend:v1
+```
+
+## 5. Pengujian
+
+Berikut adalah hasil pengujian integrasi yang telah dilakukan:
+
+### A. Pengujian Multi-Stage Build (Efisiensi)
+
+- Target: Ukuran Image Frontend < 50 MB.
+- Hasil Perintah `docker images`: 26.1 MB
+- Status: ✅ Berhasil
+- Catatan QA: Tim berhasil mengimplementasikan Multi-Stage Build menggunakan Nginx Alpine, sehingga mereduksi ukuran image secara signifikan dari estimasi ~1GB menjadi hanya 26.1 MB.
+
+### B. Pengujian Persistensi Data (Volume)
+
+### C. Pengujian Jaringan (Networking)
+
+---
