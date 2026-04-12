@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from "react"
 import { fetchMyRentals } from "../services/api"
 import { formatPrice } from "../lib/utils"
-import { Button } from "../components/ui/button"
+import { Button } from "../components/ui/Button"
 import { Card, CardContent } from "../components/ui/card"
-import { StatusBadge } from "../components/ui/badge"
+import { StatusBadge } from "../components/ui/Badge"
 import { Skeleton } from "../components/ui/skeleton"
 import { ClipboardList, ArrowLeft, ArrowRight, Calendar, Package } from "lucide-react"
 

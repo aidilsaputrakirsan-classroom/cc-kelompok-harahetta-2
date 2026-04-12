@@ -6,11 +6,11 @@ import {
   fetchPendingVerifications, verifyUser,
   fetchAllRentals,
 } from "../services/api"
-import { Button } from "../components/ui/button"
+import { Button } from "../components/ui/Button"
 import { Input } from "../components/ui/input"
 import { Label } from "../components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card"
-import { StatusBadge } from "../components/ui/badge"
+import { StatusBadge } from "../components/ui/Badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table"
 import { Skeleton } from "../components/ui/skeleton"

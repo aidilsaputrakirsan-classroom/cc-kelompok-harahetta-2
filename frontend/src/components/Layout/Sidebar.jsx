@@ -5,7 +5,7 @@ import {
   Package, LayoutDashboard, ShoppingCart, ClipboardList, User,
   Store, Crown, LogOut, ChevronLeft, Menu,
 } from "lucide-react"
-import { Button } from "../ui/button"
+import { Button } from "../ui/Button"
 import { Separator } from "../ui/separator"
 import { useState } from "react"
 
