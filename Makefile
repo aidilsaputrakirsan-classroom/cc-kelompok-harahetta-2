@@ -1,11 +1,22 @@
 
-
-IMAGE_NAME   = sewain-backend
-IMAGE_TAG    = v1
-DOCKER_USER  = alif10231056
+# ─────────────────────────────────────────────
+# BACKEND
+# ─────────────────────────────────────────────
+IMAGE_NAME     = sewain-backend
+IMAGE_TAG      = v1
+DOCKER_USER    = alif10231056
 CONTAINER_NAME = sewain-backend
-PORT         = 8000
-ENV_FILE     = ./backend/.env
+PORT           = 8000
+ENV_FILE       = ./backend/.env
+
+# ─────────────────────────────────────────────
+# FRONTEND
+# ─────────────────────────────────────────────
+FE_IMAGE_NAME     = sewain-frontend
+FE_IMAGE_TAG      = v2
+FE_CONTAINER_NAME = sewain-frontend
+FE_PORT           = 3000
+VITE_API_URL      = http://localhost:8000
 
 # ─────────────────────────────────────────────
 # Build image dari Dockerfile
@@ -111,4 +122,61 @@ help:
 	@echo "  make restart   → Rebuild + rerun dari awal"
 	@echo ""
 
-.PHONY: build run run-fg push stop clean logs health shell ps restart help
+# ─────────────────────────────────────────────
+# FRONTEND: Build image v2
+# ─────────────────────────────────────────────
+fe-build:
+	@echo "🔨 Building frontend image $(FE_IMAGE_NAME):$(FE_IMAGE_TAG)..."
+	docker build \
+		--build-arg VITE_API_URL=$(VITE_API_URL) \
+		-t $(FE_IMAGE_NAME):$(FE_IMAGE_TAG) \
+		./frontend
+	@echo "✅ Frontend build selesai!"
+
+# ─────────────────────────────────────────────
+# FRONTEND: Push image v2 ke Docker Hub
+# ─────────────────────────────────────────────
+fe-push: fe-build
+	@echo "🏷️  Tagging image ke $(DOCKER_USER)/$(FE_IMAGE_NAME):$(FE_IMAGE_TAG)..."
+	docker tag $(FE_IMAGE_NAME):$(FE_IMAGE_TAG) $(DOCKER_USER)/$(FE_IMAGE_NAME):$(FE_IMAGE_TAG)
+	@echo "📤 Pushing ke Docker Hub..."
+	docker push $(DOCKER_USER)/$(FE_IMAGE_NAME):$(FE_IMAGE_TAG)
+	@echo "✅ Push selesai! Lihat: https://hub.docker.com/r/$(DOCKER_USER)/$(FE_IMAGE_NAME)"
+
+# ─────────────────────────────────────────────
+# FRONTEND: Jalankan container
+# ─────────────────────────────────────────────
+fe-run:
+	@echo "🚀 Menjalankan frontend container di port $(FE_PORT)..."
+	docker run -d \
+		--name $(FE_CONTAINER_NAME) \
+		--network cloudnet \
+		-p $(FE_PORT):80 \
+		$(FE_IMAGE_NAME):$(FE_IMAGE_TAG)
+	@echo "✅ Frontend berjalan! Cek: http://localhost:$(FE_PORT)"
+
+# ─────────────────────────────────────────────
+# FRONTEND: Stop container
+# ─────────────────────────────────────────────
+fe-stop:
+	@echo "⏹️  Menghentikan frontend container..."
+	docker stop $(FE_CONTAINER_NAME) 2>/dev/null || true
+	docker rm $(FE_CONTAINER_NAME) 2>/dev/null || true
+	@echo "✅ Frontend container dihentikan."
+
+# ─────────────────────────────────────────────
+# FRONTEND: Rebuild + rerun
+# ─────────────────────────────────────────────
+fe-restart: fe-stop fe-build fe-run
+
+# ─────────────────────────────────────────────
+# Push semua image (backend + frontend) ke Hub
+# ─────────────────────────────────────────────
+push-all: push fe-push
+	@echo ""
+	@echo "🎉 Semua image sudah di-push ke Docker Hub!"
+	@echo "   Backend  : https://hub.docker.com/r/$(DOCKER_USER)/$(IMAGE_NAME)"
+	@echo "   Frontend : https://hub.docker.com/r/$(DOCKER_USER)/$(FE_IMAGE_NAME)"
+
+.PHONY: build run run-fg push stop clean logs health shell ps restart help \
+        fe-build fe-push fe-run fe-stop fe-restart push-all
