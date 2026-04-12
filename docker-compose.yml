@@ -1,5 +1,3 @@
-# Tes lokal penuh: Postgres + FastAPI + frontend (Nginx).
-# Kredensial DB harus sama dengan DATABASE_URL di backend/.env.docker
 services:
   db:
     image: postgres:16-alpine
@@ -17,8 +15,7 @@ services:
       start_period: 10s
 
   backend:
-    build:
-      context: ./backend
+    image: alif10231056/sewain-backend:v2   # ← pull dari Docker Hub
     env_file:
       - ./backend/.env.docker
     environment:
@@ -35,10 +32,7 @@ services:
       ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 
   frontend:
-    build:
-      context: ./frontend
-      args:
-        VITE_API_URL: http://localhost:8000
+    image: alif10231056/sewain-frontend:v2  # ← pull dari Docker Hub
     ports:
       - "3000:80"
     depends_on:
