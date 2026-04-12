@@ -74,19 +74,4 @@ docker run -d --name frontend --network cloudnet \
 -p 3000:80 cloudapp-frontend:v1
 ```
 
-## 5. Pengujian
-
-Berikut adalah hasil pengujian integrasi yang telah dilakukan:
-
-### A. Pengujian Multi-Stage Build (Efisiensi)
-
-- Target: Ukuran Image Frontend < 50 MB.
-- Hasil Perintah `docker images`: 26.1 MB
-- Status: ✅ Berhasil
-- Catatan QA: Tim berhasil mengimplementasikan Multi-Stage Build menggunakan Nginx Alpine, sehingga mereduksi ukuran image secara signifikan dari estimasi ~1GB menjadi hanya 26.1 MB.
-
-### B. Pengujian Persistensi Data (Volume)
-
-### C. Pengujian Jaringan (Networking)
-
 ---
