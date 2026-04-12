@@ -5,6 +5,8 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: setiawan
       POSTGRES_DB: data_sewain
+    ports:
+      - "15432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
