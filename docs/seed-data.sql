@@ -14,9 +14,16 @@
 
 INSERT INTO users (email, nama, hashed_password, role, is_active, is_verified) VALUES
 
--- Super Admin
+-- Super Admin 1
+-- Password: SuperAdmin123! (hash dibuat via passlib bcrypt)
 ('superadmin@sewain.id', 'Super Admin Sewain',
- '$2b$12$LCoxfXMD2LL6YNHxEjCGBubRmTD11gfVn3NJEVOwtqoJjnwlqA0aK',
+ '$2b$12$9QXR9BuEj00Gp.Do8np5Ue0P2G7otE/DuM9hwPXyXoLTA74nPP98y',
+ 'super_admin', true, false),
+
+-- Super Admin 2
+-- Password: SuperAdmin2@Sewain
+('superadmin2@sewain.id', 'Super Admin 2',
+ '$2b$12$AdrM0HT3HrKUnqaP36AKXO2NPiNhk0RoYBNYyW4mLsKcNlx2YLqQ.',
  'super_admin', true, false),
 
 -- Admin / Penyedia Barang (2 orang)

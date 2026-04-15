@@ -8,13 +8,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card"
 import { StatusBadge } from "../components/ui/Badge"
 import { Separator } from "../components/ui/separator"
 import { Skeleton } from "../components/ui/skeleton"
-import { User, Clock, CheckCircle, XCircle, Save, CreditCard, MapPin } from "lucide-react"
+import { User, Clock, CheckCircle, XCircle, Save, CreditCard, ImageIcon, X } from "lucide-react"
 
 export default function ProfilePage({ addToast }) {
   const { user, refreshUser } = useAuth()
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [uploading, setUploading] = useState({})
   const [form, setForm] = useState({
     nama_orang_tua: "", alamat: "", latitude: "", longitude: "",
     foto_ktp: "", foto_selfie_ktp: "",
@@ -38,6 +39,33 @@ export default function ProfilePage({ addToast }) {
   }, [])
 
   const handleChange = (e) => setForm(p => ({ ...p, [e.target.name]: e.target.value }))
+
+  const compressAndSet = (file, fieldName) => {
+    if (file.size > 5 * 1024 * 1024) {
+      addToast?.("Ukuran file maksimal 5MB", "error")
+      return
+    }
+    setUploading(p => ({ ...p, [fieldName]: true }))
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      const img = new Image()
+      img.onload = () => {
+        const MAX = 1024
+        let { width, height } = img
+        if (width > MAX || height > MAX) {
+          if (width > height) { height = Math.round(height * MAX / width); width = MAX }
+          else { width = Math.round(width * MAX / height); height = MAX }
+        }
+        const canvas = document.createElement("canvas")
+        canvas.width = width; canvas.height = height
+        canvas.getContext("2d").drawImage(img, 0, 0, width, height)
+        setForm(p => ({ ...p, [fieldName]: canvas.toDataURL("image/jpeg", 0.8) }))
+        setUploading(p => ({ ...p, [fieldName]: false }))
+      }
+      img.src = ev.target.result
+    }
+    reader.readAsDataURL(file)
+  }
 
   const handleSave = async (e) => {
     e.preventDefault()
@@ -165,19 +193,63 @@ export default function ProfilePage({ addToast }) {
               </p>
             </div>
 
+            {/* Foto KTP */}
             <div className="space-y-2">
-              <Label htmlFor="profile-ktp">Foto KTP</Label>
-              <Input id="profile-ktp" name="foto_ktp" type="url" placeholder="https://..." value={form.foto_ktp} onChange={handleChange} />
-              {form.foto_ktp && (
-                <img src={form.foto_ktp} alt="Foto KTP" className="max-h-36 object-contain rounded-lg border" onError={(e) => { e.target.style.display = "none" }} />
+              <Label>Foto KTP</Label>
+              {form.foto_ktp ? (
+                <div className="relative inline-block w-full">
+                  <img src={form.foto_ktp} alt="Foto KTP" className="w-full max-h-44 object-contain rounded-lg border bg-muted" />
+                  <button type="button"
+                    onClick={() => setForm(p => ({ ...p, foto_ktp: "" }))}
+                    className="absolute top-1 right-1 bg-destructive text-destructive-foreground rounded-full p-1 hover:opacity-80 transition-opacity">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <label className={`flex flex-col items-center justify-center w-full h-28 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted/50 transition-colors ${uploading.foto_ktp ? "opacity-50 pointer-events-none" : ""}`}>
+                  <div className="flex flex-col items-center gap-1 text-muted-foreground">
+                    {uploading.foto_ktp ? <span className="text-sm">Memproses...</span> : (
+                      <>
+                        <ImageIcon className="w-7 h-7" />
+                        <span className="text-sm font-medium">Klik untuk upload Foto KTP</span>
+                        <span className="text-xs">JPG, PNG, WEBP · maks 5MB</span>
+                      </>
+                    )}
+                  </div>
+                  <input type="file" className="hidden" accept="image/jpeg,image/png,image/webp,image/gif"
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) compressAndSet(f, "foto_ktp"); e.target.value = "" }}
+                    disabled={uploading.foto_ktp} />
+                </label>
               )}
             </div>
 
+            {/* Selfie dengan KTP */}
             <div className="space-y-2">
-              <Label htmlFor="profile-selfie">Selfie dengan KTP</Label>
-              <Input id="profile-selfie" name="foto_selfie_ktp" type="url" placeholder="https://..." value={form.foto_selfie_ktp} onChange={handleChange} />
-              {form.foto_selfie_ktp && (
-                <img src={form.foto_selfie_ktp} alt="Selfie KTP" className="max-h-36 object-contain rounded-lg border" onError={(e) => { e.target.style.display = "none" }} />
+              <Label>Selfie dengan KTP</Label>
+              {form.foto_selfie_ktp ? (
+                <div className="relative inline-block w-full">
+                  <img src={form.foto_selfie_ktp} alt="Selfie KTP" className="w-full max-h-44 object-contain rounded-lg border bg-muted" />
+                  <button type="button"
+                    onClick={() => setForm(p => ({ ...p, foto_selfie_ktp: "" }))}
+                    className="absolute top-1 right-1 bg-destructive text-destructive-foreground rounded-full p-1 hover:opacity-80 transition-opacity">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <label className={`flex flex-col items-center justify-center w-full h-28 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted/50 transition-colors ${uploading.foto_selfie_ktp ? "opacity-50 pointer-events-none" : ""}`}>
+                  <div className="flex flex-col items-center gap-1 text-muted-foreground">
+                    {uploading.foto_selfie_ktp ? <span className="text-sm">Memproses...</span> : (
+                      <>
+                        <ImageIcon className="w-7 h-7" />
+                        <span className="text-sm font-medium">Klik untuk upload Selfie + KTP</span>
+                        <span className="text-xs">JPG, PNG, WEBP · maks 5MB</span>
+                      </>
+                    )}
+                  </div>
+                  <input type="file" className="hidden" accept="image/jpeg,image/png,image/webp,image/gif"
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) compressAndSet(f, "foto_selfie_ktp"); e.target.value = "" }}
+                    disabled={uploading.foto_selfie_ktp} />
+                </label>
               )}
             </div>
 

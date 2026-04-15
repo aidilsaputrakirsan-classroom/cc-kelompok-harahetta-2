@@ -20,7 +20,7 @@ import {
 } from "../components/ui/dialog"
 import {
   Package, ClipboardList, Store, Plus, Pencil, Trash2,
-  Calendar, CheckCircle, XCircle, Save, AlertTriangle,
+  Calendar, CheckCircle, XCircle, Save, AlertTriangle, ImageIcon, X,
 } from "lucide-react"
 
 const defaultItem = { nama: "", deskripsi: "", harga_per_hari: "", stok: 1, foto_url: "", category_id: "" }
@@ -83,6 +83,7 @@ export default function AdminDashboard({ addToast }) {
   const [editingItem, setEditingItem] = useState(null)
   const [form, setForm] = useState(defaultItem)
   const [saving, setSaving] = useState(false)
+  const [fotoUploading, setFotoUploading] = useState(false)
   const [profileForm, setProfileForm] = useState({ nama_usaha: "", alamat_usaha: "", nomor_telepon: "" })
   const [savingProfile, setSavingProfile] = useState(false)
 
@@ -180,6 +181,39 @@ export default function AdminDashboard({ addToast }) {
       addToast?.("Profil usaha disimpan", "success")
     } catch (err) { addToast?.(err.message, "error") }
     finally { setSavingProfile(false) }
+  }
+
+  const handleFotoChange = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > 5 * 1024 * 1024) {
+      addToast?.("Ukuran file maksimal 5MB", "error")
+      e.target.value = ""
+      return
+    }
+    setFotoUploading(true)
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      const img = new Image()
+      img.onload = () => {
+        const MAX = 800
+        let { width, height } = img
+        if (width > MAX || height > MAX) {
+          if (width > height) { height = Math.round(height * MAX / width); width = MAX }
+          else { width = Math.round(width * MAX / height); height = MAX }
+        }
+        const canvas = document.createElement("canvas")
+        canvas.width = width
+        canvas.height = height
+        canvas.getContext("2d").drawImage(img, 0, 0, width, height)
+        const compressed = canvas.toDataURL("image/jpeg", 0.75)
+        setForm(p => ({ ...p, foto_url: compressed }))
+        setFotoUploading(false)
+      }
+      img.src = ev.target.result
+    }
+    reader.readAsDataURL(file)
+    e.target.value = ""
   }
 
   if (loading) {
@@ -370,9 +404,44 @@ export default function AdminDashboard({ addToast }) {
               </select>
             </div>
             <div className="space-y-2">
-              <Label>URL Foto Barang</Label>
-              <Input type="url" placeholder="https://..." value={form.foto_url}
-                onChange={(e) => setForm(p => ({ ...p, foto_url: e.target.value }))} />
+              <Label>Foto Barang</Label>
+              {form.foto_url ? (
+                <div className="relative inline-block w-full">
+                  <img
+                    src={form.foto_url}
+                    alt="Preview foto barang"
+                    className="w-full max-h-40 object-contain rounded-lg border bg-muted"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setForm(p => ({ ...p, foto_url: "" }))}
+                    className="absolute top-1 right-1 bg-destructive text-destructive-foreground rounded-full p-1 hover:opacity-80 transition-opacity"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <label className={`flex flex-col items-center justify-center w-full h-28 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted/50 transition-colors ${fotoUploading ? "opacity-50 pointer-events-none" : ""}`}>
+                  <div className="flex flex-col items-center gap-1 text-muted-foreground">
+                    {fotoUploading ? (
+                      <span className="text-sm">Memproses...</span>
+                    ) : (
+                      <>
+                        <ImageIcon className="w-7 h-7" />
+                        <span className="text-sm font-medium">Klik untuk pilih foto</span>
+                        <span className="text-xs">JPG, PNG, WEBP, GIF · maks 2MB</span>
+                      </>
+                    )}
+                  </div>
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    onChange={handleFotoChange}
+                    disabled={fotoUploading}
+                  />
+                </label>
+              )}
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setModalOpen(false)}>Batal</Button>

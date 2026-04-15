@@ -20,7 +20,7 @@ import {
 import {
   Users, Package, ClipboardList, FolderOpen, ShieldCheck, Crown,
   BarChart3, Plus, Trash2, UserCheck, UserX, CheckCircle, XCircle,
-  Calendar, ExternalLink, DollarSign, Eye,
+  Calendar, DollarSign, Eye, ImageOff,
 } from "lucide-react"
 
 function StatCard({ icon: Icon, label, value, description }) {
@@ -54,6 +54,7 @@ export default function SuperAdminPanel({ addToast }) {
   const [savingCat, setSavingCat] = useState(false)
   const [userRoleFilter, setUserRoleFilter] = useState("")
   const [rentalStatusFilter, setRentalStatusFilter] = useState("")
+  const [imgPreview, setImgPreview] = useState(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -65,9 +66,9 @@ export default function SuperAdminPanel({ addToast }) {
         fetchPendingVerifications(),
       ])
       setStats(s)
-      setUsers(u)
-      setCategories(c)
-      setVerifications(v.profiles || [])
+      setUsers(Array.isArray(u) ? u : (u?.users || []))
+      setCategories(Array.isArray(c) ? c : (c?.categories || []))
+      setVerifications(v?.profiles || [])
     } catch (err) {
       addToast?.(err.message, "error")
     } finally {
@@ -78,7 +79,7 @@ export default function SuperAdminPanel({ addToast }) {
   const loadRentals = useCallback(async () => {
     try {
       const data = await fetchAllRentals({ status: rentalStatusFilter || undefined })
-      setRentals(data.rentals)
+      setRentals(Array.isArray(data) ? data : (data?.rentals || []))
     } catch {}
   }, [rentalStatusFilter])
 
@@ -268,34 +269,68 @@ export default function SuperAdminPanel({ addToast }) {
             <div className="space-y-3">
               {verifications.map(p => (
                 <Card key={p.id}>
-                  <CardContent className="p-4 flex flex-col sm:flex-row gap-4 items-start">
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-bold text-foreground">User #{p.user_id}</h3>
-                      <div className="text-sm text-muted-foreground mt-1 space-y-0.5">
-                        {p.alamat && <div>Alamat: {p.alamat}</div>}
-                        {p.nama_orang_tua && <div>Orang Tua: {p.nama_orang_tua}</div>}
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="font-bold text-foreground">User #{p.user_id}</h3>
+                          <StatusBadge status={p.status_verifikasi} />
+                        </div>
+                        <div className="text-sm text-muted-foreground mt-1 space-y-0.5">
+                          {p.alamat && <div>📍 {p.alamat}</div>}
+                          {p.nama_orang_tua && <div>👤 Orang Tua: {p.nama_orang_tua}</div>}
+                        </div>
                       </div>
-                      <div className="mt-2"><StatusBadge status={p.status_verifikasi} /></div>
-                      <div className="flex gap-3 mt-2">
-                        {p.foto_ktp && (
-                          <a href={p.foto_ktp} target="_blank" rel="noreferrer" className="text-xs text-primary flex items-center gap-1 hover:underline">
-                            <Eye className="w-3.5 h-3.5" /> Lihat KTP
-                          </a>
-                        )}
-                        {p.foto_selfie_ktp && (
-                          <a href={p.foto_selfie_ktp} target="_blank" rel="noreferrer" className="text-xs text-primary flex items-center gap-1 hover:underline">
-                            <ExternalLink className="w-3.5 h-3.5" /> Lihat Selfie
-                          </a>
-                        )}
+                      <div className="flex gap-2 flex-shrink-0">
+                        <Button size="sm" variant="success" onClick={() => handleVerify(p.user_id, "disetujui")}>
+                          <CheckCircle className="w-3.5 h-3.5 mr-1" /> Setujui
+                        </Button>
+                        <Button size="sm" variant="destructive" onClick={() => handleVerify(p.user_id, "ditolak")}>
+                          <XCircle className="w-3.5 h-3.5 mr-1" /> Tolak
+                        </Button>
                       </div>
                     </div>
-                    <div className="flex gap-2 flex-shrink-0">
-                      <Button size="sm" variant="success" onClick={() => handleVerify(p.user_id, "disetujui")}>
-                        <CheckCircle className="w-3.5 h-3.5 mr-1" /> Setujui
-                      </Button>
-                      <Button size="sm" variant="destructive" onClick={() => handleVerify(p.user_id, "ditolak")}>
-                        <XCircle className="w-3.5 h-3.5 mr-1" /> Tolak
-                      </Button>
+
+                    {/* Foto KTP */}
+                    <div className="mt-4 grid grid-cols-2 gap-3">
+                      {/* Foto KTP */}
+                      <div className="space-y-1">
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Foto KTP</p>
+                        {p.foto_ktp ? (
+                          <button type="button" onClick={() => setImgPreview({ src: p.foto_ktp, label: "Foto KTP — User #" + p.user_id })}
+                            className="group relative w-full overflow-hidden rounded-lg border border-border bg-muted hover:ring-2 hover:ring-primary transition" style={{ aspectRatio: "16/9" }}>
+                            <img src={p.foto_ktp} alt="KTP" className="w-full h-full object-cover" />
+                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center gap-1 transition">
+                              <Eye className="w-5 h-5 text-white" />
+                              <span className="text-white text-xs font-medium">Lihat Penuh</span>
+                            </div>
+                          </button>
+                        ) : (
+                          <div className="w-full rounded-lg border-2 border-dashed border-border bg-muted/50 flex flex-col items-center justify-center gap-1.5 text-muted-foreground" style={{ aspectRatio: "16/9" }}>
+                            <ImageOff className="w-6 h-6" />
+                            <span className="text-xs">Belum diupload</span>
+                          </div>
+                        )}
+                      </div>
+                      {/* Selfie + KTP */}
+                      <div className="space-y-1">
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Selfie + KTP</p>
+                        {p.foto_selfie_ktp ? (
+                          <button type="button" onClick={() => setImgPreview({ src: p.foto_selfie_ktp, label: "Selfie + KTP — User #" + p.user_id })}
+                            className="group relative w-full overflow-hidden rounded-lg border border-border bg-muted hover:ring-2 hover:ring-primary transition" style={{ aspectRatio: "16/9" }}>
+                            <img src={p.foto_selfie_ktp} alt="Selfie KTP" className="w-full h-full object-cover" />
+                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center gap-1 transition">
+                              <Eye className="w-5 h-5 text-white" />
+                              <span className="text-white text-xs font-medium">Lihat Penuh</span>
+                            </div>
+                          </button>
+                        ) : (
+                          <div className="w-full rounded-lg border-2 border-dashed border-border bg-muted/50 flex flex-col items-center justify-center gap-1.5 text-muted-foreground" style={{ aspectRatio: "16/9" }}>
+                            <ImageOff className="w-6 h-6" />
+                            <span className="text-xs">Belum diupload</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -346,6 +381,21 @@ export default function SuperAdminPanel({ addToast }) {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Image Preview Dialog */}
+      <Dialog open={!!imgPreview} onOpenChange={() => setImgPreview(null)}>
+        <DialogContent className="sm:max-w-[640px]">
+          <DialogHeader>
+            <DialogTitle>{imgPreview?.label}</DialogTitle>
+          </DialogHeader>
+          <div className="flex justify-center">
+            {imgPreview && (
+              <img src={imgPreview.src} alt={imgPreview.label}
+                className="max-w-full max-h-[70vh] rounded-lg object-contain border border-border" />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Add Category Dialog */}
       <Dialog open={catModalOpen} onOpenChange={setCatModalOpen}>
