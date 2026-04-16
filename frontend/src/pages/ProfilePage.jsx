@@ -17,7 +17,7 @@ export default function ProfilePage({ addToast }) {
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState({})
   const [form, setForm] = useState({
-    nama_orang_tua: "", alamat: "", latitude: "", longitude: "",
+    nama_orang_tua: "", alamat: "", nomor_telepon: "",
     foto_ktp: "", foto_selfie_ktp: "",
   })
 
@@ -28,8 +28,7 @@ export default function ProfilePage({ addToast }) {
         setForm({
           nama_orang_tua: p.nama_orang_tua || "",
           alamat: p.alamat || "",
-          latitude: p.latitude || "",
-          longitude: p.longitude || "",
+          nomor_telepon: p.nomor_telepon || "",
           foto_ktp: p.foto_ktp || "",
           foto_selfie_ktp: p.foto_selfie_ktp || "",
         })
@@ -72,10 +71,6 @@ export default function ProfilePage({ addToast }) {
     setSaving(true)
     try {
       const payload = { ...form }
-      if (payload.latitude) payload.latitude = parseFloat(payload.latitude)
-      else delete payload.latitude
-      if (payload.longitude) payload.longitude = parseFloat(payload.longitude)
-      else delete payload.longitude
       Object.keys(payload).forEach(k => { if (payload[k] === "") delete payload[k] })
       const updated = await updateProfile(payload)
       setProfile(updated)
@@ -171,15 +166,9 @@ export default function ProfilePage({ addToast }) {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="profile-lat">Latitude</Label>
-                <Input id="profile-lat" name="latitude" type="number" step="any" placeholder="-1.2654" value={form.latitude} onChange={handleChange} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="profile-lon">Longitude</Label>
-                <Input id="profile-lon" name="longitude" type="number" step="any" placeholder="116.8312" value={form.longitude} onChange={handleChange} />
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="profile-phone">Nomor Telepon</Label>
+              <Input id="profile-phone" name="nomor_telepon" type="tel" placeholder="08123456789" value={form.nomor_telepon} onChange={handleChange} maxLength={20} />
             </div>
 
             <Separator />

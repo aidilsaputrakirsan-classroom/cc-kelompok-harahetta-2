@@ -8,6 +8,7 @@ import { Loader2 } from "lucide-react"
 import LandingPage from "./pages/LandingPage"
 import LoginPage from "./pages/LoginPage"
 import DashboardPage from "./pages/DashboardPage"
+import UserDashboard from "./pages/UserDashboard"
 import RentalPage from "./pages/RentalPage"
 import MyRentalsPage from "./pages/MyRentalsPage"
 import ProfilePage from "./pages/ProfilePage"
@@ -67,6 +68,11 @@ function AppLayout({ addToast }) {
       <div className="flex-1 flex flex-col">
         <main className="flex-1 p-4 md:p-6 overflow-auto">
           <Routes>
+            {/* User home (role=user) */}
+            <Route path="/home" element={<RequireAuth><UserDashboard addToast={addToast} /></RequireAuth>} />
+            {/* Catalog — accessible to all logged-in users */}
+            <Route path="/catalog" element={<DashboardPage addToast={addToast} />} />
+            {/* /dashboard → keep for admin/superadmin */}
             <Route path="/dashboard" element={<DashboardPage addToast={addToast} />} />
             <Route path="/rentals/new" element={<RequireAuth><RentalPage addToast={addToast} /></RequireAuth>} />
             <Route path="/rentals/my" element={<RequireAuth><MyRentalsPage addToast={addToast} /></RequireAuth>} />
@@ -76,7 +82,7 @@ function AppLayout({ addToast }) {
             <Route path="/admin/profile" element={<RequireAdmin><AdminDashboard addToast={addToast} /></RequireAdmin>} />
             <Route path="/superadmin" element={<RequireSuperAdmin><SuperAdminPanel addToast={addToast} /></RequireSuperAdmin>} />
             <Route path="/superadmin/*" element={<RequireSuperAdmin><SuperAdminPanel addToast={addToast} /></RequireSuperAdmin>} />
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            <Route path="*" element={<Navigate to="/home" replace />} />
           </Routes>
         </main>
       </div>
@@ -86,19 +92,20 @@ function AppLayout({ addToast }) {
 
 function AppContent() {
   const { addToast } = useToastHelper()
-  const { isAuthenticated, loading } = useAuth()
+  const { isAuthenticated, isAdmin, isSuperAdmin, loading } = useAuth()
 
   if (loading) return <LoadingScreen />
+
+  const homeRoute = isAdmin || isSuperAdmin ? "/dashboard" : "/home"
 
   return (
     <>
       <Toaster position="top-right" richColors closeButton />
       <Routes>
-        <Route path="/" element={
-          isAuthenticated ? <Navigate to="/dashboard" replace /> : <LandingPage />
-        } />
+        {/* Landing page selalu bisa dikunjungi (seperti recraft.ai) */}
+        <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={
-          isAuthenticated ? <Navigate to="/dashboard" replace /> : <LoginPage addToast={addToast} />
+          isAuthenticated ? <Navigate to={homeRoute} replace /> : <LoginPage addToast={addToast} />
         } />
         <Route path="/404" element={<RedirectToStatic404 />} />
         <Route path="/*" element={

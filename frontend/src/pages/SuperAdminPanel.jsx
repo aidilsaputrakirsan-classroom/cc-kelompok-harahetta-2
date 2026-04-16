@@ -20,7 +20,7 @@ import {
 import {
   Users, Package, ClipboardList, FolderOpen, ShieldCheck, Crown,
   BarChart3, Plus, Trash2, UserCheck, UserX, CheckCircle, XCircle,
-  Calendar, DollarSign, Eye, ImageOff,
+  Calendar, DollarSign, Eye, ImageOff, RefreshCw,
 } from "lucide-react"
 
 function StatCard({ icon: Icon, label, value, description }) {
@@ -55,6 +55,8 @@ export default function SuperAdminPanel({ addToast }) {
   const [userRoleFilter, setUserRoleFilter] = useState("")
   const [rentalStatusFilter, setRentalStatusFilter] = useState("")
   const [imgPreview, setImgPreview] = useState(null)
+  const [verifLoading, setVerifLoading] = useState(false)
+  const [verifLastUpdated, setVerifLastUpdated] = useState(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -69,12 +71,26 @@ export default function SuperAdminPanel({ addToast }) {
       setUsers(Array.isArray(u) ? u : (u?.users || []))
       setCategories(Array.isArray(c) ? c : (c?.categories || []))
       setVerifications(v?.profiles || [])
+      setVerifLastUpdated(new Date())
     } catch (err) {
       addToast?.(err.message, "error")
     } finally {
       setLoading(false)
     }
   }, [userRoleFilter, addToast])
+
+  const loadVerifications = useCallback(async () => {
+    setVerifLoading(true)
+    try {
+      const v = await fetchPendingVerifications()
+      setVerifications(v?.profiles || [])
+      setVerifLastUpdated(new Date())
+    } catch (err) {
+      addToast?.(err.message, "error")
+    } finally {
+      setVerifLoading(false)
+    }
+  }, [addToast])
 
   const loadRentals = useCallback(async () => {
     try {
@@ -150,7 +166,7 @@ export default function SuperAdminPanel({ addToast }) {
           <TabsTrigger value="stats"><BarChart3 className="w-4 h-4 mr-1" /> Statistik</TabsTrigger>
           <TabsTrigger value="users"><Users className="w-4 h-4 mr-1" /> Semua Pengguna</TabsTrigger>
           <TabsTrigger value="categories"><FolderOpen className="w-4 h-4 mr-1" /> Kategori</TabsTrigger>
-          <TabsTrigger value="verifications"><ShieldCheck className="w-4 h-4 mr-1" /> Verifikasi</TabsTrigger>
+          <TabsTrigger value="verifications" onClick={loadVerifications}><ShieldCheck className="w-4 h-4 mr-1" /> Verifikasi</TabsTrigger>
           <TabsTrigger value="rentals" onClick={loadRentals}><ClipboardList className="w-4 h-4 mr-1" /> Semua Transaksi</TabsTrigger>
         </TabsList>
 
@@ -259,7 +275,20 @@ export default function SuperAdminPanel({ addToast }) {
 
         {/* === VERIFICATIONS === */}
         <TabsContent value="verifications" className="space-y-4 mt-4">
-          <h2 className="text-lg font-semibold">Verifikasi KTP Pengguna</h2>
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <h2 className="text-lg font-semibold">Verifikasi KTP Pengguna</h2>
+            <div className="flex items-center gap-3">
+              {verifLastUpdated && (
+                <span className="text-xs text-muted-foreground">
+                  Dimuat: {verifLastUpdated.toLocaleTimeString("id-ID")}
+                </span>
+              )}
+              <Button size="sm" variant="outline" onClick={loadVerifications} disabled={verifLoading}>
+                <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${verifLoading ? "animate-spin" : ""}`} />
+                {verifLoading ? "Memuat..." : "Refresh"}
+              </Button>
+            </div>
+          </div>
           {verifications.length === 0 ? (
             <div className="text-center py-16">
               <CheckCircle className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
@@ -279,6 +308,7 @@ export default function SuperAdminPanel({ addToast }) {
                         <div className="text-sm text-muted-foreground mt-1 space-y-0.5">
                           {p.alamat && <div>📍 {p.alamat}</div>}
                           {p.nama_orang_tua && <div>👤 Orang Tua: {p.nama_orang_tua}</div>}
+                          {p.nomor_telepon && <div>📞 {p.nomor_telepon}</div>}
                         </div>
                       </div>
                       <div className="flex gap-2 flex-shrink-0">

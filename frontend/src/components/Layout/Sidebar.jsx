@@ -3,15 +3,15 @@ import { useAuth } from "../../context/AuthContext"
 import { cn } from "../../lib/utils"
 import {
   Package, LayoutDashboard, ShoppingCart, ClipboardList, User,
-  Store, Crown, LogOut, ChevronLeft, Menu,
+  Store, Crown, LogOut, ChevronLeft, Menu, Home, BookOpen,
 } from "lucide-react"
 import { Button } from "../ui/Button"
 import { Separator } from "../ui/separator"
 import { useState } from "react"
 
 const NAV_USER = [
-  { path: "/dashboard", label: "Katalog", icon: LayoutDashboard },
-  { path: "/rentals/new", label: "Sewa Barang", icon: ShoppingCart },
+  { path: "/home", label: "Beranda", icon: Home },
+  { path: "/catalog", label: "Katalog", icon: BookOpen },
   { path: "/rentals/my", label: "Sewa Saya", icon: ClipboardList },
   { path: "/profile", label: "Profil", icon: User },
 ]
@@ -75,7 +75,8 @@ export default function Sidebar() {
       {/* Navigation */}
       <nav className="flex-1 p-2 space-y-1">
         {nav.map((item) => {
-          const active = location.pathname === item.path
+          const active = location.pathname === item.path ||
+            (item.path === "/catalog" && location.pathname === "/dashboard")
           return (
             <button
               key={item.path}
