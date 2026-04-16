@@ -113,6 +113,7 @@ class UserProfile(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False)
     nama_orang_tua = Column(String(100), nullable=True)
     alamat = Column(Text, nullable=True)
+    nomor_telepon = Column(String(20), nullable=True)
     latitude = Column(Float, nullable=True)
     longitude = Column(Float, nullable=True)
     foto_ktp = Column(String(500), nullable=True)         # URL foto KTP

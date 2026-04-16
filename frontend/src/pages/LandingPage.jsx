@@ -1,27 +1,54 @@
 import { useState } from "react"
-import { Link } from "react-router-dom"
+import { Link, useNavigate } from "react-router-dom"
+import { useAuth } from "../context/AuthContext"
 import { Button } from "../components/ui/Button"
 import { Card, CardContent } from "../components/ui/card"
 import {
-  ArrowRight, ShieldCheck, Package, MousePointerClick, Users,
+  ArrowRight, ShieldCheck, Package, MousePointerClick,
   Search, BadgeCheck, Clock, Heart, Tv, TreePine, PartyPopper, Car,
-  Menu, X, Rocket,
+  Menu, X, Rocket, LayoutDashboard, LogOut,
 } from "lucide-react"
 
 function Navbar() {
   const [open, setOpen] = useState(false)
+  const { isAuthenticated, isAdmin, isSuperAdmin, user, logout } = useAuth()
+  const navigate = useNavigate()
+  const homeRoute = isAdmin || isSuperAdmin ? "/dashboard" : "/home"
+
+  const handleLogout = () => {
+    logout()
+    navigate("/")
+    setOpen(false)
+  }
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-card/80 backdrop-blur-lg border-b">
       <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-        <div className="flex items-center gap-2">
+        <Link to="/" className="flex items-center gap-2">
           <img src="/sewainLogo.webp" alt="Sewain" className="w-9 h-9 rounded-xl object-cover" />
           <span className="font-bold text-xl text-foreground">Sewain</span>
-        </div>
+        </Link>
         <div className="hidden md:flex items-center gap-6">
           <a href="#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Fitur</a>
           <a href="#categories" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Kategori</a>
-          <Link to="/login"><Button>Masuk / Daftar</Button></Link>
+          {isAuthenticated ? (
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-muted-foreground hidden lg:block">
+                Halo, <span className="font-semibold text-foreground">{user?.nama?.split(" ")[0]}</span>
+              </span>
+              <Link to={homeRoute}>
+                <Button>
+                  <LayoutDashboard className="w-4 h-4 mr-2" /> Buka Dashboard
+                </Button>
+              </Link>
+              <button onClick={handleLogout}
+                className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors">
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            <Link to="/login"><Button>Masuk / Daftar</Button></Link>
+          )}
         </div>
         <button className="md:hidden text-foreground" onClick={() => setOpen(!open)}>
           {open ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -31,7 +58,20 @@ function Navbar() {
         <div className="md:hidden bg-card border-b px-4 pb-4 space-y-2">
           <a href="#features" className="block w-full text-left py-2 text-sm text-muted-foreground hover:text-foreground" onClick={() => setOpen(false)}>Fitur</a>
           <a href="#categories" className="block py-2 text-sm text-muted-foreground hover:text-foreground" onClick={() => setOpen(false)}>Kategori</a>
-          <Link to="/login" onClick={() => setOpen(false)}><Button className="w-full mt-2">Masuk / Daftar</Button></Link>
+          {isAuthenticated ? (
+            <>
+              <Link to={homeRoute} onClick={() => setOpen(false)}>
+                <Button className="w-full mt-2">
+                  <LayoutDashboard className="w-4 h-4 mr-2" /> Buka Dashboard
+                </Button>
+              </Link>
+              <button onClick={handleLogout} className="w-full mt-1 text-sm text-destructive flex items-center justify-center gap-1 py-2">
+                <LogOut className="w-4 h-4" /> Keluar
+              </button>
+            </>
+          ) : (
+            <Link to="/login" onClick={() => setOpen(false)}><Button className="w-full mt-2">Masuk / Daftar</Button></Link>
+          )}
         </div>
       )}
     </nav>
@@ -97,11 +137,11 @@ export default function LandingPage() {
                   Mulai Sekarang <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
               </Link>
-              <Link to="/dashboard">
+              <a href="#features">
                 <Button variant="outline" size="lg" className="text-base px-8">
-                  Lihat Katalog
+                  Pelajari Lebih
                 </Button>
-              </Link>
+              </a>
             </div>
           </div>
           <div className="flex-1">
@@ -236,11 +276,11 @@ export default function LandingPage() {
                 Daftar Gratis <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
             </Link>
-            <Link to="/dashboard">
+            <a href="#features">
               <Button size="lg" variant="outline" className="text-base px-8 border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10">
-                Lihat Katalog
+                Lihat Fitur
               </Button>
-            </Link>
+            </a>
           </div>
         </div>
       </section>

@@ -133,6 +133,7 @@ class UserProfileCreate(BaseModel):
     """Schema untuk melengkapi data diri penyewa."""
     nama_orang_tua: Optional[str] = Field(None, max_length=100, examples=["Budi Santoso"])
     alamat: Optional[str] = Field(None, examples=["Jl. Merdeka No.5, Balikpapan"])
+    nomor_telepon: Optional[str] = Field(None, max_length=20, examples=["08123456789"])
     latitude: Optional[float] = Field(None, ge=-90.0, le=90.0, examples=[-1.2654])
     longitude: Optional[float] = Field(None, ge=-180.0, le=180.0, examples=[116.8312])
     foto_ktp: Optional[str] = Field(None, examples=["https://storage.sewain.id/ktp/user1.jpg"])
@@ -150,6 +151,7 @@ class UserProfileResponse(BaseModel):
     user_id: int
     nama_orang_tua: Optional[str]
     alamat: Optional[str]
+    nomor_telepon: Optional[str]
     latitude: Optional[float]
     longitude: Optional[float]
     foto_ktp: Optional[str]

@@ -8,7 +8,7 @@ export function AuthProvider({ children }) {
   const [token, setTokenState] = useState(null)
   const [loading, setLoading] = useState(true)
 
-  // Restore from localStorage on mount
+  // Restore from localStorage on mount, then refresh from server
   useEffect(() => {
     const savedToken = localStorage.getItem("sewain_token")
     const savedUser = localStorage.getItem("sewain_user")
@@ -17,7 +17,23 @@ export function AuthProvider({ children }) {
         const parsedUser = JSON.parse(savedUser)
         setTokenState(savedToken)
         setToken(savedToken)
-        setUser(parsedUser)
+        setUser(parsedUser) // set cached data first so UI loads fast
+        // Refresh from server to get latest is_verified, role, etc.
+        getMe()
+          .then((me) => {
+            setUser(me)
+            localStorage.setItem("sewain_user", JSON.stringify(me))
+          })
+          .catch(() => {
+            // Token expired or invalid — logout
+            clearToken()
+            setTokenState(null)
+            setUser(null)
+            localStorage.removeItem("sewain_token")
+            localStorage.removeItem("sewain_user")
+          })
+          .finally(() => setLoading(false))
+        return
       } catch {
         localStorage.removeItem("sewain_token")
         localStorage.removeItem("sewain_user")
