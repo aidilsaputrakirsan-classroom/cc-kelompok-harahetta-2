@@ -17,7 +17,7 @@ from schemas import (
     # Auth
     UserCreate, UserResponse, TokenResponse, UserUpdateByAdmin,
     # AdminProfile
-    AdminProfileCreate, AdminProfileUpdate, AdminProfileResponse,
+    AdminProfileCreate, AdminProfileUpdate, AdminProfileResponse, AdminCreateRequest,
     # UserProfile
     UserProfileCreate, UserProfileUpdate, UserProfileResponse, VerificationAction,
     # Category
@@ -26,6 +26,8 @@ from schemas import (
     ItemCreate, ItemUpdate, ItemResponse, ItemListResponse,
     # Rental
     RentalCreate, RentalStatusUpdate, RentalResponse, RentalListResponse,
+    # Payment
+    PaymentCreate, PaymentUpdate, PaymentResponse, PaymentListResponse,
 )
 from auth import (
     create_access_token, get_current_user,
@@ -44,33 +46,20 @@ Base.metadata.create_all(bind=engine)
 # ==================== APP INSTANCE ====================
 
 app = FastAPI(
-    title="🛵 Sewain API",
-    description="""
-## Platform Sewa Barang Online — Sewain
-
-REST API untuk aplikasi **Sewain**, platform sewa barang berbasis web yang memfasilitasi
-proses penyewaan secara mudah, aman, dan terstruktur.
-
-### 👥 Peran Pengguna
-
-| Peran | Deskripsi |
-|-------|-----------|
-| `super_admin` | Kelola seluruh platform, user, dan kategori |
-| `admin` | Penyedia barang — kelola item & penyewaan |
-| `user` | Penyewa — browse, ajukan sewa, monitor status |
-
-### 🔐 Autentikasi
-Gunakan `POST /auth/login` untuk mendapatkan JWT token, lalu klik tombol **Authorize** di atas
-dan masukkan token dalam format: `Bearer <token>`
-
-### 📋 Tim Kelompok Harahetta-2
-- **Lead Backend**: Djaky Abbyyu Fauzan Timumum (10231032)
-- **Lead Frontend**: Achmad Zaki Zaidan (10231002)
-- **Lead DevOps**: Muhammad Alif Setiawan (10231056)
-- **Lead QA & Docs**: Riqqah Khalda Karina (10231082)
-    """,
+    title="Sewain API",
+    description="Platform Sewa Barang Online. Gunakan POST /auth/login untuk login dan dapatkan token.",
     version="1.0.0",
-    contact={"name": "Kelompok Harahetta-2", "email": "sewain@itk.ac.id"},
+    openapi_tags=[
+        {"name": "🔐 Auth", "description": "Login & Token Management"},
+        {"name": "👑 Super Admin", "description": "Super Admin Functions"},
+        {"name": "🏪 Admin", "description": "Admin/Penyedia Functions"},
+        {"name": "👤 User", "description": "User/Penyewa Functions"},
+        {"name": "📦 Items", "description": "Barang Sewa Management"},
+        {"name": "📋 Rentals", "description": "Transaksi Penyewaan"},
+        {"name": "� Payments — Pembayaran", "description": "Pembayaran Penyewaan"},
+        {"name": "�📂 Categories", "description": "Kategori Barang"},
+        {"name": "ℹ️ Info", "description": "Platform Information"},
+    ]
 )
 
 # ==================== CORS ====================
@@ -91,7 +80,7 @@ app.add_middleware(
 # PUBLIC ENDPOINTS
 # ============================================================
 
-@app.get("/", tags=["🏠 Info"])
+@app.get("/", tags=["ℹ️ Info"])
 def root():
     """Informasi dasar aplikasi Sewain."""
     return {
@@ -104,12 +93,9 @@ def root():
     }
 
 
-@app.get("/health", tags=["🏠 Info"])
+@app.get("/health", tags=["ℹ️ Info"])
 def health_check(db: Session = Depends(get_db)):
-    """
-    Health check endpoint.
-    Cek status API dan koneksi database.
-    """
+    """Health check endpoint - cek status API & database."""
     # Test koneksi DB
     try:
         db.execute(text("SELECT 1"))
@@ -125,9 +111,9 @@ def health_check(db: Session = Depends(get_db)):
     }
 
 
-@app.get("/team", tags=["🏠 Info"])
+@app.get("/team", tags=["ℹ️ Info"])
 def team_info():
-    """Informasi tim pengembang Sewain."""
+    """Informasi tim pengembang."""
     return {
         "team": "Kelompok Harahetta-2",
         "institution": "Sistem Informasi — Institut Teknologi Kalimantan",
@@ -478,6 +464,73 @@ def list_all_admins(
 ):
     """Super Admin melihat semua profil penyedia barang."""
     return crud.get_all_admin_profiles(db=db, skip=skip, limit=limit)
+
+
+@app.post(
+    "/superadmin/admins",
+    response_model=AdminProfileResponse,
+    status_code=201,
+    tags=["👑 Super Admin"],
+    summary="[Super Admin] Tambahkan admin baru",
+)
+def create_admin_by_superadmin(
+    data: AdminCreateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_super_admin),
+):
+    """
+    Super Admin membuat admin baru.
+
+    **Fitur:**
+    - Buat user dengan role admin
+    - Otomatis buat profil usaha
+    - Generate password dengan hashing aman
+    """
+    user = crud.create_admin_user(
+        db=db,
+        email=data.email,
+        nama=data.nama,
+        password=data.password,
+        nama_usaha=data.nama_usaha,
+        alamat_usaha=data.alamat_usaha,
+        nomor_telepon=data.nomor_telepon,
+    )
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Email '{data.email}' sudah terdaftar",
+        )
+
+    # Return admin profile
+    profile = crud.get_admin_profile(db=db, user_id=user.id)
+    return profile
+
+
+@app.get(
+    "/superadmin/admins/{admin_id}/stats",
+    tags=["👑 Super Admin"],
+    summary="[Super Admin] Detail admin dengan statistik",
+)
+def get_admin_detail_stats(
+    admin_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_super_admin),
+):
+    """
+    Super Admin melihat detail profil admin beserta statistik lengkap:
+    - Jumlah barang & kategori
+    - Rental stats (pending, approved, completed)
+    - Revenue (total & bulanan)
+    - Unique customers
+    - Join date
+    """
+    stats = crud.get_admin_stats(db=db, admin_id=admin_id)
+    if not stats:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Admin ID {admin_id} tidak ditemukan",
+        )
+    return stats
 
 
 # ============================================================
@@ -860,3 +913,276 @@ def update_rental_status(
             detail=f"Rental ID {rental_id} tidak ditemukan atau bukan milik Anda",
         )
     return updated
+
+
+# ============================================================
+# PAYMENTS — Pembayaran Penyewaan
+# ============================================================
+
+@app.post(
+    "/payments/rentals/{rental_id}",
+    response_model=PaymentResponse,
+    status_code=201,
+    tags=["💳 Payments — Pembayaran"],
+    summary="[User] Atur pembayaran sewa",
+)
+def create_payment_for_rental(
+    rental_id: int,
+    data: PaymentCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_verified_user),
+):
+    """
+    User mengatur pembayaran untuk rental yang sudah disetujui.
+
+    **Metode pembayaran:**
+    - `transfer` — Transfer bank
+    - `cash` — Tunai
+    - `e_wallet` — Dompet digital (OVO, GoPay, dll)
+    - `credit_card` — Kartu kredit
+
+    **Catatan:**
+    - Payment auto-created ketika rental disetujui admin (status = pending)
+    - User konfirmasi pembayaran & upload bukti (kalo metode transfer/e-wallet)
+    """
+    rental = crud.get_rental(db=db, rental_id=rental_id)
+    if not rental:
+        raise HTTPException(status_code=404, detail=f"Rental ID {rental_id} tidak ditemukan")
+    
+    if rental.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Rental ini bukan milik Anda")
+    
+    payment = crud.create_payment(db=db, rental_id=rental_id, payment_data=data)
+    if not payment:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Gagal membuat pembayaran. Rental mungkin belum disetujui.",
+        )
+    return payment
+
+
+@app.get(
+    "/payments/{payment_id}",
+    response_model=PaymentResponse,
+    tags=["💳 Payments — Pembayaran"],
+    summary="Lihat detail pembayaran",
+)
+def get_payment_detail(
+    payment_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """Lihat detail pembayaran satu transaksi."""
+    payment = crud.get_payment(db=db, payment_id=payment_id)
+    if not payment:
+        raise HTTPException(status_code=404, detail=f"Payment ID {payment_id} tidak ditemukan")
+    
+    from models import UserRole as UR
+    # User hanya boleh lihat payment miliknya
+    # Admin bisa lihat payment untuk barangnya
+    # Super admin bisa lihat semua
+    if current_user.role == UR.user and payment.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Anda tidak punya akses ke pembayaran ini")
+    
+    return payment
+
+
+@app.get(
+    "/payments/my",
+    response_model=PaymentListResponse,
+    tags=["💳 Payments — Pembayaran"],
+    summary="[User] Riwayat pembayaran saya",
+)
+def my_payments(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    status: str = Query(None, description="Filter: pending | completed | failed | cancelled"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """User melihat riwayat pembayaran mereka."""
+    return crud.get_payments(
+        db=db,
+        skip=skip,
+        limit=limit,
+        user_id=current_user.id,
+        status=status,
+    )
+
+
+@app.put(
+    "/payments/{payment_id}/status",
+    response_model=PaymentResponse,
+    tags=["💳 Payments — Pembayaran"],
+    summary="[User/Admin] Update status pembayaran",
+)
+def update_payment_status(
+    payment_id: int,
+    data: PaymentUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """
+    Update status pembayaran.
+
+    **User bisa:**
+    - Update ke `completed` dengan upload bukti (untuk metode transfer/e-wallet)
+    
+    **Admin/Super Admin bisa:**
+    - Verifikasi pembayaran (set status = completed)
+    - Menolak pembayaran (set status = failed)
+    - Batalkan pembayaran (set status = cancelled)
+
+    **Efek samping ketika completed:**
+    - Rental status auto-update ke `sedang_disewa`
+    """
+    payment = crud.get_payment(db=db, payment_id=payment_id)
+    if not payment:
+        raise HTTPException(status_code=404, detail=f"Payment ID {payment_id} tidak ditemukan")
+    
+    from models import UserRole as UR
+    
+    # Validasi akses: user hanya bisa update miliknya, admin/super_admin bisa yang punya barangnya
+    if current_user.role == UR.user:
+        if payment.user_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Anda tidak punya akses ke pembayaran ini")
+    elif current_user.role == UR.admin:
+        # Admin hanya bisa update payment untuk barang-barangnya
+        admin_profile = crud.get_admin_profile(db=db, user_id=current_user.id)
+        if not admin_profile or payment.admin_id != admin_profile.id:
+            raise HTTPException(status_code=403, detail="Pembayaran ini bukan untuk barang Anda")
+    
+    updated = crud.update_payment_status(db=db, payment_id=payment_id, update_data=data)
+    if not updated:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Gagal update status pembayaran",
+        )
+    return updated
+
+
+@app.get(
+    "/admin/payments",
+    response_model=PaymentListResponse,
+    tags=["🏪 Admin — Profil Usaha"],
+    summary="[Admin] Pembayaran yang diterima",
+)
+def admin_incoming_payments(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    status: str = Query(None, description="Filter: pending | completed | failed | cancelled"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    """Admin melihat pembayaran yang diterima untuk barang-barangnya."""
+    admin_profile = crud.get_admin_profile(db=db, user_id=current_user.id)
+    if not admin_profile:
+        return {"total": 0, "payments": []}
+    
+    return crud.get_payments(
+        db=db,
+        skip=skip,
+        limit=limit,
+        admin_id=admin_profile.id,
+        status=status,
+    )
+
+
+@app.get(
+    "/admin/payments/stats",
+    tags=["🏪 Admin — Profil Usaha"],
+    summary="[Admin] Statistik pembayaran",
+)
+def admin_payment_stats(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    """
+    Admin melihat statistik pembayaran:
+    - Total pendapatan (pending, completed, failed)
+    - Jumlah transaksi per status
+    - Metode pembayaran yang paling sering digunakan
+    - Rata-rata pembayaran
+    """
+    admin_profile = crud.get_admin_profile(db=db, user_id=current_user.id)
+    if not admin_profile:
+        raise HTTPException(status_code=404, detail="Profil usaha tidak ditemukan")
+    
+    stats = crud.get_admin_payment_stats(db=db, admin_id=admin_profile.id)
+    return stats
+
+
+@app.get(
+    "/superadmin/payments",
+    response_model=PaymentListResponse,
+    tags=["👑 Super Admin"],
+    summary="[Super Admin] Semua pembayaran platform",
+)
+def all_payments(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    status: str = Query(None, description="Filter: pending | completed | failed | cancelled"),
+    admin_id: int = Query(None, description="Filter by admin ID"),
+    user_id: int = Query(None, description="Filter by user ID"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_super_admin),
+):
+    """Super Admin melihat semua pembayaran di platform."""
+    return crud.get_payments(
+        db=db,
+        skip=skip,
+        limit=limit,
+        status=status,
+        admin_id=admin_id,
+        user_id=user_id,
+    )
+
+
+@app.get(
+    "/superadmin/payments/stats",
+    tags=["👑 Super Admin"],
+    summary="[Super Admin] Statistik pembayaran platform",
+)
+def platform_payment_stats(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_super_admin),
+):
+    """
+    Super Admin dashboard statistik pembayaran:
+    - Total revenue (pending, completed, failed)
+    - Jumlah transaksi per status
+    - Payment methods distribution
+    - Top admins by revenue
+    - Payment completion rate
+    """
+    from sqlalchemy.orm import joinedload
+    from models import Payment, PaymentStatus
+    
+    payments = db.query(Payment).all()
+    
+    total_pending = sum(p.jumlah for p in payments if p.status == PaymentStatus.pending)
+    total_completed = sum(p.jumlah for p in payments if p.status == PaymentStatus.completed)
+    total_failed = sum(p.jumlah for p in payments if p.status == PaymentStatus.failed)
+    
+    count_pending = len([p for p in payments if p.status == PaymentStatus.pending])
+    count_completed = len([p for p in payments if p.status == PaymentStatus.completed])
+    count_failed = len([p for p in payments if p.status == PaymentStatus.failed])
+    count_cancelled = len([p for p in payments if p.status == PaymentStatus.cancelled])
+    
+    completion_rate = (count_completed / len(payments) * 100) if payments else 0
+    
+    return {
+        "total_payments": len(payments),
+        "total_revenue": {
+            "pending": float(total_pending),
+            "completed": float(total_completed),
+            "failed": float(total_failed),
+        },
+        "transaction_count": {
+            "pending": count_pending,
+            "completed": count_completed,
+            "failed": count_failed,
+            "cancelled": count_cancelled,
+        },
+        "completion_rate": f"{completion_rate:.2f}%",
+    }

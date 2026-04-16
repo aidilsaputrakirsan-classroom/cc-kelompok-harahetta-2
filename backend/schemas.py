@@ -40,6 +40,20 @@ class RentalStatusEnum(str, enum.Enum):
     ditolak = "ditolak"
 
 
+class PaymentStatusEnum(str, enum.Enum):
+    pending = "pending"
+    completed = "completed"
+    failed = "failed"
+    cancelled = "cancelled"
+
+
+class PaymentMethodEnum(str, enum.Enum):
+    transfer = "transfer"
+    cash = "cash"
+    e_wallet = "e_wallet"
+    credit_card = "credit_card"
+
+
 # ============================================================
 # AUTH SCHEMAS
 # ============================================================
@@ -120,6 +134,47 @@ class AdminProfileResponse(BaseModel):
     nomor_telepon: Optional[str]
     created_at: datetime
     user: UserResponse
+
+    class Config:
+        from_attributes = True
+
+
+class AdminCreateRequest(BaseModel):
+    """Schema untuk super admin membuat admin baru."""
+    email: EmailStr = Field(..., examples=["admin@sewain.id"])
+    nama: str = Field(..., min_length=2, max_length=100, examples=["Toko ABC"])
+    password: str = Field(..., min_length=8, examples=["Password123!"])
+    nama_usaha: str = Field(..., min_length=2, max_length=100, examples=["Toko Sewa ABC"])
+    alamat_usaha: Optional[str] = Field(None, examples=["Jl. Soekarno-Hatta No.1, Balikpapan"])
+    nomor_telepon: Optional[str] = Field(None, max_length=20, examples=["08123456789"])
+
+    @field_validator("password")
+    @classmethod
+    def validate_password_strength(cls, value: str):
+        """Password: min 8 karakter, harus ada huruf besar, kecil, dan angka."""
+        pattern = r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$"
+        if not re.match(pattern, value):
+            raise ValueError(
+                "Password harus minimal 8 karakter dan mengandung huruf besar, huruf kecil, dan angka."
+            )
+        return value
+
+
+class AdminStatsResponse(BaseModel):
+    """Schema response stats detail admin."""
+    admin_id: int
+    admin_profile: AdminProfileResponse
+    total_items: int
+    active_items: int
+    total_rentals: int
+    pending_rentals: int
+    approved_rentals: int
+    completed_rentals: int
+    total_revenue: float
+    monthly_revenue: float
+    average_rating: Optional[float]
+    customer_count: int
+    joined_date: datetime
 
     class Config:
         from_attributes = True
@@ -293,3 +348,53 @@ class RentalListResponse(BaseModel):
     """Response untuk list rental dengan total count."""
     total: int
     rentals: List[RentalResponse]
+
+
+# ============================================================
+# PAYMENT SCHEMAS (Pembayaran Sewa)
+# ============================================================
+
+class PaymentCreate(BaseModel):
+    """Schema untuk membuat pembayaran (auto-generated saat pengajuan sewa disetujui)."""
+    rental_id: int = Field(..., examples=[1])
+    metode_pembayaran: PaymentMethodEnum = Field(PaymentMethodEnum.transfer, examples=["transfer"])
+    catatan: Optional[str] = Field(None, examples=["Transfer ke rek 12345"])
+
+
+class PaymentUpdate(BaseModel):
+    """Schema untuk update status pembayaran (upload bukti, confirm, etc)."""
+    status: PaymentStatusEnum = Field(..., examples=["completed"])
+    bukti_pembayaran: Optional[str] = Field(None, examples=["https://storage.sewain.id/bukti/payment1.jpg"])
+    catatan: Optional[str] = Field(None, examples=["Sudah transfer"])
+
+
+class PaymentResponse(BaseModel):
+    """Schema response pembayaran."""
+    id: int
+    rental_id: int
+    user_id: int
+    admin_id: int
+    jumlah: float
+    metode_pembayaran: PaymentMethodEnum
+    status: PaymentStatusEnum
+    bukti_pembayaran: Optional[str]
+    catatan: Optional[str]
+    tanggal_pembayaran: Optional[datetime]
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class PaymentListResponse(BaseModel):
+    """Response untuk list pembayaran dengan total count."""
+    total: int
+    payments: List[PaymentResponse]
+
+
+class PaymentDetailResponse(BaseModel):
+    """Response detail pembayaran dengan info rental & user."""
+    payment: PaymentResponse
+    rental: RentalResponse
+    user: UserResponse

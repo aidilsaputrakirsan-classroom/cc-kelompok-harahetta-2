@@ -14,7 +14,11 @@ if not DATABASE_URL:
     raise ValueError("DATABASE_URL tidak ditemukan di .env!")
 
 # Buat engine (koneksi ke database)
-engine = create_engine(DATABASE_URL)
+# Khusus SQLite, perlu check_same_thread=False untuk multithreading
+if DATABASE_URL.startswith("sqlite"):
+    engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+else:
+    engine = create_engine(DATABASE_URL)
 
 # Buat session factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

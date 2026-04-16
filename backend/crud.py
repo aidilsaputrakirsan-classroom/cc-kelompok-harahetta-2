@@ -1,15 +1,15 @@
 """
 crud.py — CRUD Operations Sewain
-Semua operasi database untuk 6 entitas + business logic
+Semua operasi database untuk 7 entitas + business logic
 """
 
-from datetime import date
+from datetime import date, datetime
 from typing import Optional, List
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_, func
 
-from models import User, AdminProfile, UserProfile, Category, Item, Rental
-from models import UserRole, VerificationStatus, ItemStatus, RentalStatus
+from models import User, AdminProfile, UserProfile, Category, Item, Rental, Payment
+from models import UserRole, VerificationStatus, ItemStatus, RentalStatus, PaymentStatus, PaymentMethod
 from schemas import (
     UserCreate, UserUpdateByAdmin,
     AdminProfileCreate, AdminProfileUpdate,
@@ -18,6 +18,7 @@ from schemas import (
     ItemCreate, ItemUpdate,
     RentalCreate, RentalStatusUpdate,
     VerificationAction,
+    PaymentCreate, PaymentUpdate,
 )
 from auth import hash_password, verify_password
 
@@ -110,6 +111,50 @@ def delete_user(db: Session, user_id: int) -> bool:
     return True
 
 
+def create_admin_user(
+    db: Session,
+    email: str,
+    nama: str,
+    password: str,
+    nama_usaha: str,
+    alamat_usaha: Optional[str] = None,
+    nomor_telepon: Optional[str] = None,
+) -> User | None:
+    """
+    Buat user baru dengan role admin + auto create AdminProfile.
+    Return None jika email sudah terdaftar.
+    Digunakan oleh super admin untuk membuat admin baru.
+    """
+    # Cek email sudah ada
+    existing = db.query(User).filter(User.email == email).first()
+    if existing:
+        return None
+
+    # Buat user dengan role admin
+    db_user = User(
+        email=email,
+        nama=nama,
+        hashed_password=hash_password(password),
+        role=UserRole.admin,
+    )
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+
+    # Buat admin profile otomatis
+    admin_profile = AdminProfile(
+        user_id=db_user.id,
+        nama_usaha=nama_usaha,
+        alamat_usaha=alamat_usaha,
+        nomor_telepon=nomor_telepon,
+    )
+    db.add(admin_profile)
+    db.commit()
+
+    db.refresh(db_user)
+    return db_user
+
+
 # ============================================================
 # ADMIN PROFILE CRUD
 # ============================================================
@@ -158,6 +203,79 @@ def get_all_admin_profiles(db: Session, skip: int = 0, limit: int = 20) -> dict:
     total = query.count()
     admins = query.order_by(AdminProfile.created_at.desc()).offset(skip).limit(limit).all()
     return {"total": total, "admins": admins}
+
+
+def get_admin_stats(db: Session, admin_id: int) -> dict | None:
+    """
+    Ambil detail stats admin tertentu.
+    Return dict dengan info profil + stats atau None jika admin tidak ditemukan.
+    """
+    admin_profile = get_admin_profile_by_id(db, admin_id)
+    if not admin_profile:
+        return None
+
+    # Item stats
+    total_items = db.query(func.count(Item.id)).filter(Item.admin_id == admin_id).scalar() or 0
+    active_items = db.query(func.count(Item.id)).filter(
+        Item.admin_id == admin_id,
+        Item.status == ItemStatus.available
+    ).scalar() or 0
+
+    # Rental stats
+    total_rentals = db.query(func.count(Rental.id)).join(Item).filter(
+        Item.admin_id == admin_id
+    ).scalar() or 0
+
+    pending_rentals = db.query(func.count(Rental.id)).join(Item).filter(
+        Item.admin_id == admin_id,
+        Rental.status == RentalStatus.pending
+    ).scalar() or 0
+
+    approved_rentals = db.query(func.count(Rental.id)).join(Item).filter(
+        Item.admin_id == admin_id,
+        Rental.status == RentalStatus.disetujui
+    ).scalar() or 0
+
+    completed_rentals = db.query(func.count(Rental.id)).join(Item).filter(
+        Item.admin_id == admin_id,
+        Rental.status == RentalStatus.selesai
+    ).scalar() or 0
+
+    # Revenue stats
+    total_revenue = db.query(func.sum(Rental.total_harga)).join(Item).filter(
+        Item.admin_id == admin_id,
+        Rental.status.in_([RentalStatus.selesai, RentalStatus.sedang_disewa])
+    ).scalar() or 0.0
+
+    # Monthly revenue (bulan ini)
+    from datetime import datetime, timedelta
+    now = datetime.now()
+    month_start = datetime(now.year, now.month, 1)
+    monthly_revenue = db.query(func.sum(Rental.total_harga)).join(Item).filter(
+        Item.admin_id == admin_id,
+        Rental.status.in_([RentalStatus.selesai, RentalStatus.sedang_disewa]),
+        Rental.created_at >= month_start
+    ).scalar() or 0.0
+
+    # Unique customer count
+    customer_count = db.query(func.count(func.distinct(Rental.user_id))).join(Item).filter(
+        Item.admin_id == admin_id
+    ).scalar() or 0
+
+    return {
+        "admin_id": admin_id,
+        "admin_profile": admin_profile,
+        "total_items": total_items,
+        "active_items": active_items,
+        "total_rentals": total_rentals,
+        "pending_rentals": pending_rentals,
+        "approved_rentals": approved_rentals,
+        "completed_rentals": completed_rentals,
+        "total_revenue": float(total_revenue),
+        "monthly_revenue": float(monthly_revenue),
+        "customer_count": customer_count,
+        "joined_date": admin_profile.created_at,
+    }
 
 
 def update_admin_profile(db: Session, user_id: int, data: AdminProfileUpdate) -> AdminProfile | None:
@@ -608,4 +726,214 @@ def get_platform_stats(db: Session) -> dict:
         "pending_rentals": pending_rentals,
         "pending_verifications": pending_verif,
         "total_revenue": round(float(total_revenue), 2),
+    }
+
+
+# ============================================================
+# PAYMENT CRUD (Pembayaran Sewa)
+# ============================================================
+
+def create_payment_auto(
+    db: Session,
+    rental_id: int,
+) -> Payment | None:
+    """
+    Auto-create payment saat rental disetujui.
+    Dipanggil otomatis saat rental status diubah ke 'disetujui'.
+    """
+    rental = db.query(Rental).filter(Rental.id == rental_id).first()
+    if not rental:
+        return None
+
+    # Cek apakah sudah ada payment
+    existing = db.query(Payment).filter(Payment.rental_id == rental_id).first()
+    if existing:
+        return existing
+
+    # Cari admin dari item
+    item = db.query(Item).filter(Item.id == rental.item_id).first()
+    if not item:
+        return None
+
+    payment = Payment(
+        rental_id=rental_id,
+        user_id=rental.user_id,
+        admin_id=item.admin_id,
+        jumlah=rental.total_harga,
+        metode_pembayaran=PaymentMethod.transfer,
+        status=PaymentStatus.pending,
+    )
+    db.add(payment)
+    db.commit()
+    db.refresh(payment)
+    return payment
+
+
+def create_payment(
+    db: Session,
+    rental_id: int,
+    data: PaymentCreate,
+) -> Payment | None:
+    """Buat pembayaran baru untuk rental."""
+    rental = db.query(Rental).filter(Rental.id == rental_id).first()
+    if not rental:
+        return None
+
+    # Cari admin dari item
+    item = db.query(Item).filter(Item.id == rental.item_id).first()
+    if not item:
+        return None
+
+    payment = Payment(
+        rental_id=rental_id,
+        user_id=rental.user_id,
+        admin_id=item.admin_id,
+        jumlah=rental.total_harga,
+        metode_pembayaran=data.metode_pembayaran,
+        status=PaymentStatus.pending,
+        catatan=data.catatan,
+    )
+    db.add(payment)
+    db.commit()
+    db.refresh(payment)
+    return db.query(Payment).options(
+        joinedload(Payment.rental).joinedload(Rental.item),
+        joinedload(Payment.user)
+    ).filter(Payment.id == payment.id).first()
+
+
+def get_payment(db: Session, payment_id: int) -> Payment | None:
+    """Ambil satu pembayaran berdasarkan ID."""
+    return (
+        db.query(Payment)
+        .options(
+            joinedload(Payment.rental).joinedload(Rental.item),
+            joinedload(Payment.user)
+        )
+        .filter(Payment.id == payment_id)
+        .first()
+    )
+
+
+def get_payment_by_rental(db: Session, rental_id: int) -> Payment | None:
+    """Ambil pembayaran berdasarkan rental_id."""
+    return (
+        db.query(Payment)
+        .options(
+            joinedload(Payment.rental).joinedload(Rental.item),
+            joinedload(Payment.user)
+        )
+        .filter(Payment.rental_id == rental_id)
+        .first()
+    )
+
+
+def get_payments(
+    db: Session,
+    skip: int = 0,
+    limit: int = 20,
+    user_id: Optional[int] = None,
+    admin_id: Optional[int] = None,
+    status: Optional[str] = None,
+) -> dict:
+    """
+    Ambil daftar pembayaran dengan filter.
+    - user_id: filter pembayaran user tertentu
+    - admin_id: filter pembayaran untuk admin tertentu
+    - status: filter by status (pending, completed, failed, cancelled)
+    """
+    query = db.query(Payment).options(
+        joinedload(Payment.rental).joinedload(Rental.item),
+        joinedload(Payment.user)
+    )
+
+    if user_id:
+        query = query.filter(Payment.user_id == user_id)
+
+    if admin_id:
+        query = query.filter(Payment.admin_id == admin_id)
+
+    if status:
+        try:
+            status_enum = PaymentStatus(status)
+            query = query.filter(Payment.status == status_enum)
+        except ValueError:
+            pass
+
+    total = query.count()
+    payments = query.order_by(Payment.created_at.desc()).offset(skip).limit(limit).all()
+
+    return {"total": total, "payments": payments}
+
+
+def update_payment_status(
+    db: Session,
+    payment_id: int,
+    data: PaymentUpdate,
+) -> Payment | None:
+    """
+    Update status pembayaran (confirm payment, etc).
+    Auto-update rental status ke 'sedang_disewa' jika payment completed.
+    """
+    payment = db.query(Payment).filter(Payment.id == payment_id).first()
+    if not payment:
+        return None
+
+    old_status = payment.status
+    payment.status = data.status
+
+    if data.bukti_pembayaran:
+        payment.bukti_pembayaran = data.bukti_pembayaran
+
+    if data.catatan:
+        payment.catatan = data.catatan
+
+    if data.status == PaymentStatus.completed:
+        payment.tanggal_pembayaran = datetime.now()
+
+        # Auto-update rental status ke 'sedang_disewa' jika belum
+        rental = db.query(Rental).filter(Rental.id == payment.rental_id).first()
+        if rental and rental.status == RentalStatus.disetujui:
+            rental.status = RentalStatus.sedang_disewa
+
+    db.commit()
+    db.refresh(payment)
+    return db.query(Payment).options(
+        joinedload(Payment.rental).joinedload(Rental.item),
+        joinedload(Payment.user)
+    ).filter(Payment.id == payment_id).first()
+
+
+def get_admin_payment_stats(db: Session, admin_id: int) -> dict:
+    """Ambil statistik pembayaran untuk admin tertentu."""
+    total_payments = db.query(func.count(Payment.id)).filter(
+        Payment.admin_id == admin_id
+    ).scalar() or 0
+
+    completed_payments = db.query(func.count(Payment.id)).filter(
+        Payment.admin_id == admin_id,
+        Payment.status == PaymentStatus.completed
+    ).scalar() or 0
+
+    pending_payments = db.query(func.count(Payment.id)).filter(
+        Payment.admin_id == admin_id,
+        Payment.status == PaymentStatus.pending
+    ).scalar() or 0
+
+    total_received = db.query(func.sum(Payment.jumlah)).filter(
+        Payment.admin_id == admin_id,
+        Payment.status == PaymentStatus.completed
+    ).scalar() or 0.0
+
+    total_pending = db.query(func.sum(Payment.jumlah)).filter(
+        Payment.admin_id == admin_id,
+        Payment.status == PaymentStatus.pending
+    ).scalar() or 0.0
+
+    return {
+        "total_payments": total_payments,
+        "completed_payments": completed_payments,
+        "pending_payments": pending_payments,
+        "total_received": round(float(total_received), 2),
+        "total_pending": round(float(total_pending), 2),
     }

@@ -43,6 +43,20 @@ class RentalStatus(str, enum.Enum):
     ditolak = "ditolak"
 
 
+class PaymentStatus(str, enum.Enum):
+    pending = "pending"
+    completed = "completed"
+    failed = "failed"
+    cancelled = "cancelled"
+
+
+class PaymentMethod(str, enum.Enum):
+    transfer = "transfer"
+    cash = "cash"
+    e_wallet = "e_wallet"
+    credit_card = "credit_card"
+
+
 # ============================================================
 # TABEL users — Semua Pengguna Platform
 # ============================================================
@@ -211,6 +225,40 @@ class Rental(Base):
     # Relationships
     user = relationship("User", back_populates="rentals")
     item = relationship("Item", back_populates="rentals")
+    payment = relationship("Payment", back_populates="rental", uselist=False)
 
     def __repr__(self):
         return f"<Rental(id={self.id}, user_id={self.user_id}, item_id={self.item_id}, status='{self.status}')>"
+
+
+# ============================================================
+# TABEL payments — Pembayaran Penyewaan
+# ============================================================
+
+class Payment(Base):
+    """
+    Transaksi pembayaran untuk penyewaan barang.
+    Relasi 1:1 dengan rentals (satu rental bisa punya satu pembayaran).
+    """
+    __tablename__ = "payments"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    rental_id = Column(Integer, ForeignKey("rentals.id", ondelete="CASCADE"), unique=True, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    admin_id = Column(Integer, ForeignKey("admins.id", ondelete="CASCADE"), nullable=False)
+    jumlah = Column(Float, nullable=False)  # Jumlah yang harus dibayar
+    metode_pembayaran = Column(SAEnum(PaymentMethod), nullable=False, default=PaymentMethod.transfer)
+    status = Column(SAEnum(PaymentStatus), nullable=False, default=PaymentStatus.pending)
+    bukti_pembayaran = Column(Text, nullable=True)  # URL/path bukti transfer
+    catatan = Column(Text, nullable=True)           # Catatan dari user atau admin
+    tanggal_pembayaran = Column(DateTime(timezone=True), nullable=True)  # Kapan pembayaran dilakukan
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
+
+    # Relationships
+    rental = relationship("Rental", back_populates="payment")
+    user = relationship("User", foreign_keys=[user_id])
+    admin = relationship("AdminProfile", foreign_keys=[admin_id])
+
+    def __repr__(self):
+        return f"<Payment(id={self.id}, rental_id={self.rental_id}, status='{self.status}', jumlah={self.jumlah})>"
