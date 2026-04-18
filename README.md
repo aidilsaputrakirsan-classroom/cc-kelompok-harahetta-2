@@ -1,96 +1,39 @@
-# ☁️ Cloud App - [SEWAIN - SYSTEM FITUR]
+# 🛵 SEWAIN — Platform Sewa Barang Online
+
+> Aplikasi web platform penyewaan barang berbasis multi-role, dibangun dengan FastAPI + React + PostgreSQL,
+> dan di-deploy menggunakan Docker.
+>
+> **Mata Kuliah:** Komputasi Awan — Sistem Informasi, Institut Teknologi Kalimantan (ITK)
+> **Tim:** Kelompok Harahetta-2
+
+---
+
+## Daftar Isi
+
+1. [Deskripsi Aplikasi](#1-deskripsi-aplikasi)
+2. [Tim](#2-tim)
+3. [Fitur Utama](#3-fitur-utama)
+4. [Tech Stack](#4-tech-stack)
+5. [Arsitektur Sistem](#5-arsitektur-sistem)
+- [Struktur Proyek](#struktur-proyek)
+- [Struktur Database](#struktur-database)
+- [Cara Menjalankan Aplikasi](#cara-menjalankan-aplikasi)
+  - [Menggunakan Docker (Rekomendasi)](#menggunakan-docker-rekomendasi)
+  - [Manual (Tanpa Docker)](#manual-tanpa-docker)
+- [Akun Demo](#akun-demo)
+- [Dokumentasi API](#dokumentasi-api)
+
+---
+
+## 1. Deskripsi Aplikasi
 
 SEWAIN adalah platform berbasis web yang memfasilitasi proses penyewaan barang secara online secara lebih mudah, aman, dan terstruktur. Melalui sistem ini, penyedia dapat menampilkan dan mengelola barang yang disewakan, sementara pengguna dapat mencari barang, melihat detail, menentukan periode sewa, serta mengajukan permintaan penyewaan secara langsung. Platform ini juga dilengkapi dengan pengelolaan status transaksi secara real-time dan fitur verifikasi identitas penyewa untuk meningkatkan keamanan selama proses penyewaan.
 
-SEWAIN ditujukan untuk pelaku usaha penyewaan, khususnya UMKM, serta masyarakat yang membutuhkan barang tanpa harus membelinya. Aplikasi ini membantu mengatasi berbagai kendala dalam sistem penyewaan manual, seperti pencatatan yang tidak rapi, jangkauan pelanggan yang terbatas, kesulitan dalam promosi, serta risiko penyalahgunaan barang. Dengan digitalisasi melalui SEWAIN, proses pengelolaan menjadi lebih efisien, transparan, dan mampu menjangkau lebih banyak pengguna.
+SEWAIN ditujukan bagi pelaku usaha penyewaan khususnya UMKM, serta masyarakat yang membutuhkan suatu barang tanpa harus membelinya melainkan cukup dengan menyewanya. Platform ini membantu mengatasi berbagai kendala dalam sistem penyewaan manual, seperti pencatatan yang tidak rapi, jangkauan pelanggan yang terbatas, serta risiko penyalahgunaan barang. Dengan digitalisasi melalui Sewain, proses pengelolaan menjadi lebih efisien, transparan, dan dapat menjangkau lebih banyak pengguna.
 
 ---
 
-# Fitur Sistem
-
-SEWAIN memiliki tiga peran utama dalam sistem:
-
-- Super Admin  
-- Admin (Penyedia Barang)  
-- User (Penyewa)
-
-## 1. Super Admin
-
-Super Admin bertugas mengelola keseluruhan sistem dan penyedia layanan.
-
-### Fitur:
-- Login sebagai Super Admin
-- Melihat daftar seluruh Admin (Penyedia)
-- Menambahkan Admin baru
-- Mengedit data Admin
-- Menghapus Admin
-- Mengelola kategori barang
-- Melihat seluruh aktivitas penyewaan
-- Monitoring keseluruhan platform
-
-## 2. Admin (Penyedia Barang)
-
-Admin merupakan pemilik usaha atau penyedia jasa penyewaan.
-
-### Fitur:
-- Login sebagai Admin
-- Mengelola profil usaha
-- Menambahkan barang yang disewakan
-- Mengedit data barang
-- Menghapus barang
-- Mengatur harga sewa
-- Mengatur jumlah / stok barang
-- Melihat daftar permintaan sewa dari User
-- Menyetujui atau menolak permintaan sewa
-- Mengubah status penyewaan:
-  - Pending
-  - Disetujui
-  - Sedang Disewa
-  - Selesai
-
-## 3. User (Penyewa)
-
-User adalah pelanggan yang menyewa barang melalui platform SEWAIN.
-
-### A. Registrasi & Profil
-- Registrasi akun
-- Login
-- Melengkapi data diri:
-  - Nama lengkap
-  - Nama orang tua
-  - Alamat tempat tinggal
-  - Share location (berbagi lokasi tempat tinggal melalui peta/koordinat)
-
-### B. Verifikasi Identitas
-- Upload foto KTP
-- Upload foto selfie dengan KTP
-- Melihat status verifikasi:
-  - Menunggu verifikasi
-  - Disetujui
-  - Ditolak
-
-**Catatan Sistem:**
-User hanya dapat melakukan penyewaan jika data diri lengkap dan verifikasi identitas telah disetujui oleh admin.
-
-### C. Penyewaan
-- Melihat katalog barang dari berbagai penyedia
-- Melihat detail barang
-- Mencari barang
-- Mengajukan penyewaan:
-  - Pilih tanggal mulai
-  - Pilih tanggal selesai
-
-### D. Monitoring
-- Melihat status penyewaan:
-  - Pending
-  - Disetujui
-  - Sedang Disewa
-  - Selesai
-- Melihat riwayat penyewaan
-
----
-
-## 👥 Tim
+## 2. Tim
 
 | Nama | NIM | Peran |
 |------|-----|-------|
@@ -101,30 +44,97 @@ User hanya dapat melakukan penyewaan jika data diri lengkap dan verifikasi ident
 
 ---
 
-## 🛠️ Tech Stack
+## 3. Fitur Sistem
+
+SEWAIN memiliki tiga peran utama dalam sistem:
+
+- Super Admin  
+- Admin (Penyedia Barang)  
+- User (Penyewa)
+
+| Peran | Kategori | Fitur Utama | Detail / Deskripsi |
+|-------|----------|-------------|--------------------|
+| Super Admin | Manajemen Admin | Pengelolaan Penyedia | Login sebagai Super Admin, melihat daftar seluruh admin (penyedia), menambahkan admin baru, mengedit data admin, dan menghapus admin. |
+|  | Manajemen Konten | Pengelolaan Kategori Barang | Mengelola kategori barang yang tersedia di dalam platform. |
+|  | Monitoring | Pengawasan Platform | Melihat seluruh aktivitas penyewaan dan melakukan monitoring keseluruhan platform secara menyeluruh. |
+| Admin (Penyedia Barang) | Profil & Usaha | Pengelolaan Profil Usaha | Login sebagai admin dan mengelola profil usaha penyewaan. |
+|  | Manajemen Produk | Pengelolaan Barang | Menambahkan barang yang disewakan, mengedit data barang, menghapus barang, mengatur harga sewa, dan mengatur jumlah atau stok barang. |
+|  | Manajemen Order | Kontrol Permintaan Sewa | Melihat daftar permintaan sewa dari user, menyetujui atau menolak permintaan sewa. |
+|  | Monitoring Transaksi | Status Penyewaan | Mengubah status penyewaan menjadi Pending, Disetujui, Sedang Disewa, atau Selesai. |
+| User (Penyewa) | Akun & Profil | Registrasi & Data Diri | Registrasi akun, login, melengkapi data diri berupa nama lengkap, nama orang tua, alamat tempat tinggal, dan share location melalui peta atau koordinat. |
+|  | Verifikasi Identitas | Validasi Legalitas | Upload foto KTP, upload foto selfie dengan KTP, dan melihat status verifikasi berupa Menunggu Verifikasi, Disetujui, atau Ditolak. |
+|  | Aturan Sistem | Validasi Penyewaan | User hanya dapat melakukan penyewaan apabila data diri telah lengkap dan verifikasi identitas telah disetujui oleh admin. |
+|  | Penyewaan | Proses Pemesanan | Melihat katalog barang dari berbagai penyedia, melihat detail barang, mencari barang, serta mengajukan penyewaan dengan memilih tanggal mulai dan tanggal selesai. |
+|  | Monitoring | Status & Riwayat | Melihat status penyewaan berupa Pending, Disetujui, Sedang Disewa, atau Selesai, serta melihat riwayat penyewaan sebelumnya. |
+
+---
+
+## 4. Tech Stack
+
+Bagian ini menjelaskan teknologi yang digunakan untuk membangun dan menjalankan aplikasi SEWAIN.
 
 | Teknologi | Fungsi |
 |-----------|--------|
-| FastAPI   | Backend REST API |
-| React     | Frontend SPA |
-| PostgreSQL | Database |
-| Docker    | Containerization |
-| GitHub Actions | CI/CD |
-| Railway/Render | Cloud Deployment |
+| Python | Bahasa pemrograman utama untuk backend |
+| FastAPI | Framework untuk membangun REST API |
+| Uvicorn | Server untuk menjalankan aplikasi FastAPI |
+| SQLAlchemy | ORM untuk menghubungkan aplikasi dengan database |
+| PostgreSQL | Sistem database untuk menyimpan data |
+| python-jose | Mengelola autentikasi berbasis JWT |
+| passlib + bcrypt | Mengamankan password dengan hashing |
+| Pydantic | Validasi data dan schema API |
+| React | Library untuk membangun antarmuka pengguna |
+| Vite | Tools untuk build dan pengembangan frontend |
+| React Router DOM | Mengatur navigasi antar halaman |
+| Tailwind CSS | Framework styling antarmuka |
+| Radix UI | Komponen UI yang mudah diakses |
+| Lucide React | Library ikon pada antarmuka |
+| Sonner | Menampilkan notifikasi pada sistem |
+| Docker | Containerisasi seluruh aplikasi |
+| Docker Compose | Mengelola beberapa container sekaligus |
+| Nginx | Web server untuk frontend |
+| Docker Hub | Penyimpanan image aplikasi |
 
 ---
 
-## 🏗️ Architecture
+## 5. Architecture
+
+Bagian ini menunjukkan hubungan antar komponen utama dalam aplikasi Sewain, mulai dari pengguna, frontend, backend, hingga database dalam menjalankan sistem.
 
 ```
-[React Frontend] <--HTTP--> [FastAPI Backend] <--SQL--> [PostgreSQL]
+graph TD
+    User([User Browser])
+
+    FE[Frontend]
+    BE[Backend FastAPI]
+    DB[(PostgreSQL Database)]
+
+    User --> FE
+    FE --> BE
+    BE --> DB
 ```
 
-*(Diagram ini akan berkembang setiap minggu)*
+Diagram di atas menunjukkan alur kerja utama dalam sistem Sewain secara sederhana. Setiap komponen memiliki peran masing-masing dalam menjalankan aplikasi, yaitu sebagai berikut:
+
+- User Browser
+
+  Pengguna mengakses aplikasi melalui browser untuk melihat tampilan sistem dan melakukan berbagai aktivitas seperti login, mencari barang, maupun melakukan penyewaan.
+
+- Frontend
+
+  Frontend berfungsi sebagai antarmuka pengguna yang menampilkan halaman aplikasi serta menerima input dari pengguna sebelum diteruskan ke backend.
+
+- Backend FastAPI
+
+  Backend bertugas memproses permintaan dari frontend, menjalankan logika sistem, dan mengatur komunikasi dengan database.
+
+- PostgreSQL Database
+
+  Database digunakan untuk menyimpan, mengambil, dan memperbarui seluruh data yang dibutuhkan oleh sistem.
 
 ---
 
-## 🚀 Getting Started
+## 6. Getting Started
 
 ### Prasyarat
 - Python 3.10+
@@ -144,8 +154,50 @@ cd frontend
 npm install
 npm run dev
 ```
+<!--
+## 7. Cara Menjalankan Aplikasi Menggunakan Docker
 
-## 📅 Roadmap
+#### Prasyarat
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) terinstall
+- Port `3000`, `8000`, `15432` tidak dipakai aplikasi lain
+
+#### Langkah-langkah
+
+**1. Clone repositori**
+```bash
+git clone <url-repo>
+cd cc-kelompok-harahetta-2
+```
+
+**2. Siapkan environment file**
+```bash
+cp backend/.env.docker.example backend/.env.docker
+```
+> File `.env.docker` sudah siap pakai dengan konfigurasi default. Ubah `SECRET_KEY` jika diperlukan.
+
+**3. Jalankan semua service**
+```bash
+docker compose up -d
+```
+
+**4. Seed data awal (opsional)**
+```bash
+# Tunggu ~10 detik hingga DB siap, lalu:
+docker compose exec db psql -U postgres -d data_sewain -f /dev/stdin < docs/seed-data.sql
+```
+
+**5. Akses aplikasi**
+
+| Service | URL |
+|---------|-----|
+| Frontend | http://localhost:3000 |
+| Backend API | http://localhost:8000 |
+| Swagger UI | http://localhost:8000/docs |
+| Database | `localhost:15432` (user: `postgres`, pass: `setiawan`) |
+-->
+---
+
+## 8. Roadmap
 
 | Minggu | Target | Status |
 |--------|--------|--------|
@@ -161,547 +213,48 @@ npm run dev
 
 ---
 
-## 📁 Project Structure
+## 9. Project Structure
 
 ```
 cc-kelompok-harahetta-2/
-├── backend/                    # FastAPI Backend
-│   ├── main.py                 # Entry point aplikasi backend
-│   └── requirements.txt        # Daftar dependensi Python
+├── backend/
+│   ├── main.py                 # Entry point & semua endpoint API
+│   ├── models.py               # Database models (SQLAlchemy)
+│   ├── schemas.py              # Request/Response schemas (Pydantic)
+│   ├── crud.py                 # Operasi database (CRUD)
+│   ├── auth.py                 # JWT authentication & role guards
+│   ├── database.py             # Koneksi database
+│   ├── requirements.txt        # Dependensi Python
+│   ├── Dockerfile              # Docker image backend
+│   ├── setup.sh                # Script setup manual
+│   ├── .env.example            # Template .env (local)
+│   └── .env.docker.example     # Template .env (Docker)
 │
-├── frontend/                   # React Frontend (Vite)
-│   ├── public/                 # Aset statis publik
-│   ├── src/                    # Source code utama
-│   │   ├── assets/             # Gambar & aset statis
-│   │   ├── App.jsx             # Komponen utama React
-│   │   ├── App.css             # Style komponen App
-│   │   ├── main.jsx            # Entry point React
-│   │   └── index.css           # Style global
-│   ├── index.html              # Template HTML utama
-│   ├── package.json            # Dependensi & scripts Node.js
-│   ├── vite.config.js          # Konfigurasi Vite
-│   └── eslint.config.js        # Konfigurasi ESLint
+├── frontend/
+│   ├── src/
+│   │   ├── pages/              # Halaman utama (Dashboard, Login, dll.)
+│   │   ├── components/         # Komponen UI reusable
+│   │   ├── context/            # AuthContext (state global)
+│   │   ├── services/api.js     # HTTP client ke backend
+│   │   ├── App.jsx             # Router & layout utama
+│   │   └── main.jsx            # Entry point React
+│   ├── public/                 # Aset statis
+│   ├── nginx.conf              # Konfigurasi Nginx
+│   ├── Dockerfile              # Docker image frontend
+│   ├── package.json            # Dependensi Node.js
+│   └── vite.config.js          # Konfigurasi Vite
 │
-├── docs/                       # Dokumentasi tim
-│   ├── member-Alif.md
-│   ├── member-Fauzanabbyu.md
-│   ├── member-Riqqah.md
-│   └── member-ZakiZaidan.md
+├── docs/
+│   └── seed-data.sql           # Data awal untuk database
 │
-├── .gitignore
+├── docker-compose.yml          # Orkestrasi semua service
 └── README.md
 ```
----
-
-## 🚀 API Endpoints Documentation
-
-Dokumentasi ini menjelaskan langkah demi langkah pembuatan backend Inventory Management menggunakan FastAPI dan PostgreSQL, mulai dari setup database sampai proses testing endpoint.
 
 ---
 
-### 1. Konfigurasi Database PostgreSQL
-
-Tahap awal pengembangan dimulai dengan penyediaan basis data sebagai media penyimpanan data jangka panjang.
-
-#### 1.1 Pembuatan Database
-
-Melalui terminal PostgreSQL (psql), database dibuat dengan perintah berikut:
-
-```sql
-CREATE DATABASE cloudapp;
-```
-
-Setelah perintah dijalankan, pastikan database berhasil dibuat dengan mengecek daftar database menggunakan perintah:
-
-```bash
-\l
-```
-
-Karena database `cloudapp` muncul dalam daftar, maka proses pembuatan database sudah berhasil.
-
-#### 1.2 Variabel Lingkungan (.env)
-
-Untuk konfigurasi koneksi database, digunakan file `.env` yang berada di direktori `backend/`. Tujuannya adalah untuk menjaga keamanan data sensitif seperti username dan password database.
-
-Format koneksi yang digunakan:
-
-```env
-DATABASE_URL=postgresql://[USER]:[PASSWORD]@localhost:5432/cloudapp
-```
-
-#### 1.3 File Template Konfigurasi (.env.example)
-
-Kemudian dibuat juga file `backend/.env.example` untuk pengelolaan repositori Git. File ini berfungsi sebagai acuan konfigurasi yang di-commit ke Git, sehingga pengembang lain dapat mengetahui format variabel yang diperlukan tanpa melihat username dan password asli.
-
-Isi file `.env.example`:
-
-```env
-DATABASE_URL=postgresql://postgres:yourpassword@localhost:5432/cloudapp
-```
-
-#### 1.4 Keamanan Konfigurasi
-
-Untuk memastikan file `.env` tidak ikut terunggah ke repositori publik, pastikan file tersebut sudah terdaftar dalam `.gitignore`. Verifikasi dengan menjalankan perintah berikut:
-
-```bash
-cat .gitignore | grep .env
-```
-
-Karena output telah menampilkan baris `.env`, maka konfigurasi sudah benar. Artinya, file `.env` tidak akan terunggah ke repositori dan username serta password asli tetap terlindungi.
-
-#### 1.5 Instalasi Dependensi Backend
-
-Seluruh dependensi yang dibutuhkan oleh backend telah didefinisikan dalam file berikut:
-
-File: `backend/requirements.txt`
-
-```txt
-fastapi==0.115.0
-uvicorn==0.30.0
-sqlalchemy==2.0.35
-psycopg2-binary==2.9.9
-python-dotenv==1.0.1
-pydantic[email]==2.9.0
-```
-
-Daftar pustaka tersebut mencakup framework utama, server, ORM, driver database PostgreSQL, serta library untuk pengelolaan environment variable dan validasi data.
-
-Proses instalasi telah dijalankan dengan perintah berikut:
-
-```bash
-cd backend
-pip install -r requirements.txt
-```
-
-Setelah perintah dieksekusi, seluruh dependensi berhasil terinstal tanpa kendala. Dengan demikian, lingkungan pengembangan backend telah siap digunakan untuk menjalankan aplikasi.
-
----
-
-### 2. Struktur Arsitektur Perangkat Lunak
-
-Pengembangan backend disusun ke dalam beberapa modul utama agar struktur program lebih sistematis dan memudahkan proses pengembangan maupun pemeliharaan di masa mendatang.
-
-Berikut adalah daftar file yang telah dibuat beserta penjelasannya:
-
-#### 📁 database.py 
-
-Modul ini berfungsi untuk mengatur koneksi antara aplikasi FastAPI dengan PostgreSQL (database) menggunakan SQLAlchemy. Di dalamnya terdapat mekanisme `SessionLocal` untuk manajemen transaksi data serta fungsi dependency injection `get_db` untuk memastikan sesi database dibuka dan ditutup dengan benar pada setiap permintaan (request).
-
-File: `backend/database.py`
-
-```python
-import os
-from dotenv import load_dotenv
-from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
-
-# Load environment variables dari .env digunakan untuk memuat variabel lingkungan dari file `.env`.
-load_dotenv()
-
-# Ambil DATABASE_URL dari environment
-DATABASE_URL = os.getenv("DATABASE_URL")
-
-if not DATABASE_URL:
-    raise ValueError("DATABASE_URL tidak ditemukan di .env!")
-
-# Buat engine (koneksi ke database)
-engine = create_engine(DATABASE_URL)
-
-# Buat session factory
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-# Base class untuk models digunakan sebagai parent class untuk semua model SQLAlchemy.
-Base = declarative_base()
-
-# Dependency: dapatkan database session
-def get_db():
-    """
-    Dependency injection untuk FastAPI.
-    Membuka session saat request masuk, menutup saat selesai.
-    """
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-```
-
-#### 📁 models.py
-
-File ini mendefinisikan skema tabel `items` dalam database menggunakan deklarasi kelas SQLAlchemy. Setiap atribut dalam kelas merepresentasikan satu kolom dalam tabel.
-
-Kolom-kolom yang tersedia meliputi:
-
-- `id` : Kunci utama (Primary Key) dengan auto-increment.  
-- `name` : Nama item, wajib diisi, maksimal 100 karakter.  
-- `description` : Deskripsi item (opsional).  
-- `price` : Harga item, wajib diisi.  
-- `quantity` : Jumlah stok, nilai default 0.  
-- `created_at` : Otomatis terisi saat data dibuat.  
-- `updated_at` : Otomatis terisi saat data diperbarui.  
-
-File: `backend/models.py`
-
-```python
-from sqlalchemy import Column, Integer, String, Float, DateTime, Text
-from sqlalchemy.sql import func
-from database import Base
-
-class Item(Base):
-    """
-    Model untuk tabel 'items' di database.
-    Setiap atribut = satu kolom di tabel.
-    """
-
-    __tablename__ = "items"
-
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    name = Column(String(100), nullable=False, index=True)
-    description = Column(Text, nullable=True)
-    price = Column(Float, nullable=False)
-    quantity = Column(Integer, nullable=False, default=0)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-
-    def __repr__(self):
-        return f"<Item(id={self.id}, name='{self.name}', price={self.price})>"
-```
-
----
-
-#### 📁 schemas.py
-
-Modul ini menyediakan skema validasi menggunakan Pydantic untuk memastikan data yang masuk (request) dan keluar (response) dari API sesuai dengan aturan yang telah ditentukan.
-
-Skema yang tersedia:
-
-- `ItemCreate` : Digunakan untuk pembuatan data baru (POST).
-- `ItemUpdate` : Digunakan untuk pembaruan data (PUT), seluruh field bersifat opsional (parsial).
-- `ItemResponse` : Digunakan sebagai format standar respons API.
-- `ItemListResponse` : Digunakan untuk respons berbentuk daftar dengan metadata total data.
-
-Beberapa aturan validasi yang digunakan pada setiap field adalah sebagai berikut:
-
-- `Field(..., min_length=1)`  
-  Menunjukkan bahwa field bersifat wajib diisi dan harus memiliki minimal satu karakter.
-
-- `Field(..., gt=0)`  
-  Menunjukkan bahwa field wajib diisi dan nilainya harus lebih besar dari 0.
-
-- `Field(0, ge=0)`  
-  Menetapkan nilai default sebesar 0 serta membatasi agar nilai tidak boleh kurang dari 0 (tidak negatif).
-
-- `Optional[str] = None`  
-  Menunjukkan bahwa field bersifat opsional dan secara default akan bernilai `None` apabila tidak diberikan.
-
-- `from_attributes = True`  
-  Mengizinkan Pydantic untuk mengonversi objek SQLAlchemy langsung menjadi response model.
-
-File: `backend/schemas.py`
-
-```python
-from pydantic import BaseModel, Field
-from typing import Optional
-from datetime import datetime
-
-# === BASE SCHEMA ===
-class ItemBase(BaseModel):
-    """Base schema — field yang dipakai untuk create & update."""
-
-    name: str = Field(..., min_length=1, max_length=100, examples=["Laptop"])
-    description: Optional[str] = Field(None, examples=["Laptop untuk cloud computing"])
-    price: float = Field(..., gt=0, examples=[15000000])
-    quantity: int = Field(0, ge=0, examples=[10])
-
-# === CREATE SCHEMA (untuk POST request) ===
-class ItemCreate(ItemBase):
-    """Schema untuk membuat item baru. Mewarisi semua field dari ItemBase."""
-    pass
-
-# === UPDATE SCHEMA (untuk PUT request) ===
-class ItemUpdate(BaseModel):
-    """
-    Schema untuk update item. Semua field optional
-    karena user mungkin hanya ingin update sebagian field.
-    """
-
-    name: Optional[str] = Field(None, min_length=1, max_length=100)
-    description: Optional[str] = None
-    price: Optional[float] = Field(None, gt=0)
-    quantity: Optional[int] = Field(None, ge=0)
-
-# === RESPONSE SCHEMA (untuk output) ===
-class ItemResponse(ItemBase):
-    """Schema untuk response. Termasuk id dan timestamp dari database."""
-
-    id: int
-    created_at: datetime
-    updated_at: Optional[datetime] = None
-
-    class Config:
-        from_attributes = True  # Agar bisa convert dari SQLAlchemy model
-
-# === LIST RESPONSE (dengan metadata) ===
-class ItemListResponse(BaseModel):
-    """Schema untuk response list items dengan total count."""
-
-    total: int
-    items: list[ItemResponse]
-```
-
----
-
-#### 📁 crud.py 
-
-Modul ini berisi implementasi fungsi operasional dasar database (Create, Read, Update, Delete).  
-Selain operasi CRUD standar, modul ini juga dilengkapi dengan:
-
-- Fitur pencarian (`search`) berdasarkan nama atau deskripsi.
-- Fitur pagination menggunakan `skip` dan `limit` untuk efisiensi beban kerja server.
-- Pengurutan data berdasarkan waktu pembuatan terbaru.
-
-File: `backend/crud.py`
-
-```python
-from sqlalchemy.orm import Session
-from sqlalchemy import or_
-from models import Item
-from schemas import ItemCreate, ItemUpdate
-
-def create_item(db: Session, item_data: ItemCreate) -> Item:
-    """Buat item baru di database."""
-    db_item = Item(**item_data.model_dump())
-    db.add(db_item)
-    db.commit()
-    db.refresh(db_item)
-    return db_item
-
-def get_items(db: Session, skip: int = 0, limit: int = 20, search: str = None):
-    """
-    Ambil daftar items dengan pagination & search.
-
-    - skip: jumlah data yang di-skip (untuk pagination)
-    - limit: jumlah data per halaman
-    - search: cari berdasarkan nama atau deskripsi
-    """
-
-    query = db.query(Item)
-
-    if search:
-        query = query.filter(
-            or_(
-                Item.name.ilike(f"%{search}%"),
-                Item.description.ilike(f"%{search}%")
-            )
-        )
-
-    total = query.count()
-    items = query.order_by(Item.created_at.desc()).offset(skip).limit(limit).all()
-
-    return {"total": total, "items": items}
-
-def get_item(db: Session, item_id: int) -> Item | None:
-    """Ambil satu item berdasarkan ID."""
-    return db.query(Item).filter(Item.id == item_id).first()
-
-def update_item(db: Session, item_id: int, item_data: ItemUpdate) -> Item | None:
-    """
-    Update item berdasarkan ID.
-    Hanya update field yang dikirim (bukan None).
-    """
-
-    db_item = db.query(Item).filter(Item.id == item_id).first()
-
-    if not db_item:
-        return None
-
-    # Hanya update field yang dikirim (exclude_unset=True)
-    update_data = item_data.model_dump(exclude_unset=True)
-    for field, value in update_data.items():
-        setattr(db_item, field, value)
-
-    db.commit()
-    db.refresh(db_item)
-    return db_item
-
-def delete_item(db: Session, item_id: int) -> bool:
-    """Hapus item berdasarkan ID. Return True jika berhasil."""
-
-    db_item = db.query(Item).filter(Item.id == item_id).first()
-
-    if not db_item:
-        return False
-
-    db.delete(db_item)
-    db.commit()
-    return True
-```
-
-
-#### 📁 main.py
-
-File ini merupakan pusat aplikasi (entry point API) yang mengintegrasikan seluruh modul backend.  
-Di dalamnya terdapat:
-
-- Inisialisasi aplikasi FastAPI
-- Pembuatan tabel otomatis
-- Konfigurasi middleware CORS
-- Definisi seluruh endpoint API
-- Dokumentasi Swagger otomatis
-
-File: `backend/main.py`
-
-```python
-from fastapi import FastAPI, Depends, HTTPException, Query
-from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy.orm import Session
-from database import engine, get_db
-from models import Base
-from schemas import ItemCreate, ItemUpdate, ItemResponse, ItemListResponse
-import crud
-
-# Buat semua tabel di database (jika belum ada)
-Base.metadata.create_all(bind=engine)
-
-app = FastAPI(
-    title="Cloud App API",
-    description="REST API untuk mata kuliah Komputasi Awan — SI ITK",
-    version="0.2.0",
-)
-
-# CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# ==================== HEALTH CHECK ====================
-
-@app.get("/health")
-def health_check():
-    """Endpoint untuk mengecek apakah API berjalan."""
-    return {"status": "healthy", "version": "0.2.0"}
-
-# ==================== CRUD ENDPOINTS ====================
-
-@app.post("/items", response_model=ItemResponse, status_code=201)
-def create_item(item: ItemCreate, db: Session = Depends(get_db)):
-    """
-    Buat item baru.
-
-    - **name**: Nama item (wajib, 1-100 karakter)
-    - **price**: Harga (wajib, > 0)
-    - **description**: Deskripsi (opsional)
-    - **quantity**: Jumlah stok (default: 0)
-    """
-    return crud.create_item(db=db, item_data=item)
-
-@app.get("/items", response_model=ItemListResponse)
-def list_items(
-    skip: int = Query(0, ge=0, description="Jumlah data yang di-skip"),
-    limit: int = Query(20, ge=1, le=100, description="Jumlah data per halaman"),
-    search: str = Query(None, description="Cari berdasarkan nama/deskripsi"),
-    db: Session = Depends(get_db),
-):
-    """
-    Ambil daftar items dengan pagination dan search.
-
-    - **skip**: Offset untuk pagination (default: 0)
-    - **limit**: Jumlah item per halaman (default: 20, max: 100)
-    - **search**: Kata kunci pencarian (opsional)
-    """
-    return crud.get_items(db=db, skip=skip, limit=limit, search=search)
-
-@app.get("/items/{item_id}", response_model=ItemResponse)
-def get_item(item_id: int, db: Session = Depends(get_db)):
-    """Ambil satu item berdasarkan ID."""
-    item = crud.get_item(db=db, item_id=item_id)
-    if not item:
-        raise HTTPException(status_code=404, detail=f"Item dengan id={item_id} tidak ditemukan")
-    return item
-
-@app.put("/items/{item_id}", response_model=ItemResponse)
-def update_item(item_id: int, item: ItemUpdate, db: Session = Depends(get_db)):
-    """
-    Update item berdasarkan ID.
-    Hanya field yang dikirim yang akan di-update (partial update).
-    """
-    updated = crud.update_item(db=db, item_id=item_id, item_data=item)
-    if not updated:
-        raise HTTPException(status_code=404, detail=f"Item dengan id={item_id} tidak ditemukan")
-    return updated
-
-@app.delete("/items/{item_id}", status_code=204)
-def delete_item(item_id: int, db: Session = Depends(get_db)):
-    """Hapus item berdasarkan ID."""
-    success = crud.delete_item(db=db, item_id=item_id)
-    if not success:
-        raise HTTPException(status_code=404, detail=f"Item dengan id={item_id} tidak ditemukan")
-    return None
-
-# ==================== TEAM INFO ====================
-
-@app.get("/team")
-def team_info():
-    """Informasi tim."""
-    return {
-        "team": "cloud-team-XX",
-        "members": [
-            # TODO: Isi dengan data tim Anda
-            {"name": "Nama 1", "nim": "NIM1", "role": "Lead Backend"},
-            {"name": "Nama 2", "nim": "NIM2", "role": "Lead Frontend"},
-            {"name": "Nama 3", "nim": "NIM3", "role": "Lead DevOps"},
-            {"name": "Nama 4", "nim": "NIM4", "role": "Lead QA & Docs"},
-        ],
-    }
-```
-
----
-
-### 3. Prosedur Eksekusi
-
-Tahapan berikut menjelaskan cara menjalankan server aplikasi backend.
-
-#### 3.1 Menjalankan Server
-
-Aplikasi dapat dijalankan menggunakan Uvicorn sebagai ASGI server dengan perintah berikut:
-
-```bash
-uvicorn main:app --reload
-```
-
-Keterangan:
-- `main` → Nama file Python (`main.py`)
-- `app` → Instance FastAPI di dalam file tersebut
-- `--reload` → Mengaktifkan mode development (server otomatis restart saat ada perubahan kode)
-
-Secara default, server akan berjalan pada alamat:
-
-```
-http://localhost:8000
-```
-
-#### 3.2 Dokumentasi Interaktif API
-
-FastAPI secara otomatis menyediakan dokumentasi interaktif berbasis Swagger UI.  Dokumentasi tersebut dapat diakses melalui browser pada alamat berikut:
-
-```
-http://localhost:8000/docs
-```
-
-Melalui halaman ini, pengguna dapat:
-- Melihat seluruh endpoint yang tersedia
-- Menguji request secara langsung
-- Melihat struktur request dan response
-- Mengamati validasi parameter yang telah didefinisikan
-
----
-
-### 4. Laporan Verifikasi Pengujian
+<!-- 
+## 10. API DOCUMENTATION TESTING
 
 Pengujian dilakukan melalui Swagger UI untuk memastikan seluruh endpoint berjalan sesuai spesifikasi.  
 Semua skenario pengujian menghasilkan output yang sesuai (SEMUA PASS).
@@ -1050,3 +603,4 @@ Berikut adalah hasil pengujian yang telah dilakukan:
 | ee10 | Data tetap ada | Setelah login ulang | Data item tetap tersimpan dan tampil | ✅ Sesuai |
 
 ---
+-->
