@@ -1,15 +1,18 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
-import { useState, useCallback } from "react"
+import { useCallback } from "react"
 import { AuthProvider, useAuth } from "./context/AuthContext"
 import { Toaster, toast } from "sonner"
 import Sidebar from "./components/Layout/Sidebar"
+import UserLayout from "./components/Layout/UserLayout"
 import { Loader2 } from "lucide-react"
 
 import LandingPage from "./pages/LandingPage"
 import LoginPage from "./pages/LoginPage"
 import DashboardPage from "./pages/DashboardPage"
 import UserDashboard from "./pages/UserDashboard"
+import CatalogPage from "./pages/CatalogPage"
 import RentalPage from "./pages/RentalPage"
+import PaymentPage from "./pages/PaymentPage"
 import MyRentalsPage from "./pages/MyRentalsPage"
 import ProfilePage from "./pages/ProfilePage"
 import AdminDashboard from "./pages/AdminDashboard"
@@ -42,14 +45,14 @@ function RequireAuth({ children }) {
 function RequireAdmin({ children }) {
   const { isAdmin, isSuperAdmin, loading } = useAuth()
   if (loading) return <LoadingScreen />
-  if (!isAdmin && !isSuperAdmin) return <Navigate to="/dashboard" replace />
+  if (!isAdmin && !isSuperAdmin) return <Navigate to="/home" replace />
   return children
 }
 
 function RequireSuperAdmin({ children }) {
   const { isSuperAdmin, loading } = useAuth()
   if (loading) return <LoadingScreen />
-  if (!isSuperAdmin) return <Navigate to="/dashboard" replace />
+  if (!isSuperAdmin) return <Navigate to="/home" replace />
   return children
 }
 
@@ -61,20 +64,15 @@ function LoadingScreen() {
   )
 }
 
-function AppLayout({ addToast }) {
+// ── Layout for admin/superadmin: sidebar ─────────────────────
+function AdminLayout({ addToast }) {
   return (
     <div className="min-h-screen flex w-full">
       <Sidebar />
       <div className="flex-1 flex flex-col">
         <main className="flex-1 p-4 md:p-6 overflow-auto">
           <Routes>
-            {/* User home (role=user) */}
-            <Route path="/home" element={<RequireAuth><UserDashboard addToast={addToast} /></RequireAuth>} />
-            {/* Catalog — accessible to all logged-in users */}
-            <Route path="/catalog" element={<DashboardPage addToast={addToast} />} />
-            {/* /dashboard → keep for admin/superadmin */}
             <Route path="/dashboard" element={<DashboardPage addToast={addToast} />} />
-            <Route path="/rentals/new" element={<RequireAuth><RentalPage addToast={addToast} /></RequireAuth>} />
             <Route path="/rentals/my" element={<RequireAuth><MyRentalsPage addToast={addToast} /></RequireAuth>} />
             <Route path="/profile" element={<RequireAuth><ProfilePage addToast={addToast} /></RequireAuth>} />
             <Route path="/admin/dashboard" element={<RequireAdmin><AdminDashboard addToast={addToast} /></RequireAdmin>} />
@@ -82,11 +80,27 @@ function AppLayout({ addToast }) {
             <Route path="/admin/profile" element={<RequireAdmin><AdminDashboard addToast={addToast} /></RequireAdmin>} />
             <Route path="/superadmin" element={<RequireSuperAdmin><SuperAdminPanel addToast={addToast} /></RequireSuperAdmin>} />
             <Route path="/superadmin/*" element={<RequireSuperAdmin><SuperAdminPanel addToast={addToast} /></RequireSuperAdmin>} />
-            <Route path="*" element={<Navigate to="/home" replace />} />
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </main>
       </div>
     </div>
+  )
+}
+
+// ── Layout for regular users: top navbar ─────────────────────
+function UserAppLayout({ addToast }) {
+  return (
+    <UserLayout>
+      <Routes>
+        <Route path="/home" element={<RequireAuth><UserDashboard addToast={addToast} /></RequireAuth>} />
+        <Route path="/rentals/new" element={<RequireAuth><RentalPage addToast={addToast} /></RequireAuth>} />
+        <Route path="/rentals/my" element={<RequireAuth><MyRentalsPage addToast={addToast} /></RequireAuth>} />
+        <Route path="/payment/:rentalId" element={<RequireAuth><PaymentPage addToast={addToast} /></RequireAuth>} />
+        <Route path="/profile" element={<RequireAuth><ProfilePage addToast={addToast} /></RequireAuth>} />
+        <Route path="*" element={<Navigate to="/home" replace />} />
+      </Routes>
+    </UserLayout>
   )
 }
 
@@ -97,21 +111,27 @@ function AppContent() {
   if (loading) return <LoadingScreen />
 
   const homeRoute = isAdmin || isSuperAdmin ? "/dashboard" : "/home"
+  const isStaff = isAdmin || isSuperAdmin
 
   return (
     <>
       <Toaster position="top-right" richColors closeButton />
       <Routes>
-        {/* Landing page selalu bisa dikunjungi (seperti recraft.ai) */}
+        {/* Public pages */}
         <Route path="/" element={<LandingPage />} />
+        <Route path="/catalog" element={<CatalogPage addToast={addToast} />} />
         <Route path="/login" element={
           isAuthenticated ? <Navigate to={homeRoute} replace /> : <LoginPage addToast={addToast} />
         } />
         <Route path="/404" element={<RedirectToStatic404 />} />
+
+        {/* Authenticated routes — split by role */}
         <Route path="/*" element={
-          isAuthenticated
-            ? <AppLayout addToast={addToast} />
-            : <Navigate to="/404" replace />
+          !isAuthenticated
+            ? <Navigate to="/404" replace />
+            : isStaff
+              ? <AdminLayout addToast={addToast} />
+              : <UserAppLayout addToast={addToast} />
         } />
       </Routes>
     </>

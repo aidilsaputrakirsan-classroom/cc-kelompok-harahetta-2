@@ -12,7 +12,6 @@ import { useState } from "react"
 const NAV_USER = [
   { path: "/home", label: "Beranda", icon: Home },
   { path: "/catalog", label: "Katalog", icon: BookOpen },
-  { path: "/rentals/my", label: "Sewa Saya", icon: ClipboardList },
   { path: "/profile", label: "Profil", icon: User },
 ]
 

@@ -6,7 +6,7 @@ import { Card, CardContent } from "../components/ui/card"
 import {
   ArrowRight, ShieldCheck, Package, MousePointerClick,
   Search, BadgeCheck, Clock, Heart, Tv, TreePine, PartyPopper, Car,
-  Menu, X, Rocket, LayoutDashboard, LogOut,
+  Menu, X, Rocket, LayoutDashboard, LogOut, BookOpen,
 } from "lucide-react"
 
 function Navbar() {
@@ -31,6 +31,9 @@ function Navbar() {
         <div className="hidden md:flex items-center gap-6">
           <a href="#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Fitur</a>
           <a href="#categories" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Kategori</a>
+          <Link to="/catalog" className="flex items-center gap-1.5 text-sm font-semibold text-primary hover:text-primary/80 transition-colors">
+            <BookOpen className="w-4 h-4" /> Katalog
+          </Link>
           {isAuthenticated ? (
             <div className="flex items-center gap-3">
               <span className="text-sm text-muted-foreground hidden lg:block">
@@ -58,6 +61,9 @@ function Navbar() {
         <div className="md:hidden bg-card border-b px-4 pb-4 space-y-2">
           <a href="#features" className="block w-full text-left py-2 text-sm text-muted-foreground hover:text-foreground" onClick={() => setOpen(false)}>Fitur</a>
           <a href="#categories" className="block py-2 text-sm text-muted-foreground hover:text-foreground" onClick={() => setOpen(false)}>Kategori</a>
+          <Link to="/catalog" className="flex items-center gap-1.5 py-2 text-sm font-semibold text-primary" onClick={() => setOpen(false)}>
+            <BookOpen className="w-4 h-4" /> Katalog
+          </Link>
           {isAuthenticated ? (
             <>
               <Link to={homeRoute} onClick={() => setOpen(false)}>
@@ -132,16 +138,16 @@ export default function LandingPage() {
               Sewain menghubungkan penyewa dengan penyedia barang terpercaya. Hemat biaya, ramah lingkungan, dan mudah digunakan.
             </p>
             <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center md:justify-start">
-              <Link to="/login">
+              <Link to="/catalog">
                 <Button size="lg" className="text-base px-8">
+                  <BookOpen className="w-4 h-4 mr-2" /> Lihat Katalog
+                </Button>
+              </Link>
+              <Link to="/login">
+                <Button variant="outline" size="lg" className="text-base px-8">
                   Mulai Sekarang <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
               </Link>
-              <a href="#features">
-                <Button variant="outline" size="lg" className="text-base px-8">
-                  Pelajari Lebih
-                </Button>
-              </a>
             </div>
           </div>
           <div className="flex-1">
@@ -271,16 +277,16 @@ export default function LandingPage() {
             Bergabung sekarang dan nikmati kemudahan sewa barang dari penyedia terpercaya di seluruh Indonesia.
           </p>
           <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
-            <Link to="/login">
+            <Link to="/catalog">
               <Button size="lg" variant="secondary" className="text-base px-8">
+                <BookOpen className="w-4 h-4 mr-2" /> Lihat Katalog
+              </Button>
+            </Link>
+            <Link to="/login">
+              <Button size="lg" variant="outline" className="text-base px-8 border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10">
                 Daftar Gratis <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
             </Link>
-            <a href="#features">
-              <Button size="lg" variant="outline" className="text-base px-8 border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10">
-                Lihat Fitur
-              </Button>
-            </a>
           </div>
         </div>
       </section>

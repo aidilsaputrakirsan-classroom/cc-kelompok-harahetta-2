@@ -223,6 +223,63 @@ export async function updateRentalStatus(id, data) {
   return handleResponse(res)
 }
 
+// ==================== ADMIN PAYMENT INFO (public) ====================
+export async function fetchAdminPaymentInfo(adminId) {
+  const res = await fetch(`${API_URL}/admins/${adminId}/payment-info`)
+  return handleResponse(res)
+}
+
+// ==================== PAYMENTS API ====================
+export async function fetchMyPayments(params = {}) {
+  const q = new URLSearchParams()
+  if (params.status) q.append("status", params.status)
+  q.append("skip", params.skip ?? 0)
+  q.append("limit", params.limit ?? 50)
+  const res = await fetch(`${API_URL}/payments/my?${q}`, { headers: authOnlyHeaders() })
+  return handleResponse(res)
+}
+
+export async function fetchPayment(paymentId) {
+  const res = await fetch(`${API_URL}/payments/${paymentId}`, { headers: authOnlyHeaders() })
+  return handleResponse(res)
+}
+
+export async function createPaymentForRental(rentalId, data = {}) {
+  const res = await fetch(`${API_URL}/payments/rentals/${rentalId}`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify({ rental_id: rentalId, metode_pembayaran: "transfer", ...data }),
+  })
+  return handleResponse(res)
+}
+
+export async function uploadPaymentProof(paymentId, { bukti_pembayaran, catatan }) {
+  const res = await fetch(`${API_URL}/payments/${paymentId}/status`, {
+    method: "PUT",
+    headers: authHeaders(),
+    body: JSON.stringify({ status: "completed", bukti_pembayaran, catatan: catatan || undefined }),
+  })
+  return handleResponse(res)
+}
+
+export async function fetchAdminPayments(params = {}) {
+  const q = new URLSearchParams()
+  if (params.status) q.append("status", params.status)
+  q.append("skip", params.skip ?? 0)
+  q.append("limit", params.limit ?? 50)
+  const res = await fetch(`${API_URL}/admin/payments?${q}`, { headers: authOnlyHeaders() })
+  return handleResponse(res)
+}
+
+export async function confirmPayment(paymentId, statusVal) {
+  const res = await fetch(`${API_URL}/payments/${paymentId}/status`, {
+    method: "PUT",
+    headers: authHeaders(),
+    body: JSON.stringify({ status: statusVal }),
+  })
+  return handleResponse(res)
+}
+
 // ==================== SUPER ADMIN ====================
 export async function fetchPlatformStats() {
   const res = await fetch(`${API_URL}/superadmin/stats`, { headers: authOnlyHeaders() })
