@@ -116,6 +116,8 @@ class AdminProfileCreate(BaseModel):
     nama_usaha: str = Field(..., min_length=2, max_length=100, examples=["Toko Sewa Jaya"])
     alamat_usaha: Optional[str] = Field(None, examples=["Jl. Soekarno-Hatta No.1, Balikpapan"])
     nomor_telepon: Optional[str] = Field(None, max_length=20, examples=["08123456789"])
+    nomor_rekening: Optional[str] = Field(None, max_length=100, examples=["BCA 1234567890 a/n Toko Sewa Jaya"])
+    foto_qris: Optional[str] = Field(None, examples=["data:image/png;base64,..."])
 
 
 class AdminProfileUpdate(BaseModel):
@@ -123,6 +125,8 @@ class AdminProfileUpdate(BaseModel):
     nama_usaha: Optional[str] = Field(None, max_length=100)
     alamat_usaha: Optional[str] = None
     nomor_telepon: Optional[str] = Field(None, max_length=20)
+    nomor_rekening: Optional[str] = Field(None, max_length=100)
+    foto_qris: Optional[str] = None
 
 
 class AdminProfileResponse(BaseModel):
@@ -132,8 +136,22 @@ class AdminProfileResponse(BaseModel):
     nama_usaha: str
     alamat_usaha: Optional[str]
     nomor_telepon: Optional[str]
+    nomor_rekening: Optional[str]
+    foto_qris: Optional[str]
     created_at: datetime
     user: UserResponse
+
+    class Config:
+        from_attributes = True
+
+
+class AdminPaymentInfoResponse(BaseModel):
+    """Schema response info pembayaran admin (publik, untuk user yang mau sewa)."""
+    admin_id: int
+    nama_usaha: str
+    nomor_rekening: Optional[str]
+    foto_qris: Optional[str]
+    nomor_telepon: Optional[str]
 
     class Config:
         from_attributes = True

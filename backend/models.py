@@ -102,6 +102,8 @@ class AdminProfile(Base):
     nama_usaha = Column(String(100), nullable=False)
     alamat_usaha = Column(Text, nullable=True)
     nomor_telepon = Column(String(20), nullable=True)
+    nomor_rekening = Column(String(100), nullable=True)   # No. rek / nama bank
+    foto_qris = Column(Text, nullable=True)               # base64 gambar QRIS
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships

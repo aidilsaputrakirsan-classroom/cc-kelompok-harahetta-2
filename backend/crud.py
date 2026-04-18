@@ -170,6 +170,8 @@ def create_admin_profile(db: Session, user_id: int, data: AdminProfileCreate) ->
         nama_usaha=data.nama_usaha,
         alamat_usaha=data.alamat_usaha,
         nomor_telepon=data.nomor_telepon,
+        nomor_rekening=data.nomor_rekening,
+        foto_qris=data.foto_qris,
     )
     db.add(profile)
     db.commit()
@@ -774,10 +776,18 @@ def create_payment(
     rental_id: int,
     data: PaymentCreate,
 ) -> Payment | None:
-    """Buat pembayaran baru untuk rental."""
+    """Buat pembayaran baru untuk rental. Jika sudah ada, return yang existing."""
     rental = db.query(Rental).filter(Rental.id == rental_id).first()
     if not rental:
         return None
+
+    # Jika payment sudah ada untuk rental ini, return yang existing
+    existing = db.query(Payment).filter(Payment.rental_id == rental_id).first()
+    if existing:
+        return db.query(Payment).options(
+            joinedload(Payment.rental).joinedload(Rental.item),
+            joinedload(Payment.user)
+        ).filter(Payment.id == existing.id).first()
 
     # Cari admin dari item
     item = db.query(Item).filter(Item.id == rental.item_id).first()

@@ -17,7 +17,7 @@ from schemas import (
     # Auth
     UserCreate, UserResponse, TokenResponse, UserUpdateByAdmin,
     # AdminProfile
-    AdminProfileCreate, AdminProfileUpdate, AdminProfileResponse, AdminCreateRequest,
+    AdminProfileCreate, AdminProfileUpdate, AdminProfileResponse, AdminCreateRequest, AdminPaymentInfoResponse,
     # UserProfile
     UserProfileCreate, UserProfileUpdate, UserProfileResponse, VerificationAction,
     # Category
@@ -449,6 +449,32 @@ def update_my_admin_profile(
     if not updated:
         raise HTTPException(status_code=404, detail="Profil usaha belum dibuat")
     return updated
+
+
+@app.get(
+    "/admins/{admin_id}/payment-info",
+    response_model=AdminPaymentInfoResponse,
+    tags=["🏪 Admin — Profil Usaha"],
+    summary="[Public] Info pembayaran penyedia (nomor rekening & QRIS)",
+)
+def get_admin_payment_info(
+    admin_id: int,
+    db: Session = Depends(get_db),
+):
+    """
+    Mengambil info pembayaran penyedia barang (publik).
+    Digunakan user untuk melihat nomor rekening & QRIS saat akan membayar.
+    """
+    profile = db.query(AdminProfile).filter(AdminProfile.id == admin_id).first()
+    if not profile:
+        raise HTTPException(status_code=404, detail=f"Admin ID {admin_id} tidak ditemukan")
+    return AdminPaymentInfoResponse(
+        admin_id=profile.id,
+        nama_usaha=profile.nama_usaha,
+        nomor_rekening=profile.nomor_rekening,
+        foto_qris=profile.foto_qris,
+        nomor_telepon=profile.nomor_telepon,
+    )
 
 
 @app.get(
@@ -952,7 +978,7 @@ def create_payment_for_rental(
     if rental.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Rental ini bukan milik Anda")
     
-    payment = crud.create_payment(db=db, rental_id=rental_id, payment_data=data)
+    payment = crud.create_payment(db=db, rental_id=rental_id, data=data)
     if not payment:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -1052,7 +1078,7 @@ def update_payment_status(
         if not admin_profile or payment.admin_id != admin_profile.id:
             raise HTTPException(status_code=403, detail="Pembayaran ini bukan untuk barang Anda")
     
-    updated = crud.update_payment_status(db=db, payment_id=payment_id, update_data=data)
+    updated = crud.update_payment_status(db=db, payment_id=payment_id, data=data)
     if not updated:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
