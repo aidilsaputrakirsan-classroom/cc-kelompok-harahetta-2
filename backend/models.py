@@ -132,8 +132,8 @@ class UserProfile(Base):
     nomor_telepon = Column(String(20), nullable=True)
     latitude = Column(Float, nullable=True)
     longitude = Column(Float, nullable=True)
-    foto_ktp = Column(String(500), nullable=True)         # URL foto KTP
-    foto_selfie_ktp = Column(String(500), nullable=True)  # URL selfie dengan KTP
+    foto_ktp = Column(Text, nullable=True)
+    foto_selfie_ktp = Column(Text, nullable=True)
     status_verifikasi = Column(
         SAEnum(VerificationStatus),
         nullable=False,
