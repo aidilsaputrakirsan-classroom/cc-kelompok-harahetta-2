@@ -988,6 +988,29 @@ def create_payment_for_rental(
 
 
 @app.get(
+    "/payments/my",
+    response_model=PaymentListResponse,
+    tags=["💳 Payments — Pembayaran"],
+    summary="[User] Riwayat pembayaran saya",
+)
+def my_payments(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    status: str = Query(None, description="Filter: pending | completed | failed | cancelled"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """User melihat riwayat pembayaran mereka."""
+    return crud.get_payments(
+        db=db,
+        skip=skip,
+        limit=limit,
+        user_id=current_user.id,
+        status=status,
+    )
+
+
+@app.get(
     "/payments/{payment_id}",
     response_model=PaymentResponse,
     tags=["💳 Payments — Pembayaran"],
@@ -1011,29 +1034,6 @@ def get_payment_detail(
         raise HTTPException(status_code=403, detail="Anda tidak punya akses ke pembayaran ini")
     
     return payment
-
-
-@app.get(
-    "/payments/my",
-    response_model=PaymentListResponse,
-    tags=["💳 Payments — Pembayaran"],
-    summary="[User] Riwayat pembayaran saya",
-)
-def my_payments(
-    skip: int = Query(0, ge=0),
-    limit: int = Query(20, ge=1, le=100),
-    status: str = Query(None, description="Filter: pending | completed | failed | cancelled"),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_user),
-):
-    """User melihat riwayat pembayaran mereka."""
-    return crud.get_payments(
-        db=db,
-        skip=skip,
-        limit=limit,
-        user_id=current_user.id,
-        status=status,
-    )
 
 
 @app.put(
