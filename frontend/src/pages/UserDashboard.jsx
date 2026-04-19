@@ -9,7 +9,7 @@ import {
   ShoppingCart, ClipboardList, ArrowRight, ArrowLeft,
   Package, CheckCircle, Clock, TrendingUp,
   Calendar, ChevronRight, Sparkles, BadgeCheck, XCircle,
-  Upload, ImageIcon, X, CreditCard, Loader2, Building2, QrCode, Copy,
+  Upload, ImageIcon, X, CreditCard, Loader2, Building2, QrCode, Copy, AlertTriangle,
 } from "lucide-react"
 
 // ── Mini bar chart ──────────────────────────────────────────
