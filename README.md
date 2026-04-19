@@ -15,13 +15,12 @@
 3. [Fitur Utama](#3-fitur-utama)
 4. [Tech Stack](#4-tech-stack)
 5. [Arsitektur Sistem](#5-arsitektur-sistem)
-- [Struktur Proyek](#struktur-proyek)
-- [Struktur Database](#struktur-database)
-- [Cara Menjalankan Aplikasi](#cara-menjalankan-aplikasi)
-  - [Menggunakan Docker (Rekomendasi)](#menggunakan-docker-rekomendasi)
-  - [Manual (Tanpa Docker)](#manual-tanpa-docker)
-- [Akun Demo](#akun-demo)
-- [Dokumentasi API](#dokumentasi-api)
+6. [Getting Started](#6-getting-started)
+7. [Roadmap](#7-roadmap)
+8. [Project Structure](#8-project-structure)
+9. [API Documentation Testing](#9-api-documentation-testing)
+10. [UI & API Integration Testing](#10-ui-api-integration-testing)
+11. [Authentication & CRUD Testing](#11-Authentication-CRUD-Testing)
 
 ---
 
@@ -238,292 +237,30 @@ cc-kelompok-harahetta-2/
 ```
 ---
 
+## 9. API Documentation Testing
 
-## 10. API DOCUMENTATION TESTING
+Berikut adalah ringkasan hasil pengujian endpoint utama pada platform **SEWAIN** berdasarkan integrasi antara Frontend dan Backend. Untuk melihat hasil dan pembahasan lebih detail, silakan buka file berikut ini:
+[Hasil dan Pembahasan API Testing](./docs/api-documentation.md/)
 
-Pengujian dilakukan melalui Swagger UI untuk memastikan seluruh endpoint berjalan sesuai spesifikasi.  
-Semua skenario pengujian menghasilkan output yang sesuai (SEMUA PASS).
-
-#### 4.1 Hasil Pengujian 
-
-1️⃣ **POST /items**
-
-**Method:** POST  
-**URL:** `/items`  
-**Status Code:** 201 Created  
-
-**Request Body:**
-```json
-{
-  "name": "Laptop",
-  "description": "Laptop untuk cloud computing",
-  "price": 15000000,
-  "quantity": 10
-}
-```
-
-**Response Body:**
-```json
-{
-  "id": 1,
-  "name": "Laptop",
-  "description": "Laptop untuk cloud computing",
-  "price": 15000000,
-  "quantity": 10,
-  "created_at": "2026-03-06T22:45:09.421640+08:00",
-  "updated_at": null
-}
-```
-
-
-2️⃣ **GET /items**
-
-**Method:** GET  
-**URL:** `/items`  
-**Status Code:** 200 OK  
-
-**Response Body:**
-```json
-{
-  "total": 3,
-  "items": [
-    {
-      "name": "Keyboard Mechanical",
-      "description": "Keyboard untuk coding",
-      "price": 1200000,
-      "quantity": 8,
-      "id": 4,
-      "created_at": "2026-03-06T22:48:30.987654+08:00",
-      "updated_at": null
-    },
-    {
-      "name": "Mouse Wireless",
-      "description": "Mouse bluetooth",
-      "price": 250000,
-      "quantity": 20,
-      "id": 3,
-      "created_at": "2026-03-06T22:47:15.123456+08:00",
-      "updated_at": null
-    },
-    {
-      "name": "Laptop",
-      "description": "Laptop untuk cloud computing",
-      "price": 15000000,
-      "quantity": 10,
-      "id": 1,
-      "created_at": "2026-03-06T22:45:09.421640+08:00",
-      "updated_at": null
-    }
-  ]
-}
-```
-
-
-3️⃣ **GET /items/1**
-
-**Method:** GET  
-**URL:** `/items/1`  
-**Status Code:** 200 OK  
-
-**Response Body:**
-```json
-{
-  "name": "Laptop",
-  "description": "Laptop untuk cloud computing",
-  "price": 15000000,
-  "quantity": 10,
-  "id": 1,
-  "created_at": "2026-03-06T22:45:09.421640+08:00",
-  "updated_at": null
-}
-```
-
-
-4️⃣ **PUT /items/1**
-
-**Method:** PUT  
-**URL:** `/items/1`  
-**Status Code:** 200 OK  
-
-**Request Body:**
-```json
-{
-  "price": 14000000
-}
-```
-
-**Response Body:**
-```json
-{
-  "name": "Laptop",
-  "description": "Laptop untuk cloud computing",
-  "price": 14000000,
-  "quantity": 10,
-  "id": 1,
-  "created_at": "2026-03-06T22:45:09.421640+08:00",
-  "updated_at": "2026-03-06T22:52:47.410707+08:00"
-}
-```
-
-
-5️⃣ **GET /items/1 (Verifikasi Update)**
-
-**Method:** GET  
-**URL:** `/items/1`  
-**Status Code:** 200 OK  
-
-**Response Body:**
-```json
-{
-  "name": "Laptop",
-  "description": "Laptop untuk cloud computing",
-  "price": 14000000,
-  "quantity": 10,
-  "id": 1,
-  "created_at": "2026-03-06T22:45:09.421640+08:00",
-  "updated_at": "2026-03-06T22:52:47.410707+08:00"
-}
-```
-
-
-6️⃣ **GET /items?search=laptop**
-
-**Method:** GET  
-**URL:** `/items?search=laptop`  
-**Status Code:** 200 OK  
-
-**Response Body:**
-```json
-{
-  "total": 1,
-  "items": [
-    {
-      "name": "Laptop",
-      "description": "Laptop untuk cloud computing",
-      "price": 14000000,
-      "quantity": 10,
-      "id": 1,
-      "created_at": "2026-03-06T22:45:09.421640+08:00",
-      "updated_at": "2026-03-06T22:52:47.410707+08:00"
-    }
-  ]
-}
-```
-
-
-7️⃣ **DELETE /items/1**
-
-**Method:** DELETE  
-**URL:** `/items/1`  
-**Status Code:** 204 No Content  
-
-**Response Body:**  
-Kosong (No Content)
-
-
-
-8️⃣ **GET /items/1 (Verifikasi Delete)**
-
-**Method:** GET  
-**URL:** `/items/1`  
-**Status Code:** 404 Not Found  
-
-**Response Body:**
-```json
-{
-  "detail": "Item dengan id=1 tidak ditemukan"
-}
-```
-
-9️⃣ **GET /items/stats**
-
-**Method:** GET  
-**URL:** `/items/stats`  
-**Status Code:** 200 OK
-
-**Response Body:**
-```json
-{
-  "total_items": 3,
-  "total_value": 84600000,
-  "most_expensive": {
-    "name": "Laptop",
-    "price": 14000000
-  },
-  "cheapest": {
-    "name": "Mouse Wireless",
-    "price": 250000
-  }
-}
-```
-
-#### 4.2 Ringkasan Hasil Pengujian
-Seluruh endpoint telah diuji melalui Swagger UI dan berjalan sesuai dengan spesifikasi fungsional. Validasi data, pagination, search, serta error handling berfungsi dengan baik. Backend dinyatakan stabil dan siap untuk tahap integrasi frontend maupun deployment ke lingkungan cloud.
-
-| No | Method | URL | Request Body | Response Body (Actual) | HTTP Status Code | Hasil Pengujian |
-|----|--------|-----|--------------|------------------------|------------------|-----------------|
-| 1 | POST | /items | `{name, description, ...}` | Data item baru + ID & Timestamp | 201 Created | ✅ Sesuai |
-| 2 | GET | /items | - | List 3 item (JSON Array) | 200 OK | ✅ Sesuai |
-| 3 | GET | /items/1 | - | Detail item ID 1 (Laptop) | 200 OK | ✅ Sesuai |
-| 4 | PUT | /items/1 | `{price: 14000000}` | Data ter-update & Timestamp berubah | 200 OK | ✅ Sesuai |
-| 5 | GET | /items/1 | - | Detail item ID 1 (Harga terbaru) | 200 OK | ✅ Sesuai |
-| 6 | GET | /items?search=laptop | - | List item hasil pencarian (Laptop) | 200 OK | ✅ Sesuai |
-| 7 | DELETE | /items/1 | - | Kosong (No Content) | 204 No Content | ✅ Sesuai |
-| 8 | GET | /items/1 | - | Error Message: Not Found | 404 Not Found | ✅ Sesuai |
-| 9 | GET | /items/stats | - | Statistik total item & nilai inventaris | 200 OK | ✅ Sesuai |
+| No | Endpoint | Metode | Skenario Pengujian | Hasil | Status |
+|----|----------|--------|--------------------|-------|--------|
+| 1 | `/health` | GET | Memastikan backend dan database aktif | API mengembalikan status `healthy` | 🟢 Sesuai |
+| 2 | `/auth/register` | POST | Registrasi akun baru | Data user berhasil tersimpan | 🟢 Sesuai |
+| 3 | `/auth/login` | POST | Login dengan akun valid | Token JWT berhasil dibuat | 🟢 Sesuai |
+| 4 | `/auth/me` | GET | Ambil data user login | Profil user tampil sesuai token | 🟢 Sesuai |
+| 5 | `/categories` | GET | Menampilkan daftar kategori | Data kategori tampil | 🟢 Sesuai |
+| 6 | `/items` | GET | Menampilkan katalog barang | Data barang berhasil dimuat | 🟢 Sesuai |
+| 7 | `/items` | POST | Menambah barang baru | Barang berhasil ditambahkan | 🟢 Sesuai |
+| 8 | `/items/{id}` | PUT | Memperbarui data barang | Perubahan tersimpan | 🟢 Sesuai |
+| 9 | `/items/{id}` | DELETE | Menghapus barang | Barang berhasil dihapus | 🟢 Sesuai |
+| 10 | `/rentals` | POST | Membuat transaksi sewa | Data rental berhasil dibuat | 🟢 Sesuai |
 
 ---
 
-## 🚀 Frontend React — UI & API Integration
+## 10. UI & API Integration Testing
 
-Pada tahap ini, aplikasi SEWAIN mulai mengintegrasikan antarmuka pengguna (Frontend) dengan layanan API (Backend) menggunakan React.js.
-
-**1. Fitur Frontend yang Diimplementasikan**
-
-Berdasarkan panduan Modul 3, pada tahap ini telah berhasil dikembangkan berbagai fitur pada sisi frontend. Aplikasi telah memiliki tampilan antarmuka (UI) yang memungkinkan pengguna berinteraksi secara langsung dengan sistem.
-
-Fitur yang tersedia meliputi dashboard item yang berfungsi untuk menampilkan katalog barang sewa secara dinamis dari database. Selain itu, telah diimplementasikan fitur management UI berbasis CRUD, yaitu form penambahan barang baru dengan validasi field, fitur edit detail barang langsung melalui interface, serta tombol hapus yang telah terintegrasi dengan database secara real-time.
-
-Dari sisi interaktivitas, aplikasi dilengkapi dengan SearchBar untuk melakukan pencarian barang secara instan (client-side filtering). Terdapat juga API Status Indicator yang menampilkan status koneksi ke server (Connected/Disconnected). 
-
-**2. Arsitektur Kode**
-
-Struktur folder pada sisi frontend `(/frontend/src)` telah diorganisir secara sistematis untuk mendukung pengembangan yang rapi dan terstruktur.
-
-Folder `services/api.js` digunakan untuk menangani logika komunikasi dengan backend FastAPI menggunakan pendekatan async/await.
-
-Komponen antarmuka pengguna ditempatkan dalam folder `components/` agar bersifat reusable, yang terdiri dari `Header.jsx, SearchBar.jsx, ItemForm.jsx, ItemList.jsx, dan ItemCard.jsx.`
-
-Sementara itu, `App.jsx` berfungsi sebagai pengelola state utama aplikasi dengan memanfaatkan React Hooks seperti `useState` dan `useEffect`. Struktur ini menunjukkan penerapan konsep clean architecture dalam pengembangan frontend.
-
-**3. Cara Menjalankan Aplikasi (Local Development)**
-
-Untuk menjalankan aplikasi secara keseluruhan, pastikan database PostgreSQL dalam keadaan aktif. Selanjutnya, aplikasi dijalankan menggunakan dua terminal karena terdiri dari backend dan frontend.
-
-Terminal pertama digunakan untuk menjalankan backend pada port 8000:
-```bash
-cd backend
-source venv/bin/activate (atau venv\Scripts\activate untuk Windows)
-uvicorn main:app --reload
-```
-
-Terminal kedua digunakan untuk menjalankan frontend pada port 5173:
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Kedua server harus dijalankan secara bersamaan agar aplikasi dapat berjalan dengan baik. Jika backend tidak aktif, maka frontend tidak dapat mengambil data sehingga tampilan tidak akan muncul dengan semestinya.
-
-**4. Penggunaan Environment Variables**
-
-Dalam implementasinya, URL API seperti http://localhost:8000
-tidak dituliskan secara langsung di dalam kode program, melainkan disimpan dalam file .env. Pendekatan ini bertujuan untuk meningkatkan keamanan serta memudahkan proses konfigurasi apabila aplikasi dipindahkan ke lingkungan lain, seperti server cloud.
-
-**5. Laporan Hasil Pengujian UI (QA Testing)**
-
-Berdasarkan hasil pengujian yang telah dilakukan, seluruh fitur CRUD dan interaktivitas aplikasi berjalan dengan baik dan sesuai dengan yang diharapkan. Setiap aksi yang dilakukan pada antarmuka pengguna telah terhubung dengan backend dan database secara sinkron.
+Berdasarkan hasil pengujian yang telah dilakukan, seluruh fitur CRUD dan interaktivitas aplikasi berjalan dengan baik dan sesuai dengan yang diharapkan. Setiap aksi yang dilakukan pada antarmuka pengguna telah terhubung dengan backend dan database secara sinkron. Untuk melihat hasil dan pembahasan lebih detail, silakan buka file berikut ini:
+[Hasil dan Pembahasan UI Testing](./docs/ui-test-result.md/)
 
 Berikut adalah ringkasan hasil pengujian yang telah dilakukan:
 | No | Skenario Pengujian | Langkah Pengerjaan | Hasil Sebenarnya | Status |
@@ -541,10 +278,10 @@ Berikut adalah ringkasan hasil pengujian yang telah dilakukan:
 
 ---
 
-## 🔐 Authentication
+## 11. Authentication & CRUD Testing
 
 Pengujian sistem dilakukan untuk memastikan seluruh fitur aplikasi berjalan dengan baik sesuai dengan kebutuhan yang telah dirancang. Proses pengujian mencakup fitur autentikasi (authentication), pengelolaan data (CRUD), serta pengujian alur penggunaan secara menyeluruh (end-to-end). Untuk melihat hasil pengujian berupa screenshot, silakan buka folder berikut:
-[Folder Screenshot Testing](./docs/img/imgw4/)
+[Hasil dan Pembahasan Auth Testing](./docs/auth-test-result/)
 
 Pengujian dilakukan dengan mensimulasikan interaksi langsung pengguna terhadap aplikasi, mulai dari proses registrasi, login, pengelolaan data barang, hingga logout. Setiap skenario diuji untuk memastikan bahwa sistem dapat memberikan respon yang sesuai, data tersimpan dengan benar di database, serta tampilan antarmuka tetap sinkron dengan kondisi sistem.
 
@@ -569,23 +306,19 @@ Berikut adalah hasil pengujian yang telah dilakukan:
 | crud3 | Read Data | Membuka dashboard | Semua item tampil dengan data lengkap | ✅ Sesuai |
 | crud4 | Update Item | Klik edit, ubah data, simpan | Data berubah di UI dan database | ✅ Sesuai |
 | crud5 | Delete Item | Klik hapus dan konfirmasi | Item terhapus dari UI dan database | ✅ Sesuai |
-| crud6 | Search Feature | Ketik di search bar | Data terfilter sesuai kata kunci | ✅ Sesuai |
-| crud7 | Sorting | Mengubah urutan data | Data terurut sesuai pilihan | ✅ Sesuai |
 
 ### End-to-End Testing (Modul 4)
 
 | No | Skenario Pengujian | Langkah Pengerjaan | Hasil Sebenarnya | Status |
 |----|-------------------|------------------|----------------------|--------|
-| ee1 | Buka aplikasi | Membuka localhost:5173 di browser | Halaman login muncul | ✅ Sesuai |
+| ee1 | Buka aplikasi | Membuka localhost:3000 di browser | Halaman login muncul | ✅ Sesuai |
 | ee2 | Register user | Mengisi form register dan submit | User berhasil terdaftar | ✅ Sesuai |
 | ee3 | Auto login | Setelah register selesai | User otomatis masuk ke dashboard | ✅ Sesuai |
 | ee4 | Dashboard tampil | Setelah login berhasil | Halaman dashboard dan data item muncul | ✅ Sesuai |
 | ee5 | Nama user muncul | Melihat bagian header | Nama user tampil di header | ✅ Sesuai |
 | ee6 | CRUD berjalan | Menambah, edit, dan hapus item | Semua fitur CRUD berjalan dengan baik | ✅ Sesuai |
 | ee7 | Logout | Klik tombol logout | User keluar dari sistem | ✅ Sesuai |
-| ee8 | Kembali ke login | Setelah logout | Halaman login ditampilkan kembali | ✅ Sesuai |
-| ee9 | Login ulang | Login dengan akun yang sama | User berhasil masuk kembali | ✅ Sesuai |
-| ee10 | Data tetap ada | Setelah login ulang | Data item tetap tersimpan dan tampil | ✅ Sesuai |
+| ee8 | Login ulang | Login dengan akun yang sama | User berhasil masuk kembali | ✅ Sesuai |
+| ee9 | Data tetap ada | Setelah login ulang | Data item tetap tersimpan dan tampil | ✅ Sesuai |
 
 ---
--->
