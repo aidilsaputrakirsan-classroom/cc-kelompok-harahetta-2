@@ -140,6 +140,7 @@ Diagram di atas menunjukkan alur kerja utama dalam sistem Sewain secara sederhan
 - Python 3.10+
 - Node.js 18+
 - Git
+- Docker (Opsional, jika ingin menjalankan via Docker)
 
 ### Backend
 ```bash
@@ -154,39 +155,24 @@ cd frontend
 npm install
 npm run dev
 ```
-<!--
-## 7. Cara Menjalankan Aplikasi Menggunakan Docker
 
-#### Prasyarat
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) terinstall
-- Port `3000`, `8000`, `15432` tidak dipakai aplikasi lain
-
-#### Langkah-langkah
-
-**1. Clone repositori**
+### Docker
 ```bash
+# Clone repositori
 git clone <url-repo>
 cd cc-kelompok-harahetta-2
-```
 
-**2. Siapkan environment file**
-```bash
-cp backend/.env.docker.example backend/.env.docker
-```
-> File `.env.docker` sudah siap pakai dengan konfigurasi default. Ubah `SECRET_KEY` jika diperlukan.
+# Siapkan environment file
+cp backend/.env.docker.example backend/.env.docker 
 
-**3. Jalankan semua service**
-```bash
+# Jalankan semua service
 docker compose up -d
-```
 
-**4. Seed data awal (opsional)**
-```bash
-# Tunggu ~10 detik hingga DB siap, lalu:
+# Seed data awal (opsional)
 docker compose exec db psql -U postgres -d data_sewain -f /dev/stdin < docs/seed-data.sql
 ```
 
-**5. Akses aplikasi**
+### Akses Aplikasi
 
 | Service | URL |
 |---------|-----|
@@ -194,10 +180,10 @@ docker compose exec db psql -U postgres -d data_sewain -f /dev/stdin < docs/seed
 | Backend API | http://localhost:8000 |
 | Swagger UI | http://localhost:8000/docs |
 | Database | `localhost:15432` (user: `postgres`, pass: `setiawan`) |
--->
+
 ---
 
-## 8. Roadmap
+## 7. Roadmap
 
 | Minggu | Target | Status |
 |--------|--------|--------|
@@ -213,7 +199,7 @@ docker compose exec db psql -U postgres -d data_sewain -f /dev/stdin < docs/seed
 
 ---
 
-## 9. Project Structure
+## 8. Project Structure
 
 ```
 cc-kelompok-harahetta-2/
@@ -250,10 +236,9 @@ cc-kelompok-harahetta-2/
 ├── docker-compose.yml          # Orkestrasi semua service
 └── README.md
 ```
-
 ---
 
-<!-- 
+
 ## 10. API DOCUMENTATION TESTING
 
 Pengujian dilakukan melalui Swagger UI untuk memastikan seluruh endpoint berjalan sesuai spesifikasi.  
@@ -541,18 +526,18 @@ tidak dituliskan secara langsung di dalam kode program, melainkan disimpan dalam
 Berdasarkan hasil pengujian yang telah dilakukan, seluruh fitur CRUD dan interaktivitas aplikasi berjalan dengan baik dan sesuai dengan yang diharapkan. Setiap aksi yang dilakukan pada antarmuka pengguna telah terhubung dengan backend dan database secara sinkron.
 
 Berikut adalah ringkasan hasil pengujian yang telah dilakukan:
-| No | Skenario Pengujian | Langkah Pengerjaan                                         | Hasil Sebenarnya                                           | Status   |
-| -- | ------------------ | ---------------------------------------------------------- | ---------------------------------------------------------- | -------- |
-| 1  | Status API         | Membuka dashboard dan mengecek indikator koneksi di header | Indikator berubah menjadi "Connected" saat backend aktif   | ✅ Sesuai |
-| 2  | Sync Data          | Me-refresh halaman utama aplikasi                          | Data dari PostgreSQL berhasil di-fetch dan tampil otomatis | ✅ Sesuai |
-| 3  | Create Item        | Mengisi form tambah barang dan submit                      | Data baru terkirim ke API dan muncul tanpa refresh         | ✅ Sesuai |
-| 4  | Read Data          | Melihat kartu barang di dashboard                          | Informasi nama, harga, dan deskripsi tampil akurat         | ✅ Sesuai |
-| 5  | Edit Mode          | Menekan tombol edit pada item                              | Form otomatis terisi data awal                             | ✅ Sesuai |
-| 6  | Update Data        | Mengubah data dan menyimpan                                | Data ter-update dan langsung terlihat di UI                | ✅ Sesuai |
-| 7  | Search Feature     | Mengetik kata kunci di SearchBar                           | Data terfilter sesuai input                                | ✅ Sesuai |
-| 8  | Delete Item        | Menekan tombol hapus dan konfirmasi                        | Data terhapus dari UI dan database                         | ✅ Sesuai |
-| 9  | Loading State      | Mensimulasikan delay koneksi                               | Muncul indikator "Loading..."                              | ✅ Sesuai |
-| 10 | Validation         | Mengosongkan field lalu submit                             | Muncul pesan error dan data tidak dikirim                  | ✅ Sesuai |
+| No | Skenario Pengujian | Langkah Pengerjaan | Hasil Sebenarnya | Status |
+|----|--------------------|--------------------|------------------|--------|
+| 1 | Cek Status Koneksi | Membuka aplikasi di localhost:3000 | Sidebar dan konten dashboard dimuat tanpa error (API Connected) | ✅ Sesuai |
+| 2 | Read Data (Katalog) | Membuka menu "Katalog" pada sidebar | Item "kamera sony" dari database Modul 2 tampil dengan harga Rp 15.000 | ✅ Sesuai |
+| 3 | Tambah Item Baru | Menekan tombol "+ Tambah Barang Baru" di Admin Panel | Modal form muncul dengan input Nama, Deskripsi, Harga, Stok, dan Foto | ✅ Sesuai |
+| 4 | Create & Upload | Mengisi data  dan mengunggah gambar | Data tersimpan dan thumbnail foto muncul di pratinjau sebelum submit | ✅ Sesuai |
+| 5 | Sync UI (Post-Create) | Melihat daftar barang setelah submit | Item baru muncul secara otomatis di "Daftar Barang Saya" | ✅ Sesuai |
+| 6 | Edit Mode | Klik tombol icon ✏️ (Edit) pada kartu barang | Form modal terbuka dan otomatis terisi data lama item tersebut | ✅ Sesuai |
+| 7 | Update Data | Mengubah harga/stok dan klik "Simpan" | Perubahan data langsung terupdate pada kartu barang di UI | ✅ Sesuai |
+| 8 | Search Feature | Mengetik nama barang di Search Bar menu Katalog | Daftar barang menyusut (terfilter) sesuai kata kunci yang diketik | ✅ Sesuai |
+| 9 | Delete Item | Klik icon 🗑️ (Hapus) pada salah satu item | Item terhapus dari UI dan database setelah konfirmasi | ✅ Sesuai |
+| 10 | Empty State | Menghapus semua barang yang ada | Muncul pesan/tampilan "Data tidak ditemukan" atau daftar kosong | ✅ Sesuai |
 
 ---
 
