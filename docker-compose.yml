@@ -1,0 +1,88 @@
+# ============================================================
+# docker-compose.yml — Sewain App
+# Menjalankan 3 service: database (PostgreSQL), backend (FastAPI), frontend (React/Nginx)
+# Cara pakai:
+#   - Jalankan semua service : docker compose up -d
+#   - Stop semua service     : docker compose down
+#   - Rebuild + jalankan ulang: docker compose up -d --build
+#   - Lihat log realtime     : docker compose logs -f
+# ============================================================
+
+services:
+
+  # ----------------------------------------------------------
+  # SERVICE: db
+  # Database PostgreSQL versi 16 (ringan, pakai Alpine Linux).
+  # Menyimpan semua data aplikasi Sewain.
+  # Port host 15432 → container 5432 (agar tidak bentrok dengan
+  # PostgreSQL lokal yang biasanya di port 5432).
+  # Data disimpan di volume `pgdata` supaya tidak hilang saat
+  # container di-restart.
+  # ----------------------------------------------------------
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: setiawan
+      POSTGRES_DB: data_sewain        # nama database yang dibuat otomatis
+    ports:
+      - "15432:5432"                  # akses dari host: localhost:15432
+    volumes:
+      - pgdata:/var/lib/postgresql/data  # persistensi data database
+    healthcheck:
+      # Memastikan database benar-benar siap menerima koneksi
+      # sebelum service lain (backend) dijalankan.
+      test: ["CMD-SHELL", "pg_isready -U postgres -d data_sewain"]
+      interval: 5s      # cek setiap 5 detik
+      timeout: 5s       # batas waktu tiap pengecekan
+      retries: 10       # maksimal 10 kali percobaan
+      start_period: 10s # tunggu 10 detik sebelum mulai health check
+
+  # ----------------------------------------------------------
+  # SERVICE: backend
+  # REST API berbasis FastAPI (Python), dijalankan dengan Uvicorn.
+  # Image di-pull dari Docker Hub: alif10231056/sewain-backend
+  # Membaca konfigurasi dari file .env.docker (API key, secret, dll).
+  # Menunggu service `db` sehat (healthy) sebelum start.
+  # Port host 8000 → container 8000.
+  # ----------------------------------------------------------
+  backend:
+    image: alif10231056/sewain-backend:v2  # pull dari Docker Hub
+    env_file:
+      - ./backend/.env.docker              # variabel environment tambahan (API key, dll)
+    environment:
+      DB_HOST: db                          # nama service db di jaringan internal Docker
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: setiawan
+      POSTGRES_DB: data_sewain
+    ports:
+      - "8000:8000"                        # akses API: http://localhost:8000
+    depends_on:
+      db:
+        condition: service_healthy         # backend baru start setelah db siap
+    command:
+      ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+  # ----------------------------------------------------------
+  # SERVICE: frontend
+  # Aplikasi React yang sudah di-build dan di-serve oleh Nginx.
+  # Image di-pull dari Docker Hub: alif10231056/sewain-frontend
+  # Port host 3000 → container 80 (Nginx default port 80).
+  # Menunggu backend start terlebih dahulu sebelum dijalankan.
+  # Akses aplikasi: http://localhost:3000
+  # ----------------------------------------------------------
+  frontend:
+    image: alif10231056/sewain-frontend:v2  # pull dari Docker Hub
+    ports:
+      - "3000:80"                           # akses frontend: http://localhost:3000
+    depends_on:
+      - backend                             # frontend start setelah backend siap
+
+# ============================================================
+# VOLUMES
+# pgdata: volume persisten untuk menyimpan data PostgreSQL.
+# Data tetap ada meskipun container dihapus/di-restart.
+# Untuk menghapus data sepenuhnya: docker compose down -v
+# ============================================================
+volumes:
+  pgdata:
