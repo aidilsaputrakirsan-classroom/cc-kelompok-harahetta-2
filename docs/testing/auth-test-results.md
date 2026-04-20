@@ -13,7 +13,7 @@ Bagian ini menjelaskan hasil pengujian pada fitur keamanan dan manajemen akun pe
     Status: 🟢 PASS
     
     **Bukti Screenshot Pengujian**  
-    ![Register User](img/authtest/auth1.png)
+    ![Register User](../img/authtest/auth1.png)
 
 
 
@@ -28,7 +28,7 @@ Bagian ini menjelaskan hasil pengujian pada fitur keamanan dan manajemen akun pe
     Status: 🟢 PASS
 
     **Bukti Screenshot Pengujian**  
-    ![Validasi Register](img/authtest/auth2.png)
+    ![Validasi Register](../img/authtest/auth2.png)
 
 
 
@@ -43,7 +43,7 @@ Bagian ini menjelaskan hasil pengujian pada fitur keamanan dan manajemen akun pe
     Status: 🟢 PASS
 
     **Bukti Screenshot Pengujian**  
-    ![Login Berhasil](img/authtest/auth3.png)
+    ![Login Berhasil](../img/authtest/auth3.png)
 
 
 4. **Login Gagal**
@@ -57,7 +57,7 @@ Bagian ini menjelaskan hasil pengujian pada fitur keamanan dan manajemen akun pe
     Status: 🟢 PASS
 
     **Bukti Screenshot Pengujian**  
-    ![Login Gagal](img/authtest/auth4.png)
+    ![Login Gagal](../img/authtest/auth4.png)
 
 
 5. **Logout**
@@ -71,7 +71,7 @@ Bagian ini menjelaskan hasil pengujian pada fitur keamanan dan manajemen akun pe
     Status: 🟢 PASS
 
     **Bukti Screenshot Pengujian**  
-    ![Logout](img/authtest/auth5.png)
+    ![Logout](../img/authtest/auth5.png)
 
 ---
 
@@ -90,7 +90,7 @@ Bagian ini menjelaskan pengujian fungsionalitas pengolahan data item pada sistem
     Status: 🟢 PASS
 
     **Bukti Screenshot Pengujian**  
-    ![Create Item](img/authtest/crud1.png)
+    ![Create Item](../img/authtest/crud1.png)
 
 
 2. **Validasi Form**
@@ -104,7 +104,7 @@ Bagian ini menjelaskan pengujian fungsionalitas pengolahan data item pada sistem
     Status: 🟢 PASS
 
     **Bukti Screenshot Pengujian**  
-    ![Validasi Form](img/authtest/crud2.png)
+    ![Validasi Form](../img/authtest/crud2.png)
 
 
 3. **Read Data**
@@ -118,7 +118,7 @@ Bagian ini menjelaskan pengujian fungsionalitas pengolahan data item pada sistem
     Status: 🟢 PASS
 
     **Bukti Screenshot Pengujian**  
-    ![Read Data](img/authtest/crud3.png)
+    ![Read Data](../img/authtest/crud3.png)
 
 
 4. **Update Item**
@@ -132,7 +132,7 @@ Bagian ini menjelaskan pengujian fungsionalitas pengolahan data item pada sistem
     Status: 🟢 PASS
 
     **Bukti Screenshot Pengujian**  
-    ![Update Item](img/authtest/crud4.png)
+    ![Update Item](../img/authtest/crud4.png)
 
 
 5. **Delete Item**
@@ -146,7 +146,7 @@ Bagian ini menjelaskan pengujian fungsionalitas pengolahan data item pada sistem
     Status: 🟢 PASS
 
     **Bukti Screenshot Pengujian**  
-    ![Delete Item](img/authtest/crud5.png)
+    ![Delete Item](../img/authtest/crud5.png)
 
 ---
 
@@ -161,7 +161,7 @@ Pengujian alur pengguna secara menyeluruh dari awal hingga akhir aplikasi.
     Status: 🟢 PASS
 
     **Bukti Screenshot Pengujian**  
-    ![Buka Aplikasi](img/authtest/ee1.png)
+    ![Buka Aplikasi](../img/authtest/ee1.png)
 
 
 2. **Register User**
@@ -171,7 +171,7 @@ Pengujian alur pengguna secara menyeluruh dari awal hingga akhir aplikasi.
     Status: 🟢 PASS
 
     **Bukti Screenshot Pengujian**  
-    ![Register User](img/authtest/ee2.png)
+    ![Register User](../img/authtest/ee2.png)
 
 3. **Auto Login**
 
@@ -180,7 +180,7 @@ Pengujian alur pengguna secara menyeluruh dari awal hingga akhir aplikasi.
     Status: 🟢 PASS
 
     **Bukti Screenshot Pengujian**  
-    ![Auto Login](img/authtest/ee3.png)
+    ![Auto Login](../img/authtest/ee3.png)
 
 4. **Dashboard Tampil**
     
@@ -189,7 +189,7 @@ Pengujian alur pengguna secara menyeluruh dari awal hingga akhir aplikasi.
     Status: 🟢 PASS
 
     **Bukti Screenshot Pengujian**  
-    ![Dashboard Tampil](img/authtest/ee4.png)
+    ![Dashboard Tampil](../img/authtest/ee4.png)
 
 5. **Nama User Muncul**
 
@@ -198,7 +198,7 @@ Pengujian alur pengguna secara menyeluruh dari awal hingga akhir aplikasi.
     Status: 🟢 PASS
 
     **Bukti Screenshot Pengujian**  
-    ![Nama User](img/authtest/ee5.png)
+    ![Nama User](../img/authtest/ee5.png)
 
 6. **CRUD Berjalan**
 
@@ -207,7 +207,7 @@ Pengujian alur pengguna secara menyeluruh dari awal hingga akhir aplikasi.
     Status: 🟢 PASS
 
     **Bukti Screenshot Pengujian**  
-    ![CRUD Berjalan](img/authtest/ee6.png)
+    ![CRUD Berjalan](../img/authtest/ee6.png)
 
 7. **Logout**
 
@@ -216,7 +216,7 @@ Pengujian alur pengguna secara menyeluruh dari awal hingga akhir aplikasi.
     Status: 🟢 PASS
 
     **Bukti Screenshot Pengujian**  
-    ![Logout](img/authtest/ee7.png)
+    ![Logout](../img/authtest/ee7.png)
 
 8. **Login Ulang**
 
@@ -225,7 +225,7 @@ Pengujian alur pengguna secara menyeluruh dari awal hingga akhir aplikasi.
     Status: 🟢 PASS
 
     **Bukti Screenshot Pengujian**  
-    ![Login Ulang](img/authtest/ee9.png)
+    ![Login Ulang](../img/authtest/ee8.png)
 
 9. **Data Tetap Ada**
 
@@ -234,4 +234,4 @@ Pengujian alur pengguna secara menyeluruh dari awal hingga akhir aplikasi.
     Status: 🟢 PASS
 
     **Bukti Screenshot Pengujian**  
-    ![Data Tetap Ada](img/authtest/ee10.png)
+    ![Data Tetap Ada](../img/authtest/ee9.png)
