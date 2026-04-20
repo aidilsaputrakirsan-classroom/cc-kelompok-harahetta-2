@@ -100,7 +100,7 @@ Bagian ini menjelaskan teknologi yang digunakan untuk membangun dan menjalankan 
 
 Bagian ini menunjukkan hubungan antar komponen utama dalam aplikasi Sewain, mulai dari pengguna, frontend, backend, hingga database dalam menjalankan sistem.
 
-```
+```mermaid
 graph TD
     User([User Browser])
 
@@ -141,34 +141,45 @@ Diagram di atas menunjukkan alur kerja utama dalam sistem Sewain secara sederhan
 - Git
 - Docker (Opsional, jika ingin menjalankan via Docker)
 
-### Backend
+### Menjalankan Manual 
+1. **Database**
+
+    - Buat database bernama data_sewain di PostgreSQL lokal Anda.
+    - Import initial data: `psql -U postgres -d data_sewain -f docs/seed-data.sql`
+
+2. **Backend**
 ```bash
 cd backend
 pip install -r requirements.txt
 uvicorn main:app --reload --port 8000
 ```
 
-### Frontend
+3. **Frontend**
 ```bash
 cd frontend
 npm install
-npm run dev
+npm run dev -- --port 3000
 ```
 
-### Docker
+### Menjalankan via Docker
 ```bash
 # Clone repositori
 git clone <url-repo>
+
+# Masuk ke Direktori 
 cd cc-kelompok-harahetta-2
 
 # Siapkan environment file
 cp backend/.env.docker.example backend/.env.docker 
 
 # Jalankan semua service
-docker compose up -d
+docker compose up -d --build
 
 # Seed data awal (opsional)
 docker compose exec db psql -U postgres -d data_sewain -f /dev/stdin < docs/seed-data.sql
+
+# Jalankan aplikasi di
+http://localhost:3000
 ```
 
 ### Akses Aplikasi
@@ -190,7 +201,7 @@ docker compose exec db psql -U postgres -d data_sewain -f /dev/stdin < docs/seed
 | 2 | REST API + Database | ✅ |
 | 3 | React Frontend | ✅ |
 | 4 | Full-Stack Integration | ✅ |
-| 5-7 | Docker & Compose | ⬜ |
+| 5-7 | Docker & Compose | ✅ |
 | 8 | UTS Demo | ⬜ |
 | 9-11 | CI/CD Pipeline | ⬜ |
 | 12-14 | Microservices | ⬜ |
@@ -240,7 +251,7 @@ cc-kelompok-harahetta-2/
 ## 9. API Documentation Testing
 
 Berikut adalah ringkasan hasil pengujian endpoint utama pada platform **SEWAIN** berdasarkan integrasi antara Frontend dan Backend. Untuk melihat hasil dan pembahasan lebih detail, silakan buka file berikut ini:
-[Hasil dan Pembahasan API Testing](./docs/api-documentation.md/)
+[Hasil dan Pembahasan API Testing](./docs/testing/api-documentation.md/)
 
 | No | Endpoint | Metode | Skenario Pengujian | Hasil | Status |
 |----|----------|--------|--------------------|-------|--------|
@@ -260,7 +271,7 @@ Berikut adalah ringkasan hasil pengujian endpoint utama pada platform **SEWAIN**
 ## 10. UI & API Integration Testing
 
 Berdasarkan hasil pengujian yang telah dilakukan, seluruh fitur CRUD dan interaktivitas aplikasi berjalan dengan baik dan sesuai dengan yang diharapkan. Setiap aksi yang dilakukan pada antarmuka pengguna telah terhubung dengan backend dan database secara sinkron. Untuk melihat hasil dan pembahasan lebih detail, silakan buka file berikut ini:
-[Hasil dan Pembahasan UI Testing](./docs/ui-test-result.md/)
+[Hasil dan Pembahasan UI Testing](./docs/testing/ui-test-result.md/)
 
 Berikut adalah ringkasan hasil pengujian yang telah dilakukan:
 | No | Skenario Pengujian | Langkah Pengerjaan | Hasil Sebenarnya | Status |
@@ -281,7 +292,7 @@ Berikut adalah ringkasan hasil pengujian yang telah dilakukan:
 ## 11. Authentication & CRUD Testing
 
 Pengujian sistem dilakukan untuk memastikan seluruh fitur aplikasi berjalan dengan baik sesuai dengan kebutuhan yang telah dirancang. Proses pengujian mencakup fitur autentikasi (authentication), pengelolaan data (CRUD), serta pengujian alur penggunaan secara menyeluruh (end-to-end). Untuk melihat hasil pengujian berupa screenshot, silakan buka folder berikut:
-[Hasil dan Pembahasan Auth Testing](./docs/auth-test-result/)
+[Hasil dan Pembahasan Auth Testing](./docs/testing/auth-test-result/)
 
 Pengujian dilakukan dengan mensimulasikan interaksi langsung pengguna terhadap aplikasi, mulai dari proses registrasi, login, pengelolaan data barang, hingga logout. Setiap skenario diuji untuk memastikan bahwa sistem dapat memberikan respon yang sesuai, data tersimpan dengan benar di database, serta tampilan antarmuka tetap sinkron dengan kondisi sistem.
 
