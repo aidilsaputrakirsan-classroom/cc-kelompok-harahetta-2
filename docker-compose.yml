@@ -21,6 +21,7 @@ services:
   # ----------------------------------------------------------
   db:
     image: postgres:16-alpine
+    restart: unless-stopped             # otomatis restart jika crash, kecuali di-stop manual
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: setiawan
@@ -48,6 +49,7 @@ services:
   # ----------------------------------------------------------
   backend:
     image: alif10231056/sewain-backend:v2  # pull dari Docker Hub
+    restart: unless-stopped                # otomatis restart jika crash, kecuali di-stop manual
     env_file:
       - ./backend/.env.docker              # variabel environment tambahan (API key, dll)
     environment:
@@ -73,6 +75,7 @@ services:
   # ----------------------------------------------------------
   frontend:
     image: alif10231056/sewain-frontend:v2  # pull dari Docker Hub
+    restart: unless-stopped                 # otomatis restart jika crash, kecuali di-stop manual
     ports:
       - "3000:80"                           # akses frontend: http://localhost:3000
     depends_on:
