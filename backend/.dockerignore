@@ -1,35 +1,49 @@
-# Virtual environment
+# ============================================================
+# backend/.dockerignore — Sewain Backend
+#
+# File ini memberitahu Docker untuk MENGABAIKAN file/folder
+# berikut saat membangun image (COPY . . di Dockerfile).
+#
+# Manfaat:
+#   1. Build lebih cepat  → build context yang dikirim ke Docker daemon lebih kecil
+#   2. Image lebih kecil  → tidak ada file tidak perlu di dalam image
+#   3. Lebih aman         → file sensitif (.env) tidak ikut masuk ke image
+# ============================================================
+
+# Virtual environment — dependency Python diinstall ulang di dalam container
+# (via pip install di Dockerfile), jadi folder venv lokal tidak perlu ikut
 venv/
 .venv/
 
-# Environment files (secrets!)
+# File environment lokal — berisi secret (password, API key, JWT secret)
+# yang TIDAK boleh masuk ke image karena image bisa dipublikasikan
 .env
 
-# Python cache
+# Python bytecode — file cache hasil kompilasi Python, tidak dibutuhkan di image
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
 
-# IDE
+# File konfigurasi IDE — hanya relevan di mesin pengembang, bukan di container
 .vscode/
 .idea/
 
-# Git
+# Riwayat Git — tidak dibutuhkan di dalam container runtime
 .git/
 .gitignore
 
-# Docker
+# File Docker itu sendiri — container tidak perlu tahu cara membangun dirinya sendiri
 Dockerfile
 .dockerignore
 
-# Testing
+# File testing — tidak perlu dijalankan di production container
 tests/
 *.test.py
 
-# Documentation
+# Dokumentasi — tidak dibutuhkan di runtime container
 *.md
 docs/
 
-# Setup scripts
+# Script setup lokal — hanya dipakai di lingkungan pengembang, bukan di container
 setup.sh

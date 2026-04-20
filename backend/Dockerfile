@@ -1,101 +1,84 @@
-# # ============================================================
-# # Stage: Production Image
-# # ============================================================
+# ============================================================
+# backend/Dockerfile — Sewain Backend (FastAPI)
+#
+# Menggunakan MULTI-STAGE BUILD dengan 2 tahap:
+#   Stage 1 (builder) : install semua dependency Python ke venv
+#   Stage 2 (runtime) : copy venv + kode → image production bersih
+#
+# Manfaat multi-stage build:
+#   - Image final TIDAK membawa pip, cache, atau build tools
+#   - Ukuran image lebih kecil & lebih aman di production
+#   - Layer caching: install deps tidak diulang jika kode saja yang berubah
+# ============================================================
 
-# # 1. Base image — Python 3.12 slim (debian minimal, ~50MB)
-# FROM python:3.12-slim
-
-# # 2. Set working directory di dalam container
-# WORKDIR /app
-
-# # 3. Copy HANYA requirements.txt dulu (cache optimization)
-# #    Layer ini hanya rebuild jika requirements.txt berubah
-# COPY requirements.txt .
-
-# # 4. Install Python dependencies + curl untuk healthcheck
-# #    --no-cache-dir: jangan simpan pip cache (hemat space)
-# RUN pip install --no-cache-dir -r requirements.txt
-
-# # 5. Install curl untuk HEALTHCHECK & bersihkan apt cache
-# RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
-
-# # 6. Copy seluruh kode aplikasi
-# #    Layer ini rebuild setiap kali kode berubah
-# COPY . .
-
-# # 7. Buat non-root user untuk keamanan (best practice production)
-# RUN useradd -m appuser
-# USER appuser
-
-# # 8. Dokumentasikan port yang digunakan
-# EXPOSE 8000
-
-# # 9. Healthcheck — Docker akan monitor status container secara otomatis
-# #    --interval=30s : cek setiap 30 detik
-# #    --timeout=10s  : timeout jika tidak respond dalam 10 detik
-# #    --retries=3    : tandai unhealthy setelah 3x gagal
-# HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
-#     CMD curl -f http://localhost:8000/health || exit 1
-
-# # 10. Command untuk menjalankan aplikasi
-# #     --host 0.0.0.0: agar bisa diakses dari luar container
-# CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 
 # ============================================================
-# Stage 1: Builder — install deps ke venv
+# STAGE 1: builder
+# Tujuan: install dependency Python ke dalam virtual environment.
+# Stage ini tidak masuk ke image final — hanya venv-nya yang dipakai.
 # ============================================================
 FROM python:3.12-slim AS builder
 
 WORKDIR /app
 
+# Buat virtual environment (venv) sebagai wadah instalasi deps
 RUN python -m venv /app/venv
+
+# Aktifkan venv: semua perintah pip/python setelah ini pakai venv
 ENV PATH="/app/venv/bin:$PATH"
 
+# --- LAYER CACHING: copy requirements.txt DULU sebelum kode ---
+# Tujuan: jika hanya kode aplikasi yang berubah (bukan requirements.txt),
+# Docker tidak perlu menjalankan pip install ulang → build lebih cepat.
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+#               └─ --no-cache-dir: tidak simpan cache pip → image lebih kecil
 
 
 # ============================================================
-# Stage 2: Production Image
+# STAGE 2: runtime (image production final)
+# Tujuan: ambil venv dari stage 1, tambahkan kode aplikasi.
+# Stage ini yang benar-benar dijalankan saat `docker compose up`.
 # ============================================================
-
-# 1. Base image — Python 3.12 slim (debian minimal, ~50MB)
 FROM python:3.12-slim
 
-# 2. Set working directory di dalam container
 WORKDIR /app
 
-# 3. Copy venv dari Stage 1 (TIDAK perlu pip install lagi!)
-#    Ini inti dari multi-stage build — deps sudah ada di venv builder
+# Ambil venv yang sudah terisi dependency dari stage builder.
+# Instruksi --from=builder adalah kunci multi-stage build:
+# kita ambil hanya yang dibutuhkan, sisanya (pip, cache) tidak ikut masuk.
 COPY --from=builder /app/venv /app/venv
 
-# 4. Set PATH agar Python & pip dari venv digunakan
+# Aktifkan venv di stage ini juga
 ENV PATH="/app/venv/bin:$PATH"
 
-# 5. Install curl untuk HEALTHCHECK & bersihkan apt cache
+# Install curl untuk kebutuhan HEALTHCHECK di bawah.
+# rm -rf /var/lib/apt/lists/* → bersihkan cache apt agar image lebih kecil.
 RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
-# 7. Copy seluruh kode aplikasi
-#    Layer ini rebuild setiap kali kode berubah
+# Copy seluruh kode aplikasi.
+# Diletakkan SETELAH install deps agar perubahan kode tidak
+# membatalkan cache layer instalasi dependency di atas.
 COPY . .
 
-# 8. Copy wait-for-db script & set permission
+# Copy script yang menunggu DB siap sebelum uvicorn dijalankan
 COPY scripts/wait-for-db.sh /app/scripts/wait-for-db.sh
 RUN chmod +x /app/scripts/wait-for-db.sh
 
-# 9. Buat non-root user untuk keamanan (best practice production)
+# Jalankan proses sebagai non-root user (best practice keamanan production).
+# Agar jika container disusupi, attacker tidak punya akses root ke sistem.
 RUN useradd -m appuser
 USER appuser
 
-# 10. Dokumentasikan port yang digunakan
+# Dokumentasikan port yang diexpose container (informatif, tidak membuka port)
 EXPOSE 8000
 
-# 11. Healthcheck — Docker akan monitor status container secara otomatis
-#    --interval=30s : cek setiap 30 detik
-#    --timeout=10s  : timeout jika tidak respond dalam 10 detik
-#    --retries=3    : tandai unhealthy setelah 3x gagal
+# Docker akan otomatis cek kesehatan container setiap 30 detik.
+# Hasilnya (healthy/unhealthy) dipakai oleh docker-compose depends_on.
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
+#           └─ -f: curl return exit code 1 jika HTTP status bukan 2xx
 
-# 12. Jalankan wait-for-db.sh, otomatis start uvicorn setelah DB siap
+# Entry point: jalankan wait-for-db.sh.
+# Script ini polling ke PostgreSQL dulu, baru start uvicorn setelah DB siap.
 CMD ["/app/scripts/wait-for-db.sh"]
