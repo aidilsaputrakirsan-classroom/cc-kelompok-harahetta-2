@@ -1,9 +1,35 @@
+# ============================================================
+# frontend/.dockerignore — Sewain Frontend
+#
+# File ini memberitahu Docker untuk MENGABAIKAN file/folder
+# berikut saat membangun image (COPY . . di Dockerfile).
+#
+# Manfaat:
+#   1. Build lebih cepat  → tidak perlu kirim node_modules (bisa ratusan MB) ke Docker
+#   2. Image lebih kecil  → file development tidak masuk ke image production
+#   3. Lebih aman         → file sensitif (.env) tidak ikut masuk ke image
+# ============================================================
+
+# Dependency Node.js — akan diinstall ulang di dalam container (via npm ci di Dockerfile).
+# Folder ini bisa berisi ratusan MB, WAJIB di-ignore agar build tidak lambat.
 node_modules/
+
+# Hasil build sebelumnya — Stage 1 Dockerfile akan build ulang dari source.
+# dist/ yang lama tidak perlu ikut masuk ke build context.
 dist/
+
+# File environment lokal — berisi variabel yang berbeda antara lokal & production.
+# Nilai VITE_API_URL dikirim via ARG di Dockerfile, bukan dari file .env ini.
 .env
+
+# Riwayat Git — tidak dibutuhkan di dalam container runtime
 .git/
 .gitignore
+
+# Dokumentasi — tidak dibutuhkan di runtime container
 *.md
 README.md
+
+# File Docker itu sendiri — container tidak perlu tahu cara membangun dirinya sendiri
 Dockerfile
 .dockerignore
