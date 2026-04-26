@@ -6,6 +6,10 @@
 #   - Stop semua service     : docker compose down
 #   - Rebuild + jalankan ulang: docker compose up -d --build
 #   - Lihat log realtime     : docker compose logs -f
+#
+# Network:
+#   - sewain-network: custom bridge network agar semua container
+#     berkomunikasi secara terisolasi & bisa saling resolve by name.
 # ============================================================
 
 services:
@@ -38,6 +42,8 @@ services:
       timeout: 5s       # batas waktu tiap pengecekan
       retries: 10       # maksimal 10 kali percobaan
       start_period: 10s # tunggu 10 detik sebelum mulai health check
+    networks:
+      - sewain-network  # bergabung ke custom network
 
   # ----------------------------------------------------------
   # SERVICE: backend
@@ -62,6 +68,8 @@ services:
     depends_on:
       db:
         condition: service_healthy         # backend baru start setelah db siap
+    networks:
+      - sewain-network  # bergabung ke custom network
     command:
       ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
 
@@ -80,6 +88,8 @@ services:
       - "3000:80"                           # akses frontend: http://localhost:3000
     depends_on:
       - backend                             # frontend start setelah backend siap
+    networks:
+      - sewain-network  # bergabung ke custom network
 
 # ============================================================
 # VOLUMES
@@ -89,3 +99,15 @@ services:
 # ============================================================
 volumes:
   pgdata:
+
+# ============================================================
+# NETWORKS
+# sewain-network: custom bridge network untuk komunikasi antar container.
+# Keuntungan vs default network:
+#   - Container bisa saling resolve pakai nama service (db, backend, frontend)
+#   - Traffic terisolasi dari container lain di Docker
+#   - Lebih aman & sesuai best practice production
+# ============================================================
+networks:
+  sewain-network:
+    driver: bridge
