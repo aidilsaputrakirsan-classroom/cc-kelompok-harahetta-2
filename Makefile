@@ -109,6 +109,8 @@ help:
 	@echo ""
 	@echo "🛵 Sewain Docker Commands"
 	@echo "=========================="
+	@echo ""
+	@echo "📦 Backend Commands:"
 	@echo "  make build     → Build Docker image dari Dockerfile"
 	@echo "  make run       → Jalankan container di background"
 	@echo "  make run-fg    → Jalankan container di foreground (debug)"
@@ -120,6 +122,25 @@ help:
 	@echo "  make shell     → Masuk ke shell container"
 	@echo "  make ps        → Lihat status container"
 	@echo "  make restart   → Rebuild + rerun dari awal"
+	@echo ""
+	@echo "🎨 Frontend Commands:"
+	@echo "  make fe-build  → Build frontend image"
+	@echo "  make fe-push   → Push frontend image ke Docker Hub"
+	@echo "  make fe-run    → Jalankan frontend container"
+	@echo "  make fe-stop   → Stop frontend container"
+	@echo "  make fe-restart → Rebuild + rerun frontend"
+	@echo ""
+	@echo "🐳 Docker Compose Commands:"
+	@echo "  make compose-up      → Jalankan semua services (detached)"
+	@echo "  make compose-down    → Stop semua services"
+	@echo "  make compose-build   → Rebuild + jalankan semua services"
+	@echo "  make compose-logs    → Lihat log realtime semua services"
+	@echo "  make compose-ps      → Status semua services"
+	@echo "  make compose-restart → Restart semua services"
+	@echo "  make compose-clean   → Hapus containers, networks, volumes"
+	@echo ""
+	@echo "📤 Push Commands:"
+	@echo "  make push-all  → Push backend + frontend ke Docker Hub"
 	@echo ""
 
 # ─────────────────────────────────────────────
@@ -178,5 +199,42 @@ push-all: push fe-push
 	@echo "   Backend  : https://hub.docker.com/r/$(DOCKER_USER)/$(IMAGE_NAME)"
 	@echo "   Frontend : https://hub.docker.com/r/$(DOCKER_USER)/$(FE_IMAGE_NAME)"
 
+# ─────────────────────────────────────────────
+# DOCKER COMPOSE COMMANDS
+# ─────────────────────────────────────────────
+compose-up:
+	@echo "🚀 Menjalankan semua services dengan Docker Compose..."
+	docker compose up -d
+	@echo "✅ Services berjalan! Cek status: make compose-ps"
+
+compose-down:
+	@echo "⏹️  Menghentikan semua services..."
+	docker compose down
+	@echo "✅ Semua services dihentikan."
+
+compose-build:
+	@echo "🔨 Rebuild dan jalankan semua services..."
+	docker compose up --build -d
+	@echo "✅ Rebuild selesai dan services berjalan!"
+
+compose-logs:
+	@echo "📋 Menampilkan log real-time dari semua services..."
+	docker compose logs -f
+
+compose-ps:
+	@echo "📊 Status semua services:"
+	docker compose ps
+
+compose-restart:
+	@echo "🔄 Restart semua services..."
+	docker compose restart
+	@echo "✅ Services direstart!"
+
+compose-clean:
+	@echo "🧹 Menghapus containers, networks, dan volumes..."
+	docker compose down -v
+	@echo "✅ Semua data dibersihkan!"
+
 .PHONY: build run run-fg push stop clean logs health shell ps restart help \
-        fe-build fe-push fe-run fe-stop fe-restart push-all
+        fe-build fe-push fe-run fe-stop fe-restart push-all \
+        compose-up compose-down compose-build compose-logs compose-ps compose-restart compose-clean
