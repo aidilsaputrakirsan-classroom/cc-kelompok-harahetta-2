@@ -94,6 +94,8 @@ export default function ProfilePage({ addToast }) {
   }
 
   const verifStatus = profile?.status_verifikasi || "menunggu"
+  const isVerified = verifStatus === "disetujui"
+  const isPending = verifStatus === "menunggu" && form.foto_ktp
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -158,17 +160,17 @@ export default function ProfilePage({ addToast }) {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="profile-parent">Nama Orang Tua</Label>
-                <Input id="profile-parent" name="nama_orang_tua" placeholder="Masukkan nama orang tua" value={form.nama_orang_tua} onChange={handleChange} />
+                <Input id="profile-parent" name="nama_orang_tua" placeholder="Masukkan nama orang tua" value={form.nama_orang_tua} onChange={handleChange} disabled={isVerified || isPending} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="profile-address">Alamat Lengkap</Label>
-                <Input id="profile-address" name="alamat" placeholder="Alamat lengkap" value={form.alamat} onChange={handleChange} />
+                <Input id="profile-address" name="alamat" placeholder="Alamat lengkap" value={form.alamat} onChange={handleChange} disabled={isVerified || isPending} />
               </div>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="profile-phone">Nomor Telepon</Label>
-              <Input id="profile-phone" name="nomor_telepon" type="tel" placeholder="08123456789" value={form.nomor_telepon} onChange={handleChange} maxLength={20} />
+              <Input id="profile-phone" name="nomor_telepon" type="tel" placeholder="08123456789" value={form.nomor_telepon} onChange={handleChange} maxLength={20} disabled={isVerified || isPending} />
             </div>
 
             <Separator />
@@ -188,14 +190,16 @@ export default function ProfilePage({ addToast }) {
               {form.foto_ktp ? (
                 <div className="relative inline-block w-full">
                   <img src={form.foto_ktp} alt="Foto KTP" className="w-full max-h-44 object-contain rounded-lg border bg-muted" />
-                  <button type="button"
-                    onClick={() => setForm(p => ({ ...p, foto_ktp: "" }))}
-                    className="absolute top-1 right-1 bg-destructive text-destructive-foreground rounded-full p-1 hover:opacity-80 transition-opacity">
-                    <X className="w-3.5 h-3.5" />
-                  </button>
+                  {!isVerified && !isPending && (
+                    <button type="button"
+                      onClick={() => setForm(p => ({ ...p, foto_ktp: "" }))}
+                      className="absolute top-1 right-1 bg-destructive text-destructive-foreground rounded-full p-1 hover:opacity-80 transition-opacity">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
               ) : (
-                <label className={`flex flex-col items-center justify-center w-full h-28 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted/50 transition-colors ${uploading.foto_ktp ? "opacity-50 pointer-events-none" : ""}`}>
+                <label className={`flex flex-col items-center justify-center w-full h-28 border-2 border-dashed rounded-lg ${isVerified || isPending ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-muted/50"} transition-colors ${uploading.foto_ktp ? "opacity-50 pointer-events-none" : ""}`}>
                   <div className="flex flex-col items-center gap-1 text-muted-foreground">
                     {uploading.foto_ktp ? <span className="text-sm">Memproses...</span> : (
                       <>
@@ -207,7 +211,7 @@ export default function ProfilePage({ addToast }) {
                   </div>
                   <input type="file" className="hidden" accept="image/jpeg,image/png,image/webp,image/gif"
                     onChange={(e) => { const f = e.target.files?.[0]; if (f) compressAndSet(f, "foto_ktp"); e.target.value = "" }}
-                    disabled={uploading.foto_ktp} />
+                    disabled={uploading.foto_ktp || isVerified || isPending} />
                 </label>
               )}
             </div>
@@ -218,14 +222,16 @@ export default function ProfilePage({ addToast }) {
               {form.foto_selfie_ktp ? (
                 <div className="relative inline-block w-full">
                   <img src={form.foto_selfie_ktp} alt="Selfie KTP" className="w-full max-h-44 object-contain rounded-lg border bg-muted" />
-                  <button type="button"
-                    onClick={() => setForm(p => ({ ...p, foto_selfie_ktp: "" }))}
-                    className="absolute top-1 right-1 bg-destructive text-destructive-foreground rounded-full p-1 hover:opacity-80 transition-opacity">
-                    <X className="w-3.5 h-3.5" />
-                  </button>
+                  {!isVerified && !isPending && (
+                    <button type="button"
+                      onClick={() => setForm(p => ({ ...p, foto_selfie_ktp: "" }))}
+                      className="absolute top-1 right-1 bg-destructive text-destructive-foreground rounded-full p-1 hover:opacity-80 transition-opacity">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
               ) : (
-                <label className={`flex flex-col items-center justify-center w-full h-28 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted/50 transition-colors ${uploading.foto_selfie_ktp ? "opacity-50 pointer-events-none" : ""}`}>
+                <label className={`flex flex-col items-center justify-center w-full h-28 border-2 border-dashed rounded-lg ${isVerified || isPending ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-muted/50"} transition-colors ${uploading.foto_selfie_ktp ? "opacity-50 pointer-events-none" : ""}`}>
                   <div className="flex flex-col items-center gap-1 text-muted-foreground">
                     {uploading.foto_selfie_ktp ? <span className="text-sm">Memproses...</span> : (
                       <>
@@ -237,14 +243,17 @@ export default function ProfilePage({ addToast }) {
                   </div>
                   <input type="file" className="hidden" accept="image/jpeg,image/png,image/webp,image/gif"
                     onChange={(e) => { const f = e.target.files?.[0]; if (f) compressAndSet(f, "foto_selfie_ktp"); e.target.value = "" }}
-                    disabled={uploading.foto_selfie_ktp} />
+                    disabled={uploading.foto_selfie_ktp || isVerified || isPending} />
                 </label>
               )}
             </div>
 
-            <Button type="submit" size="lg" loading={saving} className="mt-2">
-              <Save className="w-4 h-4 mr-2" /> Simpan & Ajukan Verifikasi
-            </Button>
+            {/* Tombol hanya muncul jika belum diverifikasi atau ditolak */}
+            {verifStatus !== "disetujui" && !(verifStatus === "menunggu" && form.foto_ktp) && (
+              <Button type="submit" size="lg" loading={saving} className="mt-2">
+                <Save className="w-4 h-4 mr-2" /> Simpan & Ajukan Verifikasi
+              </Button>
+            )}
           </form>
         </CardContent>
       </Card>
