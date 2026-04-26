@@ -24,6 +24,7 @@ services:
   # container di-restart.
   # ----------------------------------------------------------
   db:
+    container_name: sewain-db
     image: postgres:16-alpine
     restart: unless-stopped             # otomatis restart jika crash, kecuali di-stop manual
     environment:
@@ -54,6 +55,7 @@ services:
   # Port host 8000 → container 8000.
   # ----------------------------------------------------------
   backend:
+    container_name: sewain-backend
     image: alif10231056/sewain-backend:v2  # pull dari Docker Hub
     restart: unless-stopped                # otomatis restart jika crash, kecuali di-stop manual
     env_file:
@@ -68,6 +70,12 @@ services:
     depends_on:
       db:
         condition: service_healthy         # backend baru start setelah db siap
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
     networks:
       - sewain-network  # bergabung ke custom network
     command:
@@ -82,12 +90,14 @@ services:
   # Akses aplikasi: http://localhost:3000
   # ----------------------------------------------------------
   frontend:
+    container_name: sewain-frontend
     image: alif10231056/sewain-frontend:v2  # pull dari Docker Hub
     restart: unless-stopped                 # otomatis restart jika crash, kecuali di-stop manual
     ports:
       - "3000:80"                           # akses frontend: http://localhost:3000
     depends_on:
-      - backend                             # frontend start setelah backend siap
+      backend:
+        condition: service_healthy          # frontend start setelah backend benar-benar ready
     networks:
       - sewain-network  # bergabung ke custom network
 
@@ -99,6 +109,7 @@ services:
 # ============================================================
 volumes:
   pgdata:
+    name: sewain-pgdata
 
 # ============================================================
 # NETWORKS
@@ -110,4 +121,5 @@ volumes:
 # ============================================================
 networks:
   sewain-network:
+    name: sewain-network
     driver: bridge
