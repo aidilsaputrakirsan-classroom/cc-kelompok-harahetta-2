@@ -17,6 +17,10 @@ import MyRentalsPage from "./pages/MyRentalsPage"
 import ProfilePage from "./pages/ProfilePage"
 import AdminDashboard from "./pages/AdminDashboard"
 import SuperAdminPanel from "./pages/SuperAdminPanel"
+import OnboardingPage from "./pages/OnboardingPage"
+import ItemDetailPage from "./pages/ItemDetailPage"
+import AdminOnboardingPage from "./pages/AdminOnboardingPage"
+import AdminPaymentsPage from "./pages/AdminPaymentsPage"
 
 function RedirectToStatic404() {
   if (typeof window !== "undefined") {
@@ -75,8 +79,10 @@ function AdminLayout({ addToast }) {
             <Route path="/dashboard" element={<DashboardPage addToast={addToast} />} />
             <Route path="/rentals/my" element={<RequireAuth><MyRentalsPage addToast={addToast} /></RequireAuth>} />
             <Route path="/profile" element={<RequireAuth><ProfilePage addToast={addToast} /></RequireAuth>} />
+            <Route path="/admin/onboarding" element={<RequireAdmin><AdminOnboardingPage addToast={addToast} /></RequireAdmin>} />
             <Route path="/admin/dashboard" element={<RequireAdmin><AdminDashboard addToast={addToast} /></RequireAdmin>} />
             <Route path="/admin/rentals" element={<RequireAdmin><AdminDashboard addToast={addToast} /></RequireAdmin>} />
+            <Route path="/admin/payments" element={<RequireAdmin><AdminPaymentsPage addToast={addToast} /></RequireAdmin>} />
             <Route path="/admin/profile" element={<RequireAdmin><AdminDashboard addToast={addToast} /></RequireAdmin>} />
             <Route path="/superadmin" element={<RequireSuperAdmin><SuperAdminPanel addToast={addToast} /></RequireSuperAdmin>} />
             <Route path="/superadmin/*" element={<RequireSuperAdmin><SuperAdminPanel addToast={addToast} /></RequireSuperAdmin>} />
@@ -94,6 +100,7 @@ function UserAppLayout({ addToast }) {
     <UserLayout>
       <Routes>
         <Route path="/home" element={<RequireAuth><UserDashboard addToast={addToast} /></RequireAuth>} />
+        <Route path="/onboarding" element={<RequireAuth><OnboardingPage addToast={addToast} /></RequireAuth>} />
         <Route path="/rentals/new" element={<RequireAuth><RentalPage addToast={addToast} /></RequireAuth>} />
         <Route path="/rentals/my" element={<RequireAuth><MyRentalsPage addToast={addToast} /></RequireAuth>} />
         <Route path="/payment/:rentalId" element={<RequireAuth><PaymentPage addToast={addToast} /></RequireAuth>} />
@@ -120,6 +127,7 @@ function AppContent() {
         {/* Public pages */}
         <Route path="/" element={<LandingPage />} />
         <Route path="/catalog" element={<CatalogPage addToast={addToast} />} />
+        <Route path="/items/:itemId" element={<ItemDetailPage addToast={addToast} />} />
         <Route path="/login" element={
           isAuthenticated ? <Navigate to={homeRoute} replace /> : <LoginPage addToast={addToast} />
         } />
@@ -128,7 +136,7 @@ function AppContent() {
         {/* Authenticated routes — split by role */}
         <Route path="/*" element={
           !isAuthenticated
-            ? <Navigate to="/404" replace />
+            ? <Navigate to="/login" replace />
             : isStaff
               ? <AdminLayout addToast={addToast} />
               : <UserAppLayout addToast={addToast} />

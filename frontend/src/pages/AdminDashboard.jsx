@@ -5,7 +5,7 @@ import {
   fetchMyItems, createItem, updateItem, deleteItem,
   fetchAdminRentals, updateRentalStatus,
   fetchAdminProfile, createAdminProfile, updateAdminProfile,
-  fetchCategories, fetchAdminPayments, confirmPayment,
+  fetchCategories,
 } from "../services/api"
 import { Button } from "../components/ui/Button"
 import { Input } from "../components/ui/input"
@@ -21,15 +21,12 @@ import {
 import {
   Package, ClipboardList, Store, Plus, Pencil, Trash2,
   Calendar, CheckCircle, XCircle, Save, AlertTriangle, ImageIcon, X,
-  CreditCard, Eye, ThumbsUp, ThumbsDown,
 } from "lucide-react"
 
 const defaultItem = { nama: "", deskripsi: "", harga_per_hari: "", stok: 1, foto_url: "", category_id: "" }
 
-function AdminRentalCard({ rental, onUpdateStatus, payment, onViewBukti }) {
+function AdminRentalCard({ rental, onUpdateStatus, onViewBukti }) {
   const item = rental.item
-  const hasBukti = !!payment?.bukti_pembayaran
-  const isPaid = payment?.status === "completed"
   return (
     <Card className="hover:shadow-md transition-shadow">
       <CardContent className="p-4">
@@ -48,37 +45,10 @@ function AdminRentalCard({ rental, onUpdateStatus, payment, onViewBukti }) {
               </div>
               <div className="flex flex-col items-end gap-1.5">
                 <StatusBadge status={rental.status} />
-                {/* payment badge */}
-                {isPaid && (
-                  <span className="text-[10px] font-bold bg-green-100 text-green-700 px-2 py-0.5 rounded-full flex items-center gap-1">
-                    <CheckCircle className="w-3 h-3" /> Lunas
-                  </span>
-                )}
-                {hasBukti && !isPaid && (
-                  <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
-                    ⏳ Bukti Dikirim
-                  </span>
-                )}
               </div>
             </div>
             <div className="text-lg font-bold text-primary mt-2">{formatPrice(rental.total_harga)}</div>
             {rental.catatan && <p className="text-xs text-muted-foreground mt-1">{rental.catatan}</p>}
-
-            {/* Bukti mini preview */}
-            {hasBukti && (
-              <button
-                onClick={() => onViewBukti(payment.bukti_pembayaran)}
-                className="mt-2 flex items-center gap-2 group"
-                title="Lihat bukti pembayaran"
-              >
-                <img
-                  src={payment.bukti_pembayaran}
-                  alt="bukti"
-                  className="w-12 h-12 rounded-xl object-cover border border-slate-200 group-hover:opacity-80 transition"
-                />
-                <span className="text-xs text-primary underline">Lihat bukti bayar</span>
-              </button>
-            )}
           </div>
           <div className="flex flex-col gap-2 flex-shrink-0">
             {rental.status === "pending" && (
@@ -113,6 +83,7 @@ export default function AdminDashboard({ addToast }) {
   const [loading, setLoading] = useState(true)
   const [deletingId, setDeletingId] = useState(null)
   const [rentalFilter, setRentalFilter] = useState("")
+  const [rentalsLoading, setRentalsLoading] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [editingItem, setEditingItem] = useState(null)
   const [form, setForm] = useState(defaultItem)
@@ -121,32 +92,30 @@ export default function AdminDashboard({ addToast }) {
   const [profileForm, setProfileForm] = useState({ nama_usaha: "", alamat_usaha: "", nomor_telepon: "", nomor_rekening: "", foto_qris: "" })
   const [qrisUploading, setQrisUploading] = useState(false)
   const [savingProfile, setSavingProfile] = useState(false)
-  const [payments, setPayments]           = useState([])
-  const [paymentFilter, setPaymentFilter] = useState("")
   const [previewBukti, setPreviewBukti]   = useState(null) // base64 string
-  const [confirmingId, setConfirmingId]   = useState(null)
 
   const loadItems = useCallback(async () => {
     try { const data = await fetchMyItems(); setItems(data.items) } catch {}
   }, [])
 
   const loadRentals = useCallback(async () => {
-    try { const data = await fetchAdminRentals({ status: rentalFilter || undefined }); setRentals(data.rentals) } catch {}
+    setRentalsLoading(true)
+    try { 
+      const data = await fetchAdminRentals({ status: rentalFilter || undefined })
+      setRentals(data.rentals || []) 
+    } catch (err) {
+      console.error("Error loading rentals:", err)
+      setRentals([])
+    } finally {
+      setRentalsLoading(false)
+    }
   }, [rentalFilter])
-
-  const loadPayments = useCallback(async () => {
-    try {
-      const data = await fetchAdminPayments({ status: paymentFilter || undefined, limit: 50 })
-      setPayments(Array.isArray(data) ? data : (data?.payments || []))
-    } catch {}
-  }, [paymentFilter])
 
   useEffect(() => {
     setLoading(true)
     Promise.all([
       loadItems(),
       loadRentals(),
-      loadPayments(),
       fetchAdminProfile().then(p => {
         setProfile(p)
         setProfileForm({
@@ -160,6 +129,23 @@ export default function AdminDashboard({ addToast }) {
       fetchCategories().then(setCategories).catch(() => {}),
     ]).finally(() => setLoading(false))
   }, [])
+
+  // Reload rentals ketika filter berubah
+  useEffect(() => {
+    const loadData = async () => {
+      setRentalsLoading(true)
+      try { 
+        const data = await fetchAdminRentals({ status: rentalFilter || undefined })
+        setRentals(data.rentals || []) 
+      } catch (err) {
+        console.error("Error loading rentals:", err)
+        setRentals([])
+      } finally {
+        setRentalsLoading(false)
+      }
+    }
+    loadData()
+  }, [rentalFilter])
 
   const openAdd = () => {
     if (!profile) {
@@ -218,28 +204,9 @@ export default function AdminDashboard({ addToast }) {
     try {
       await updateRentalStatus(rentalId, { status })
       addToast?.(`Status diubah ke "${status}"`, "success")
-      loadRentals()
+      // Reload both rentals and items (stok barang akan berubah)
+      await Promise.all([loadRentals(), loadItems()])
     } catch (err) { addToast?.(err.message, "error") }
-  }
-
-  const handleConfirmPayment = async (paymentId, statusVal) => {
-    setConfirmingId(paymentId)
-    try {
-      const updatedPay = await confirmPayment(paymentId, statusVal)
-      // Jika pembayaran dikonfirmasi (completed), setujui rental yang masih pending
-      if (statusVal === "completed" && updatedPay?.rental_id) {
-        const matchRental = rentals.find(r => r.id === updatedPay.rental_id)
-        if (matchRental?.status === "pending") {
-          await updateRentalStatus(matchRental.id, { status: "disetujui" }).catch(() => {})
-        }
-      }
-      addToast?.(
-        statusVal === "completed" ? "Pembayaran dikonfirmasi & sewa disetujui!" : "Bukti pembayaran ditolak",
-        statusVal === "completed" ? "success" : "error"
-      )
-      await Promise.all([loadPayments(), loadRentals()])
-    } catch (err) { addToast?.(err.message, "error") }
-    finally { setConfirmingId(null) }
   }
 
   const handleSaveProfile = async (e) => {
@@ -341,14 +308,6 @@ export default function AdminDashboard({ addToast }) {
         <TabsList>
           <TabsTrigger value="items"><Package className="w-4 h-4 mr-1" /> Barang ({items.length})</TabsTrigger>
           <TabsTrigger value="rentals" onClick={loadRentals}><ClipboardList className="w-4 h-4 mr-1" /> Sewa Masuk</TabsTrigger>
-          <TabsTrigger value="payments" onClick={loadPayments}>
-            <CreditCard className="w-4 h-4 mr-1" /> Pembayaran
-            {payments.filter(p => p.status === "completed" && p.bukti_pembayaran).length > 0 && (
-              <span className="ml-1.5 bg-amber-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-                {payments.filter(p => p.status === "completed" && p.bukti_pembayaran).length}
-              </span>
-            )}
-          </TabsTrigger>
           <TabsTrigger value="profile"><Store className="w-4 h-4 mr-1" /> Profil Usaha</TabsTrigger>
         </TabsList>
 
@@ -418,10 +377,25 @@ export default function AdminDashboard({ addToast }) {
               </Button>
             ))}
           </div>
-          {rentals.length === 0 ? (
+          {rentalsLoading ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map(i => (
+                <Card key={i} className="overflow-hidden">
+                  <CardContent className="p-4">
+                    <Skeleton className="h-6 w-48 mb-2" />
+                    <Skeleton className="h-4 w-32 mb-2" />
+                    <Skeleton className="h-4 w-full" />
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : rentals.length === 0 ? (
             <div className="text-center py-16">
               <ClipboardList className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
               <h3 className="text-lg font-semibold">Tidak ada permintaan sewa</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                {rentalFilter ? `Tidak ada sewa dengan status "${rentalFilter}"` : "Belum ada permintaan sewa masuk"}
+              </p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -430,146 +404,9 @@ export default function AdminDashboard({ addToast }) {
                   key={r.id}
                   rental={r}
                   onUpdateStatus={handleUpdateRentalStatus}
-                  payment={payments.find(p => p.rental_id === r.id)}
                   onViewBukti={setPreviewBukti}
                 />
               ))}
-            </div>
-          )}
-        </TabsContent>
-
-        {/* === PEMBAYARAN === */}
-        <TabsContent value="payments" className="mt-4 space-y-4">
-          <div className="flex items-center justify-between flex-wrap gap-3">
-            <h2 className="text-lg font-semibold text-foreground">Pembayaran Masuk</h2>
-            <div className="flex gap-2 flex-wrap">
-              {[
-                { v: "", label: "Semua" },
-                { v: "pending", label: "Menunggu" },
-                { v: "completed", label: "Selesai" },
-                { v: "failed", label: "Ditolak" },
-              ].map(({ v, label }) => (
-                <button
-                  key={v}
-                  onClick={() => { setPaymentFilter(v); loadPayments() }}
-                  className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition ${
-                    paymentFilter === v
-                      ? "bg-primary text-white border-primary"
-                      : "bg-white text-slate-600 border-slate-200 hover:border-primary hover:text-primary"
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {payments.length === 0 ? (
-            <div className="text-center py-16">
-              <CreditCard className="w-14 h-14 text-muted-foreground/30 mx-auto mb-3" />
-              <p className="text-muted-foreground font-medium">Belum ada pembayaran masuk</p>
-              <p className="text-sm text-muted-foreground mt-1">Pembayaran akan muncul setelah penyewa mengajukan sewa</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {payments.map(pay => {
-                const payStatusCfg = {
-                  pending:   { cls: "bg-amber-100 text-amber-700",  label: "Belum Dikonfirmasi" },
-                  completed: { cls: "bg-green-100 text-green-700",  label: "Terkonfirmasi" },
-                  failed:    { cls: "bg-red-100 text-red-700",      label: "Ditolak" },
-                  cancelled: { cls: "bg-slate-100 text-slate-500",  label: "Dibatalkan" },
-                }
-                const sc = payStatusCfg[pay.status] || payStatusCfg.pending
-                const isConfirming = confirmingId === pay.id
-                // find matching rental for status info
-                const matchRental = rentals.find(r => r.id === pay.rental_id)
-                const rentalPending = matchRental?.status === "pending"
-                return (
-                  <Card key={pay.id} className={pay.bukti_pembayaran && pay.status === "pending" ? "border-amber-200 shadow-amber-50 shadow" : ""}>
-                    <CardContent className="p-4">
-                      {/* Header badge jika ada bukti & belum dikonfirmasi */}
-                      {pay.bukti_pembayaran && pay.status === "pending" && (
-                        <div className="flex items-center gap-2 mb-3 p-2 bg-amber-50 rounded-xl text-xs font-semibold text-amber-700">
-                          <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                          Bukti pembayaran diterima — perlu konfirmasi
-                        </div>
-                      )}
-
-                      <div className="flex flex-col sm:flex-row gap-4">
-                        {/* Bukti foto thumbnail */}
-                        {pay.bukti_pembayaran ? (
-                          <button
-                            onClick={() => setPreviewBukti(pay.bukti_pembayaran)}
-                            className="w-24 h-24 rounded-2xl overflow-hidden border-2 border-amber-200 flex-shrink-0 relative group"
-                            title="Lihat bukti pembayaran"
-                          >
-                            <img src={pay.bukti_pembayaran} alt="bukti" className="w-full h-full object-cover" />
-                            <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition gap-1">
-                              <Eye className="w-5 h-5 text-white" />
-                              <span className="text-[10px] text-white font-semibold">Lihat</span>
-                            </div>
-                          </button>
-                        ) : (
-                          <div className="w-24 h-24 rounded-2xl bg-slate-100 flex-shrink-0 flex flex-col items-center justify-center gap-1 text-slate-300">
-                            <CreditCard className="w-7 h-7" />
-                            <span className="text-[10px] font-medium">Belum upload</span>
-                          </div>
-                        )}
-
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-2 flex-wrap mb-1">
-                            <div>
-                              <p className="font-bold text-foreground">
-                                {matchRental?.item?.nama || `Rental #${pay.rental_id}`}
-                              </p>
-                              <p className="text-sm text-muted-foreground mt-0.5">
-                                {matchRental?.user?.nama || `User #${pay.user_id}`} · {pay.metode_pembayaran}
-                              </p>
-                            </div>
-                            <span className={`text-xs font-bold px-2.5 py-1 rounded-full flex-shrink-0 ${sc.cls}`}>{sc.label}</span>
-                          </div>
-                          <p className="text-xl font-extrabold text-primary">{formatPrice(pay.jumlah)}</p>
-                          {pay.catatan && <p className="text-xs text-muted-foreground mt-1 italic">"{pay.catatan}"</p>}
-                          {!pay.bukti_pembayaran && (
-                            <p className="text-xs text-amber-600 mt-1.5 font-medium">⏳ Menunggu user upload bukti transfer</p>
-                          )}
-                        </div>
-
-                        {/* Actions */}
-                        {pay.status === "completed" && (
-                          <div className="flex items-center flex-shrink-0">
-                            <span className="text-sm text-green-600 font-bold flex items-center gap-1">
-                              <CheckCircle className="w-5 h-5" /> Lunas
-                            </span>
-                          </div>
-                        )}
-
-                        {pay.bukti_pembayaran && pay.status === "pending" && (
-                          <div className="flex sm:flex-col gap-2 flex-shrink-0 justify-end">
-                            <Button
-                              size="sm"
-                              variant="success"
-                              disabled={isConfirming}
-                              onClick={() => handleConfirmPayment(pay.id, "completed")}
-                            >
-                              <ThumbsUp className="w-3.5 h-3.5 mr-1" />
-                              {isConfirming ? "Memproses..." : "Setujui & Konfirmasi"}
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              disabled={isConfirming}
-                              onClick={() => handleConfirmPayment(pay.id, "failed")}
-                            >
-                              <ThumbsDown className="w-3.5 h-3.5 mr-1" /> Tolak Bukti
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                )
-              })}
             </div>
           )}
         </TabsContent>

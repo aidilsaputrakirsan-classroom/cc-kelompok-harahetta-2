@@ -34,20 +34,82 @@ function MiniBarChart({ data = [] }) {
   )
 }
 
-// ── Donut chart ─────────────────────────────────────────────
-function DonutChart({ pct = 0, color = "#1b7e6a" }) {
-  const clamped = Math.min(100, Math.max(0, pct))
+// ── Countdown Timer ─────────────────────────────────────────────
+function CountdownTimer({ endDate }) {
+  const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 })
+  const [isExpired, setIsExpired] = useState(false)
+
+  useEffect(() => {
+    if (!endDate) return
+
+    const calculateTimeLeft = () => {
+      const now = new Date().getTime()
+      const end = new Date(endDate).getTime()
+      const difference = end - now
+
+      if (difference <= 0) {
+        setIsExpired(true)
+        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 })
+        return
+      }
+
+      setIsExpired(false)
+      setTimeLeft({
+        days: Math.floor(difference / (1000 * 60 * 60 * 24)),
+        hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
+        minutes: Math.floor((difference / 1000 / 60) % 60),
+        seconds: Math.floor((difference / 1000) % 60),
+      })
+    }
+
+    calculateTimeLeft()
+    const timer = setInterval(calculateTimeLeft, 1000)
+
+    return () => clearInterval(timer)
+  }, [endDate])
+
+  if (!endDate) {
+    return (
+      <div className="text-center py-4">
+        <p className="text-xs text-slate-400">Tidak ada sewa aktif</p>
+      </div>
+    )
+  }
+
+  if (isExpired) {
+    return (
+      <div className="text-center py-4">
+        <p className="text-sm font-bold text-red-600">Masa sewa telah berakhir!</p>
+        <p className="text-xs text-slate-400 mt-1">Segera kembalikan barang</p>
+      </div>
+    )
+  }
+
   return (
-    <div className="relative w-20 h-20 flex-shrink-0">
-      <div
-        className="w-full h-full rounded-full"
-        style={{
-          background: `conic-gradient(${color} 0% ${clamped}%, #e5e7eb ${clamped}% 100%)`,
-        }}
-      />
-      {/* inner hole */}
-      <div className="absolute inset-[6px] rounded-full bg-white flex items-center justify-center">
-        <span className="text-sm font-extrabold text-slate-800">{clamped}%</span>
+    <div className="grid grid-cols-4 gap-2">
+      <div className="text-center">
+        <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-xl p-2 shadow-md">
+          <p className="text-lg font-black leading-none">{timeLeft.days}</p>
+        </div>
+        <p className="text-[9px] text-slate-400 mt-1 font-medium">HARI</p>
+      </div>
+      <div className="text-center">
+        <div className="bg-gradient-to-br from-teal-500 to-teal-600 text-white rounded-xl p-2 shadow-md">
+          <p className="text-lg font-black leading-none">{String(timeLeft.hours).padStart(2, '0')}</p>
+        </div>
+        <p className="text-[9px] text-slate-400 mt-1 font-medium">JAM</p>
+      </div>
+      <div className="text-center">
+        <div className="bg-gradient-to-br from-orange-500 to-orange-600 text-white rounded-xl p-2 shadow-md">
+          <p className="text-lg font-black leading-none">{String(timeLeft.minutes).padStart(2, '0')}</p>
+        </div>
+        <p className="text-[9px] text-slate-400 mt-1 font-medium">MENIT</p>
+      </div>
+      <div className="text-center">
+        <div className="bg-gradient-to-br from-red-500 to-red-600 text-white rounded-xl p-2 shadow-md animate-pulse">
+          <p className="text-lg font-black leading-none">{String(timeLeft.seconds).padStart(2, '0')}</p>
+        </div>
+        <p className="text-[9px] text-slate-400 mt-1 font-medium">DETIK</p>
       </div>
     </div>
   )
@@ -99,6 +161,7 @@ export default function UserDashboard({ addToast }) {
   // — Payment / Bukti Bayar state
   const [payments, setPayments]           = useState([])
   const [buktiModal, setBuktiModal]       = useState(null) // { rental, payment | null }
+  const [selectedRentalIndex, setSelectedRentalIndex] = useState(0) // index untuk dropdown countdown
   const [adminPayInfo, setAdminPayInfo]   = useState(null) // admin rekening/qris info
   const [buktiFile, setBuktiFile]         = useState(null) // { preview, base64 }
   const [buktiCatatan, setBuktiCatatan]   = useState("")
@@ -202,6 +265,10 @@ export default function UserDashboard({ addToast }) {
       const data = await fetchMyRentals(params)
       setAllRentals(Array.isArray(data) ? data : (data?.rentals || []))
       setAllTotal(data?.total || 0)
+      
+      // Reload payments juga untuk sinkronisasi dengan rental (payment auto-created saat disetujui)
+      const p = await fetchMyPayments({ limit: 50 }).catch(() => ({ payments: [] }))
+      setPayments(Array.isArray(p) ? p : (p?.payments || []))
     } catch (err) {
       addToast?.(err.message, "error")
     } finally {
@@ -211,6 +278,14 @@ export default function UserDashboard({ addToast }) {
 
   useEffect(() => { loadAllRentals() }, [loadAllRentals])
 
+  // Reset selected rental index jika jumlah active rental berubah
+  useEffect(() => {
+    const activeCount = rentals.filter(r => r.status === "sedang_disewa" || r.status === "disetujui").length
+    if (selectedRentalIndex >= activeCount) {
+      setSelectedRentalIndex(0)
+    }
+  }, [rentals, selectedRentalIndex])
+
   // — derived stats
   const totalSpend = rentals.reduce((s, r) => s + (r.total_harga || 0), 0)
   const active = rentals.filter(r => ["pending","disetujui","sedang_disewa"].includes(r.status))
@@ -219,7 +294,9 @@ export default function UserDashboard({ addToast }) {
   const completionPct = rentals.length ? Math.round((done.length / rentals.length) * 100) : 0
   const activePct = rentals.length ? Math.round((active.length / rentals.length) * 100) : 0
   const recentRentals = rentals.slice(0, 5)
-  const activeRental = active.find(r => r.status === "sedang_disewa") || active[0]
+  // Cari semua rental yang sedang berlangsung untuk countdown
+  const activeRentals = rentals.filter(r => r.status === "sedang_disewa" || r.status === "disetujui")
+  const selectedRental = activeRentals[selectedRentalIndex] || null
 
   // — fake weekly bar (counts by day-of-week from real data)
   const weekBars = [0, 0, 0, 0, 0, 0, 0]
@@ -347,15 +424,15 @@ export default function UserDashboard({ addToast }) {
             <p className="text-3xl font-black mt-2">{active.length}</p>
             <p className="text-xs text-white/60 mt-0.5">Barang sedang disewa</p>
           </div>
-          {activeRental ? (
+          {activeRentals.length > 0 ? (
             <div className="relative mt-3 pt-3 border-t border-white/20">
               <p className="text-xs text-white/70">Terbaru</p>
               <p className="font-bold text-sm truncate mt-0.5">
-                {activeRental.item?.nama || `Item #${activeRental.item_id}`}
+                {activeRentals[0].item?.nama || `Item #${activeRentals[0].item_id}`}
               </p>
               <p className="text-xs text-white/60 mt-0.5 flex items-center gap-1">
                 <Calendar className="w-3 h-3" />
-                {new Date(activeRental.tanggal_selesai).toLocaleDateString("id-ID")}
+                {new Date(activeRentals[0].tanggal_selesai).toLocaleDateString("id-ID")}
               </p>
             </div>
           ) : (
@@ -371,28 +448,61 @@ export default function UserDashboard({ addToast }) {
           )}
         </div>
 
-        {/* Card 3 — Analytics donut (completion rate) */}
-        <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100 flex flex-col justify-between min-h-[160px]">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Analitik</p>
-            <div className="flex flex-col gap-1">
-              <div className="flex items-center gap-1 text-[10px] text-slate-500">
-                <span className="w-2 h-2 rounded-full bg-primary inline-block" /> Selesai
-              </div>
-              <div className="flex items-center gap-1 text-[10px] text-slate-500">
-                <span className="w-2 h-2 rounded-full bg-blue-400 inline-block" /> Aktif
-              </div>
-              <div className="flex items-center gap-1 text-[10px] text-slate-500">
-                <span className="w-2 h-2 rounded-full bg-slate-200 inline-block" /> Lainnya
-              </div>
+        {/* Card 3 — Countdown Timer */}
+        <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Countdown Sewa</p>
+            {activeRentals.length > 0 && (
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-100 text-teal-700">
+                {activeRentals.length} Aktif
+              </span>
+            )}
+          </div>
+          
+          {activeRentals.length > 0 ? (
+            <>
+              {/* Dropdown Selector jika ada lebih dari 1 sewa aktif */}
+              {activeRentals.length > 1 && (
+                <div className="mb-3">
+                  <select
+                    value={selectedRentalIndex}
+                    onChange={(e) => setSelectedRentalIndex(Number(e.target.value))}
+                    className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
+                  >
+                    {activeRentals.map((r, idx) => (
+                      <option key={r.id} value={idx}>
+                        {r.item?.nama || `Item #${r.item_id}`} - {new Date(r.tanggal_selesai).toLocaleDateString("id-ID", { day: "2-digit", month: "short" })}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {selectedRental && (
+                <>
+                  <div className="mb-3">
+                    <p className="text-xs text-slate-600 font-semibold truncate">
+                      {selectedRental.item?.nama || `Item #${selectedRental.item_id}`}
+                    </p>
+                    <p className="text-[10px] text-slate-400">
+                      Berakhir: {new Date(selectedRental.tanggal_selesai).toLocaleDateString("id-ID", {
+                        day: "2-digit",
+                        month: "short",
+                        year: "numeric"
+                      })}
+                    </p>
+                  </div>
+                  <CountdownTimer endDate={selectedRental.tanggal_selesai} />
+                </>
+              )}
+            </>
+          ) : (
+            <div className="text-center py-8">
+              <Clock className="w-12 h-12 text-slate-300 mx-auto mb-2" />
+              <p className="text-sm text-slate-400">Tidak ada sewa aktif</p>
+              <p className="text-xs text-slate-400 mt-1">Sewa barang untuk memulai countdown</p>
             </div>
-          </div>
-          <div className="flex items-center justify-center py-2">
-            <DonutChart pct={completionPct} color="#1b7e6a" />
-          </div>
-          <p className="text-center text-xs text-slate-400">
-            {done.length} dari {rentals.length} sewa selesai
-          </p>
+          )}
         </div>
       </div>
 
@@ -594,7 +704,8 @@ export default function UserDashboard({ addToast }) {
                 const item = r.item
                 const st = STATUS_LABEL[r.status] || { label: r.status, color: "bg-slate-100 text-slate-600" }
                 const payment = payments.find(p => p.rental_id === r.id)
-                const needsPayment = r.status === "pending" || r.status === "disetujui"
+                // Tampilkan payment section hanya jika rental disetujui DAN payment sudah ada (auto-created)
+                const needsPayment = r.status === "disetujui" && payment
                 const hasBukti = !!payment?.bukti_pembayaran
                 const isActive = r.status === "sedang_disewa"
                 return (
@@ -636,7 +747,7 @@ export default function UserDashboard({ addToast }) {
                           ) : hasBukti ? (
                             <span className="text-xs text-amber-600 font-medium">Bukti dikirim · menunggu konfirmasi</span>
                           ) : (
-                            <span className="text-xs text-primary font-semibold">Bayar & upload bukti transfer</span>
+                            <span className="text-xs text-primary font-semibold">Upload bukti transfer</span>
                           )}
                         </div>
                         {payment?.status !== "completed" && (
@@ -649,7 +760,7 @@ export default function UserDashboard({ addToast }) {
                             }`}
                           >
                             <CreditCard className="w-3.5 h-3.5" />
-                            {hasBukti ? "Lihat Pembayaran" : "Bayar Sekarang"}
+                            {hasBukti ? "Lihat Pembayaran" : "Upload Bukti"}
                           </button>
                         )}
                       </div>

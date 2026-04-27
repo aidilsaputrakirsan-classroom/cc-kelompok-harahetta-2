@@ -59,12 +59,11 @@ class PaymentMethodEnum(str, enum.Enum):
 # ============================================================
 
 class UserCreate(BaseModel):
-    """Schema untuk registrasi user baru."""
+    """Schema untuk registrasi user baru (publik - hanya role 'user')."""
 
     email: EmailStr = Field(..., examples=["user@student.itk.ac.id"])
     nama: str = Field(..., min_length=2, max_length=100, examples=["Djaky Abbyyu"])
     password: str = Field(..., min_length=8, examples=["Password123!"])
-    role: UserRoleEnum = Field(UserRoleEnum.user, examples=["user"])
 
     @field_validator("password")
     @classmethod

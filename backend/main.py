@@ -137,18 +137,18 @@ def team_info():
     response_model=UserResponse,
     status_code=201,
     tags=["🔐 Auth"],
-    summary="Daftar akun baru",
+    summary="Daftar akun baru (hanya untuk Penyewa)",
 )
 def register(user_data: UserCreate, db: Session = Depends(get_db)):
     """
-    Registrasi akun baru di Sewain.
+    Registrasi akun baru di Sewain sebagai **Penyewa** (role: user).
 
-    **Role tersedia:**
-    - `user` — Penyewa barang (default)
-    - `admin` — Penyedia barang/UMKM
-    - `super_admin` — Administrator platform
+    **Catatan Keamanan:**
+    - Registrasi publik **hanya untuk role `user`** (penyewa barang)
+    - **Admin** (penyedia barang) dibuat oleh Super Admin via `POST /superadmin/admins`
+    - **Super Admin** dibuat manual oleh developer/database seeder
 
-    > ⚠️ Dalam production, pembuatan `super_admin` & `admin` hanya boleh dilakukan oleh super_admin.
+    Setelah registrasi, user perlu melengkapi profil dan upload KTP untuk diverifikasi.
     """
     user = crud.create_user(db=db, user_data=user_data)
     if not user:
@@ -637,7 +637,7 @@ def verify_user_identity(
     "/items",
     response_model=ItemListResponse,
     tags=["📦 Items — Barang Sewa"],
-    summary="Lihat katalog barang (semua login bisa)",
+    summary="Lihat katalog barang (PUBLIK - tanpa login)",
 )
 def list_items(
     skip: int = Query(0, ge=0),
@@ -646,11 +646,17 @@ def list_items(
     category_id: int = Query(None, description="Filter by ID kategori"),
     item_status: str = Query(None, alias="status", description="Filter: available | rented | unavailable"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
     """
     Katalog semua barang sewa yang tersedia.
-    Bisa di-filter by kategori, status, dan search keyword.
+    
+    **Akses:** Publik (tidak perlu login)
+    
+    **Filter tersedia:**
+    - `search`: Cari nama atau deskripsi barang
+    - `category_id`: Filter berdasarkan kategori
+    - `status`: Filter berdasarkan ketersediaan (available, rented, unavailable)
+    - `skip` & `limit`: Pagination
     """
     return crud.get_items(
         db=db,
@@ -666,14 +672,20 @@ def list_items(
     "/items/{item_id}",
     response_model=ItemResponse,
     tags=["📦 Items — Barang Sewa"],
-    summary="Detail satu barang",
+    summary="Detail satu barang (PUBLIK - tanpa login)",
 )
 def get_item(
     item_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
 ):
-    """Detail lengkap satu barang: foto, deskripsi, harga, ketersediaan."""
+    """
+    Detail lengkap satu barang: foto, deskripsi, harga, ketersediaan.
+    
+    **Akses:** Publik (tidak perlu login)
+    
+    Endpoint ini digunakan di landing page untuk menampilkan detail barang
+    sebelum user login atau register.
+    """
     item = crud.get_item(db=db, item_id=item_id)
     if not item:
         raise HTTPException(status_code=404, detail=f"Barang ID {item_id} tidak ditemukan")
@@ -784,6 +796,50 @@ def list_my_items(
     if not admin_profile:
         return {"total": 0, "items": []}
     return crud.get_items(db=db, skip=skip, limit=limit, search=search, admin_id=admin_profile.id)
+
+
+@app.post(
+    "/admin/items/fix-status",
+    tags=["🏪 Admin — Profil Usaha"],
+    summary="[Admin/Super Admin] Fix status semua barang berdasarkan stok",
+)
+def fix_items_status(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    """
+    Recalculate status untuk semua barang berdasarkan stok aktual.
+    Berguna untuk memperbaiki barang yang statusnya tidak sesuai dengan stok.
+    
+    - Super admin: fix semua barang di platform
+    - Admin biasa: fix hanya barang milik sendiri
+    """
+    from models import Item, UserRole
+    
+    # Ambil items yang perlu di-fix
+    if current_user.role == UserRole.super_admin:
+        items = db.query(Item).all()
+    else:
+        admin_profile = crud.get_admin_profile(db=db, user_id=current_user.id)
+        if not admin_profile:
+            raise HTTPException(status_code=400, detail="Profil usaha tidak ditemukan")
+        items = db.query(Item).filter(Item.admin_id == admin_profile.id).all()
+    
+    fixed_count = 0
+    for item in items:
+        old_status = item.status
+        crud._recalculate_item_status(db, item)
+        if old_status != item.status:
+            fixed_count += 1
+    
+    db.commit()
+    
+    return {
+        "success": True,
+        "total_items": len(items),
+        "fixed_count": fixed_count,
+        "message": f"Berhasil memperbaiki {fixed_count} dari {len(items)} barang"
+    }
 
 
 # ============================================================
@@ -938,6 +994,14 @@ def update_rental_status(
             status_code=404,
             detail=f"Rental ID {rental_id} tidak ditemukan atau bukan milik Anda",
         )
+    
+    # Handle error dari validasi transisi status
+    if isinstance(updated, dict) and "error" in updated:
+        raise HTTPException(
+            status_code=400,
+            detail=updated["error"],
+        )
+    
     return updated
 
 
@@ -1001,13 +1065,23 @@ def my_payments(
     current_user: User = Depends(require_user),
 ):
     """User melihat riwayat pembayaran mereka."""
-    return crud.get_payments(
-        db=db,
-        skip=skip,
-        limit=limit,
-        user_id=current_user.id,
-        status=status,
-    )
+    try:
+        result = crud.get_payments(
+            db=db,
+            skip=skip,
+            limit=limit,
+            user_id=current_user.id,
+            status=status,
+        )
+        return result
+    except Exception as e:
+        import traceback
+        print(f"ERROR in /payments/my: {str(e)}")
+        print(traceback.format_exc())
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error fetching payments: {str(e)}"
+        )
 
 
 @app.get(

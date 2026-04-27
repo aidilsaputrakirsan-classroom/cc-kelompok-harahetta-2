@@ -24,12 +24,58 @@ from auth import hash_password, verify_password
 
 
 # ============================================================
+# RENTAL STATUS TRANSITION RULES
+# ============================================================
+
+VALID_RENTAL_TRANSITIONS = {
+    RentalStatus.pending: [RentalStatus.disetujui, RentalStatus.ditolak],
+    RentalStatus.disetujui: [RentalStatus.sedang_disewa, RentalStatus.ditolak],
+    RentalStatus.sedang_disewa: [RentalStatus.selesai],
+    RentalStatus.selesai: [],  # final state
+    RentalStatus.ditolak: [],  # final state
+}
+
+
+# ============================================================
+# HELPER FUNCTIONS — ITEM STATUS
+# ============================================================
+
+def _recalculate_item_status(db: Session, item: Item):
+    """
+    Recalculate item status berdasarkan stok dan rental aktif.
+    Dipanggil setiap kali stok berubah.
+    
+    Aturan:
+    - stok > 0 → available
+    - stok == 0 DAN ada rental aktif → rented
+    - stok == 0 DAN tidak ada rental aktif → unavailable
+    """
+    if item.stok > 0:
+        item.status = ItemStatus.available
+    else:
+        # Cek apakah ada rental aktif untuk item ini
+        active_rental = db.query(Rental).filter(
+            Rental.item_id == item.id,
+            Rental.status.in_([
+                RentalStatus.pending,
+                RentalStatus.disetujui,
+                RentalStatus.sedang_disewa,
+            ])
+        ).first()
+        if active_rental:
+            item.status = ItemStatus.rented
+        else:
+            item.status = ItemStatus.unavailable
+
+
+# ============================================================
 # USER CRUD
 # ============================================================
 
 def create_user(db: Session, user_data: UserCreate) -> User | None:
     """
     Buat user baru dengan password yang di-hash.
+    Registrasi publik hanya untuk role 'user'.
     Return None jika email sudah terdaftar.
     """
     existing = db.query(User).filter(User.email == user_data.email).first()
@@ -40,7 +86,7 @@ def create_user(db: Session, user_data: UserCreate) -> User | None:
         email=user_data.email,
         nama=user_data.nama,
         hashed_password=hash_password(user_data.password),
-        role=user_data.role,
+        role=UserRole.user,  # Force role user untuk registrasi publik
     )
     db.add(db_user)
     db.commit()
@@ -506,6 +552,10 @@ def update_item(db: Session, item_id: int, admin_id: int, data: ItemUpdate) -> I
     for field, value in update_fields.items():
         setattr(item, field, value)
 
+    # Auto-recalculate status jika stok berubah
+    if "stok" in update_fields:
+        _recalculate_item_status(db, item)
+
     db.commit()
     db.refresh(item)
     return db.query(Item).options(joinedload(Item.category)).filter(Item.id == item_id).first()
@@ -520,6 +570,10 @@ def update_item_superadmin(db: Session, item_id: int, data: ItemUpdate) -> Item 
     update_fields = data.model_dump(exclude_unset=True)
     for field, value in update_fields.items():
         setattr(item, field, value)
+
+    # Auto-recalculate status jika stok berubah
+    if "stok" in update_fields:
+        _recalculate_item_status(db, item)
 
     db.commit()
     db.refresh(item)
@@ -657,13 +711,15 @@ def update_rental_status(
     rental_id: int,
     data: RentalStatusUpdate,
     admin_id: Optional[int] = None,
-) -> Rental | None:
+) -> Rental | None | dict:
     """
-    Update status rental.
+    Update status rental dengan validasi transisi.
     - admin_id: jika diisi, validasi bahwa rental ini milik admin
     - Jika status → disetujui: kurangi stok barang
     - Jika status → selesai: kembalikan stok & set item available
     - Jika status → ditolak: pastikan stok tidak berubah
+    
+    Return dict dengan key "error" jika transisi tidak valid.
     """
     rental = db.query(Rental).filter(Rental.id == rental_id).first()
     if not rental:
@@ -675,6 +731,14 @@ def update_rental_status(
             return None  # Rental ini bukan milik admin
 
     old_status = rental.status
+    
+    # Validasi transisi status
+    allowed_transitions = VALID_RENTAL_TRANSITIONS.get(old_status, [])
+    if data.status not in allowed_transitions:
+        return {
+            "error": f"Tidak dapat mengubah status dari '{old_status.value}' ke '{data.status.value}'. Transisi tidak valid."
+        }
+    
     rental.status = data.status
     if data.catatan:
         rental.catatan = data.catatan
@@ -685,14 +749,16 @@ def update_rental_status(
         if data.status == RentalStatus.disetujui and old_status == RentalStatus.pending:
             # Disetujui: kurangi stok
             item.stok = max(0, item.stok - 1)
-            if item.stok == 0:
-                item.status = ItemStatus.rented
+            _recalculate_item_status(db, item)
+            
+            # Auto-create payment saat rental disetujui
+            create_payment_auto(db=db, rental_id=rental_id)
+            
         elif data.status in [RentalStatus.selesai, RentalStatus.ditolak]:
             # Selesai atau ditolak: kembalikan stok
             if old_status in [RentalStatus.disetujui, RentalStatus.sedang_disewa]:
                 item.stok += 1
-            if item.stok > 0:
-                item.status = ItemStatus.available
+            _recalculate_item_status(db, item)
 
     db.commit()
     db.refresh(rental)

@@ -95,7 +95,9 @@ export default function ProfilePage({ addToast }) {
 
   const verifStatus = profile?.status_verifikasi || "menunggu"
   const isVerified = verifStatus === "disetujui"
-  const isPending = verifStatus === "menunggu" && form.foto_ktp
+  const bothPhotosUploaded = form.foto_ktp && form.foto_selfie_ktp
+  const hasSubmittedVerification = verifStatus === "menunggu" && profile?.foto_ktp && profile?.foto_selfie_ktp
+  const isPending = hasSubmittedVerification
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -122,7 +124,7 @@ export default function ProfilePage({ addToast }) {
       </Card>
 
       {/* Verification status banners */}
-      {verifStatus === "menunggu" && form.foto_ktp && (
+      {hasSubmittedVerification && (
         <div className="p-4 rounded-lg bg-warning/10 border border-warning/30 flex items-start gap-3">
           <Clock className="w-5 h-5 text-warning flex-shrink-0 mt-0.5" />
           <div>
@@ -248,8 +250,15 @@ export default function ProfilePage({ addToast }) {
               )}
             </div>
 
-            {/* Tombol hanya muncul jika belum diverifikasi atau ditolak */}
-            {verifStatus !== "disetujui" && !(verifStatus === "menunggu" && form.foto_ktp) && (
+            {/* Info message jika belum lengkap */}
+            {!bothPhotosUploaded && verifStatus !== "disetujui" && !hasSubmittedVerification && (
+              <div className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg">
+                📸 Upload kedua foto (KTP dan Selfie dengan KTP) untuk melanjutkan verifikasi
+              </div>
+            )}
+
+            {/* Tombol hanya muncul jika kedua foto sudah diupload dan belum submit/disetujui */}
+            {verifStatus !== "disetujui" && !hasSubmittedVerification && bothPhotosUploaded && (
               <Button type="submit" size="lg" loading={saving} className="mt-2">
                 <Save className="w-4 h-4 mr-2" /> Simpan & Ajukan Verifikasi
               </Button>
