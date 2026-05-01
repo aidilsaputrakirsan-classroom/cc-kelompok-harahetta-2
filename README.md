@@ -19,8 +19,8 @@
 7. [Roadmap](#7-roadmap)
 8. [Project Structure](#8-project-structure)
 9. [API Documentation Testing](#9-api-documentation-testing)
-10. [UI & API Integration Testing](#10-ui-api-integration-testing)
-11. [Authentication & CRUD Testing](#11-Authentication-CRUD-Testing)
+10. [UI and API Integration Testing](#10-ui-and-api-integration-testing)
+11. [Authentication and CRUD Testing](#11-authentication-and-crud-testing)
 
 ---
 
@@ -189,7 +189,6 @@ http://localhost:3000
 | Frontend | http://localhost:3000 |
 | Backend API | http://localhost:8000 |
 | Swagger UI | http://localhost:8000/docs |
-| Database | `localhost:15432` (user: `postgres`, pass: `setiawan`) |
 
 ---
 
@@ -202,7 +201,7 @@ http://localhost:3000
 | 3 | React Frontend | ✅ |
 | 4 | Full-Stack Integration | ✅ |
 | 5-7 | Docker & Compose | ✅ |
-| 8 | UTS Demo | ⬜ |
+| 8 | UTS Demo | ✅ |
 | 9-11 | CI/CD Pipeline | ⬜ |
 | 12-14 | Microservices | ⬜ |
 | 15-16 | Final & UAS | ⬜ |
