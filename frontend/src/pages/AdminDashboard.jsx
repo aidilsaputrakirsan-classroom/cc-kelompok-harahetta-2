@@ -5,7 +5,7 @@ import {
   fetchMyItems, createItem, updateItem, deleteItem,
   fetchAdminRentals, updateRentalStatus,
   fetchAdminProfile, createAdminProfile, updateAdminProfile,
-  fetchCategories,
+  fetchCategories, fetchAdminPayments, confirmPayment,
 } from "../services/api"
 import { Button } from "../components/ui/Button"
 import { Input } from "../components/ui/input"
@@ -20,13 +20,21 @@ import {
 } from "../components/ui/dialog"
 import {
   Package, ClipboardList, Store, Plus, Pencil, Trash2,
-  Calendar, CheckCircle, XCircle, Save, AlertTriangle, ImageIcon, X,
+  Calendar, CheckCircle, XCircle, Save, AlertTriangle, ImageIcon, X, Eye, CreditCard,
 } from "lucide-react"
 
 const defaultItem = { nama: "", deskripsi: "", harga_per_hari: "", stok: 1, foto_url: "", category_id: "" }
 
-function AdminRentalCard({ rental, onUpdateStatus, onViewBukti }) {
+const PAYMENT_STATUS_LABEL = {
+  pending: { label: "Menunggu Pembayaran", cls: "bg-yellow-100 text-yellow-800" },
+  completed: { label: "Lunas", cls: "bg-green-100 text-green-800" },
+  failed: { label: "Ditolak", cls: "bg-red-100 text-red-800" },
+  cancelled: { label: "Dibatalkan", cls: "bg-gray-100 text-gray-600" },
+}
+
+function AdminRentalCard({ rental, payment, onUpdateStatus, onViewBukti, onConfirmPayment, onRejectPayment }) {
   const item = rental.item
+  const paymentMeta = payment ? PAYMENT_STATUS_LABEL[payment.status] : null
   return (
     <Card className="hover:shadow-md transition-shadow">
       <CardContent className="p-4">
@@ -45,10 +53,31 @@ function AdminRentalCard({ rental, onUpdateStatus, onViewBukti }) {
               </div>
               <div className="flex flex-col items-end gap-1.5">
                 <StatusBadge status={rental.status} />
+                {paymentMeta && (
+                  <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${paymentMeta.cls}`}>
+                    <CreditCard className="w-3 h-3" /> {paymentMeta.label}
+                  </span>
+                )}
               </div>
             </div>
             <div className="text-lg font-bold text-primary mt-2">{formatPrice(rental.total_harga)}</div>
             {rental.catatan && <p className="text-xs text-muted-foreground mt-1">{rental.catatan}</p>}
+
+            {/* Info bukti pembayaran */}
+            {payment && (
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                {payment.bukti_pembayaran ? (
+                  <button
+                    onClick={() => onViewBukti(payment)}
+                    className="inline-flex items-center gap-1 text-xs text-primary underline underline-offset-2 hover:opacity-80"
+                  >
+                    <Eye className="w-3.5 h-3.5" /> Lihat bukti pembayaran
+                  </button>
+                ) : (
+                  <span className="text-xs text-muted-foreground italic">Bukti pembayaran belum diupload</span>
+                )}
+              </div>
+            )}
           </div>
           <div className="flex flex-col gap-2 flex-shrink-0">
             {rental.status === "pending" && (
@@ -62,7 +91,19 @@ function AdminRentalCard({ rental, onUpdateStatus, onViewBukti }) {
               </>
             )}
             {rental.status === "disetujui" && (
-              <Button size="sm" onClick={() => onUpdateStatus(rental.id, "sedang_disewa")}>Proses Sewa</Button>
+              <>
+                {payment?.status === "pending" && payment?.bukti_pembayaran && (
+                  <>
+                    <Button size="sm" variant="success" onClick={() => onConfirmPayment(payment.id)}>
+                      <CheckCircle className="w-3.5 h-3.5 mr-1" /> Konfirmasi Bayar
+                    </Button>
+                    <Button size="sm" variant="destructive" onClick={() => onRejectPayment(payment.id)}>
+                      <XCircle className="w-3.5 h-3.5 mr-1" /> Tolak Bayar
+                    </Button>
+                  </>
+                )}
+                <Button size="sm" variant="outline" onClick={() => onUpdateStatus(rental.id, "sedang_disewa")}>Proses Sewa</Button>
+              </>
             )}
             {rental.status === "sedang_disewa" && (
               <Button size="sm" variant="secondary" onClick={() => onUpdateStatus(rental.id, "selesai")}>Selesai</Button>
@@ -92,7 +133,8 @@ export default function AdminDashboard({ addToast }) {
   const [profileForm, setProfileForm] = useState({ nama_usaha: "", alamat_usaha: "", nomor_telepon: "", nomor_rekening: "", foto_qris: "" })
   const [qrisUploading, setQrisUploading] = useState(false)
   const [savingProfile, setSavingProfile] = useState(false)
-  const [previewBukti, setPreviewBukti]   = useState(null) // base64 string
+  const [previewBukti, setPreviewBukti] = useState(null)   // payment object
+  const [paymentMap, setPaymentMap] = useState({})          // rental_id -> payment
 
   const loadItems = useCallback(async () => {
     try { const data = await fetchMyItems(); setItems(data.items) } catch {}
@@ -100,9 +142,17 @@ export default function AdminDashboard({ addToast }) {
 
   const loadRentals = useCallback(async () => {
     setRentalsLoading(true)
-    try { 
-      const data = await fetchAdminRentals({ status: rentalFilter || undefined })
-      setRentals(data.rentals || []) 
+    try {
+      const [rentalData, paymentData] = await Promise.all([
+        fetchAdminRentals({ status: rentalFilter || undefined }),
+        fetchAdminPayments({ limit: 100 }),
+      ])
+      setRentals(rentalData.rentals || [])
+      const map = {}
+      for (const p of (paymentData.payments || [])) {
+        map[p.rental_id] = p
+      }
+      setPaymentMap(map)
     } catch (err) {
       console.error("Error loading rentals:", err)
       setRentals([])
@@ -132,19 +182,7 @@ export default function AdminDashboard({ addToast }) {
 
   // Reload rentals ketika filter berubah
   useEffect(() => {
-    const loadData = async () => {
-      setRentalsLoading(true)
-      try { 
-        const data = await fetchAdminRentals({ status: rentalFilter || undefined })
-        setRentals(data.rentals || []) 
-      } catch (err) {
-        console.error("Error loading rentals:", err)
-        setRentals([])
-      } finally {
-        setRentalsLoading(false)
-      }
-    }
-    loadData()
+    loadRentals()
   }, [rentalFilter])
 
   const openAdd = () => {
@@ -204,8 +242,27 @@ export default function AdminDashboard({ addToast }) {
     try {
       await updateRentalStatus(rentalId, { status })
       addToast?.(`Status diubah ke "${status}"`, "success")
-      // Reload both rentals and items (stok barang akan berubah)
       await Promise.all([loadRentals(), loadItems()])
+    } catch (err) { addToast?.(err.message, "error") }
+  }
+
+  const handleConfirmPayment = async (paymentId) => {
+    if (!confirm("Konfirmasi pembayaran ini?")) return
+    try {
+      await confirmPayment(paymentId, "completed")
+      addToast?.("Pembayaran dikonfirmasi", "success")
+      setPreviewBukti(null)
+      await loadRentals()
+    } catch (err) { addToast?.(err.message, "error") }
+  }
+
+  const handleRejectPayment = async (paymentId) => {
+    if (!confirm("Tolak pembayaran ini?")) return
+    try {
+      await confirmPayment(paymentId, "failed")
+      addToast?.("Pembayaran ditolak", "success")
+      setPreviewBukti(null)
+      await loadRentals()
     } catch (err) { addToast?.(err.message, "error") }
   }
 
@@ -403,8 +460,11 @@ export default function AdminDashboard({ addToast }) {
                 <AdminRentalCard
                   key={r.id}
                   rental={r}
+                  payment={paymentMap[r.id]}
                   onUpdateStatus={handleUpdateRentalStatus}
                   onViewBukti={setPreviewBukti}
+                  onConfirmPayment={handleConfirmPayment}
+                  onRejectPayment={handleRejectPayment}
                 />
               ))}
             </div>
@@ -605,15 +665,68 @@ export default function AdminDashboard({ addToast }) {
           className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
           onClick={() => setPreviewBukti(null)}
         >
-          <div className="relative max-w-lg w-full" onClick={(e) => e.stopPropagation()}>
-            <button
-              onClick={() => setPreviewBukti(null)}
-              className="absolute -top-3 -right-3 w-8 h-8 bg-white rounded-full shadow flex items-center justify-center text-slate-600 hover:text-destructive z-10"
-            >
-              <X className="w-4 h-4" />
-            </button>
-            <img src={previewBukti} alt="Bukti Pembayaran" className="w-full rounded-2xl shadow-2xl object-contain max-h-[80vh]" />
-            <p className="text-center text-white/70 text-xs mt-3">Bukti Pembayaran · Klik di luar untuk tutup</p>
+          <div
+            className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-y-auto max-h-[90vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b">
+              <h3 className="font-bold text-foreground">Bukti Pembayaran #{previewBukti.id}</h3>
+              <button
+                onClick={() => setPreviewBukti(null)}
+                className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-muted text-muted-foreground"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              {/* Info ringkas */}
+              <div className="bg-muted/50 rounded-lg p-3 text-sm space-y-1">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Jumlah</span>
+                  <span className="font-semibold">{formatPrice(previewBukti.jumlah)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Metode</span>
+                  <span className="font-medium capitalize">{previewBukti.metode_pembayaran}</span>
+                </div>
+                {previewBukti.catatan && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Catatan</span>
+                    <span className="text-right max-w-[60%]">{previewBukti.catatan}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Foto bukti */}
+              <img
+                src={previewBukti.bukti_pembayaran}
+                alt="Bukti Pembayaran"
+                className="w-full rounded-xl border object-contain max-h-72"
+              />
+
+              {/* Tombol aksi jika masih pending */}
+              {previewBukti.status === "pending" && (
+                <div className="flex gap-2 pt-1">
+                  <Button
+                    className="flex-1"
+                    variant="success"
+                    size="sm"
+                    onClick={() => handleConfirmPayment(previewBukti.id)}
+                  >
+                    <CheckCircle className="w-3.5 h-3.5 mr-1" /> Konfirmasi
+                  </Button>
+                  <Button
+                    className="flex-1"
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => handleRejectPayment(previewBukti.id)}
+                  >
+                    <XCircle className="w-3.5 h-3.5 mr-1" /> Tolak
+                  </Button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

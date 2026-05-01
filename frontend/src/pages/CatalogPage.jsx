@@ -9,7 +9,7 @@ import { Skeleton } from "../components/ui/skeleton"
 import {
   Search, Package, ShoppingCart, ChevronRight, ArrowLeft, ArrowRight,
   SlidersHorizontal, X, Menu, LogOut, LayoutDashboard, Sparkles,
-  Tag, CheckCircle, Clock,
+  Tag, CheckCircle, Clock, Eye,
 } from "lucide-react"
 
 // ── Navbar (sama gaya dengan LandingPage) ───────────────────
@@ -86,12 +86,17 @@ const STATUS_CONFIG = {
 }
 
 function ItemCard({ item, onRent, isAuthenticated }) {
+  const navigate = useNavigate()
   const imgFallback = `https://ui-avatars.com/api/?name=${encodeURIComponent(item.nama)}&background=1b7e6a&color=fff&size=400&bold=true`
   const st = STATUS_CONFIG[item.status] || STATUS_CONFIG.unavailable
 
   return (
     <div className="group bg-white rounded-3xl overflow-hidden border border-slate-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col">
-      <div className="relative aspect-[4/3] overflow-hidden bg-slate-50">
+      {/* Image — klik untuk detail */}
+      <div
+        className="relative aspect-[4/3] overflow-hidden bg-slate-50 cursor-pointer"
+        onClick={() => navigate(`/items/${item.id}`)}
+      >
         <img
           src={item.foto_url || imgFallback}
           alt={item.nama}
@@ -99,6 +104,12 @@ function ItemCard({ item, onRent, isAuthenticated }) {
           onError={(e) => { e.target.src = imgFallback }}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+        {/* Hover overlay: "Lihat Detail" */}
+        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+          <span className="flex items-center gap-1.5 text-xs font-bold text-white bg-black/50 px-3 py-1.5 rounded-full backdrop-blur-sm">
+            <Eye className="w-3.5 h-3.5" /> Lihat Detail
+          </span>
+        </div>
         <span className={`absolute top-3 right-3 text-xs font-bold px-2.5 py-1 rounded-full ${st.cls}`}>
           {st.label}
         </span>
@@ -109,7 +120,12 @@ function ItemCard({ item, onRent, isAuthenticated }) {
         )}
       </div>
       <div className="p-4 flex flex-col flex-1">
-        <h3 className="font-bold text-slate-800 line-clamp-1 text-base">{item.nama}</h3>
+        <h3
+          className="font-bold text-slate-800 line-clamp-1 text-base cursor-pointer hover:text-primary transition-colors"
+          onClick={() => navigate(`/items/${item.id}`)}
+        >
+          {item.nama}
+        </h3>
         {item.deskripsi && (
           <p className="text-xs text-slate-500 line-clamp-2 mt-1 flex-1">{item.deskripsi}</p>
         )}
@@ -118,16 +134,25 @@ function ItemCard({ item, onRent, isAuthenticated }) {
             <div className="text-xl font-extrabold text-primary">{formatPrice(item.harga_per_hari)}</div>
             <div className="text-xs text-slate-400">/ hari · Stok {item.stok}</div>
           </div>
-          {item.status === "available" && (
-            <Button
-              size="sm"
-              className="rounded-xl text-xs"
-              onClick={() => onRent(item)}
-              disabled={item.stok <= 0}
+          <div className="flex gap-1.5">
+            <button
+              onClick={() => navigate(`/items/${item.id}`)}
+              className="p-2 rounded-xl border border-slate-200 text-slate-500 hover:border-primary hover:text-primary transition"
+              title="Lihat Detail"
             >
-              <ShoppingCart className="w-3.5 h-3.5 mr-1" /> Sewa
-            </Button>
-          )}
+              <Eye className="w-3.5 h-3.5" />
+            </button>
+            {item.status === "available" && (
+              <Button
+                size="sm"
+                className="rounded-xl text-xs"
+                onClick={() => onRent(item)}
+                disabled={item.stok <= 0}
+              >
+                <ShoppingCart className="w-3.5 h-3.5 mr-1" /> Sewa
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     </div>
