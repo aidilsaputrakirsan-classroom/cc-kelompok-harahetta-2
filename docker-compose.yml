@@ -1,10 +1,19 @@
 # ============================================================
 # docker-compose.yml — Sewain App
 # Menjalankan 3 service: database (PostgreSQL), backend (FastAPI), frontend (React/Nginx)
-# Cara pakai:
-#   - Jalankan semua service   : docker compose up -d
-#   - Stop semua service       : docker compose down
-#   - Rebuild + jalankan ulang : docker compose up -d --build
+#
+# PROFILES:
+#   Gunakan --profile untuk memilih environment:
+#
+#   Development (hot-reload, port DB terbuka):
+#     docker compose --profile dev up -d --build
+#
+#   Production (no reload, port DB tertutup):
+#     docker compose --profile prod -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Perintah umum:
+#   - Stop semua service       : docker compose --profile dev down
+#   - Rebuild + jalankan ulang : docker compose --profile dev up -d --build
 #   - Lihat log realtime       : docker compose logs -f
 #   - Status services          : docker compose ps
 #
@@ -27,6 +36,7 @@ services:
   db:
     container_name: sewain-db
     image: postgres:16-alpine
+    profiles: [dev, prod]
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
@@ -56,6 +66,7 @@ services:
   backend:
     container_name: sewain-backend
     build: ./backend
+    profiles: [dev, prod]
     restart: unless-stopped
     env_file:
       - ./backend/.env.docker
@@ -64,6 +75,7 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: setiawan
       POSTGRES_DB: data_sewain
+      APP_ENV: development
     ports:
       - "8000:8000"
     depends_on:
@@ -78,7 +90,7 @@ services:
     networks:
       - sewain-network
     command:
-      ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+      ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 
   # ----------------------------------------------------------
   # SERVICE: frontend
@@ -93,6 +105,7 @@ services:
   frontend:
     container_name: sewain-frontend
     image: alif10231056/sewain-frontend:v2
+    profiles: [dev, prod]
     restart: unless-stopped
     ports:
       - "3000:80"
