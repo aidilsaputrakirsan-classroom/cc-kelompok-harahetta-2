@@ -335,6 +335,7 @@ export default function UserDashboard({ addToast }) {
     <div className="space-y-4">
 
       {/* ── HEADER ─────────────────────────────────────────── */}
+      <div className="pt-5  " />
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <p className="text-xs text-slate-500 font-medium tracking-wide uppercase">Platform Sewa Barang</p>

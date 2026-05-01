@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react"
 import { useSearchParams, useNavigate } from "react-router-dom"
 import { useAuth } from "../context/AuthContext"
-import { fetchItem, createRental, createPaymentForRental, fetchAdminPaymentInfo } from "../services/api"
+import { fetchItem, createRental, createPaymentForRental } from "../services/api"
 import { formatPrice } from "../lib/utils"
 import { Button } from "../components/ui/Button"
 import { Input } from "../components/ui/input"
@@ -11,7 +11,7 @@ import { Separator } from "../components/ui/separator"
 import { Skeleton } from "../components/ui/skeleton"
 import {
   ArrowLeft, AlertTriangle, Calendar,
-  CreditCard, Building2, QrCode, Copy, CheckCircle,
+  CreditCard, CheckCircle,
 } from "lucide-react"
 
 export default function RentalPage({ addToast }) {
@@ -21,10 +21,8 @@ export default function RentalPage({ addToast }) {
   const { isVerified } = useAuth()
 
   const [item, setItem]               = useState(null)
-  const [adminPayment, setAdminPayment] = useState(null)
   const [loading, setLoading]         = useState(true)
   const [submitting, setSubmitting]   = useState(false)
-  const [copied, setCopied]           = useState(false)
   const [form, setForm] = useState({ tanggal_mulai: "", tanggal_selesai: "", catatan: "" })
 
   useEffect(() => {
@@ -32,11 +30,6 @@ export default function RentalPage({ addToast }) {
     fetchItem(itemId)
       .then(async (data) => {
         setItem(data)
-        // load admin payment info using admin_id from item
-        if (data.admin_id) {
-          const info = await fetchAdminPaymentInfo(data.admin_id).catch(() => null)
-          setAdminPayment(info)
-        }
       })
       .catch(() => navigate("/catalog"))
       .finally(() => setLoading(false))
@@ -75,12 +68,6 @@ export default function RentalPage({ addToast }) {
     }
   }
 
-  const copyRekening = () => {
-    if (!adminPayment?.nomor_rekening) return
-    navigator.clipboard.writeText(adminPayment.nomor_rekening).then(() => {
-      setCopied(true); setTimeout(() => setCopied(false), 2000)
-    })
-  }
 
   if (loading) {
     return (
@@ -95,7 +82,6 @@ export default function RentalPage({ addToast }) {
   }
 
   const imgFallback = `https://ui-avatars.com/api/?name=${encodeURIComponent(item?.nama || "Item")}&background=1b7e6a&color=fff&size=400&bold=true`
-  const hasPaymentInfo = adminPayment?.nomor_rekening || adminPayment?.foto_qris
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
@@ -139,59 +125,6 @@ export default function RentalPage({ addToast }) {
             </div>
           </div>
 
-          {/* Payment info card */}
-          {hasPaymentInfo && (
-            <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-3xl p-5 text-white space-y-4">
-              <div className="flex items-center gap-2">
-                <CreditCard className="w-5 h-5 text-primary" />
-                <p className="font-bold text-sm">Info Pembayaran Penyedia</p>
-              </div>
-              <p className="text-xs text-slate-400">
-                Setelah pengajuan disetujui, transfer ke rekening berikut dan upload buktinya.
-              </p>
-
-              {adminPayment.nomor_rekening && (
-                <div className="bg-white/10 rounded-2xl p-3 space-y-1">
-                  <div className="flex items-center gap-1.5 text-xs text-slate-400">
-                    <Building2 className="w-3.5 h-3.5" /> Nomor Rekening / Bank
-                  </div>
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="font-bold text-white text-sm">{adminPayment.nomor_rekening}</p>
-                    <button
-                      onClick={copyRekening}
-                      className="flex items-center gap-1 text-xs text-primary bg-primary/20 px-2 py-1 rounded-lg hover:bg-primary/30 transition flex-shrink-0"
-                    >
-                      {copied
-                        ? <><CheckCircle className="w-3 h-3" /> Tersalin</>
-                        : <><Copy className="w-3 h-3" /> Salin</>
-                      }
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {adminPayment.foto_qris && (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-1.5 text-xs text-slate-400">
-                    <QrCode className="w-3.5 h-3.5" /> Scan QRIS
-                  </div>
-                  <div className="bg-white rounded-2xl p-3 flex justify-center">
-                    <img
-                      src={adminPayment.foto_qris}
-                      alt="QRIS"
-                      className="w-44 h-44 object-contain"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {adminPayment.nomor_telepon && (
-                <p className="text-xs text-slate-400">
-                  Konfirmasi: {adminPayment.nomor_telepon}
-                </p>
-              )}
-            </div>
-          )}
         </div>
 
         {/* Right col: form */}
