@@ -55,9 +55,7 @@ services:
   # ----------------------------------------------------------
   backend:
     container_name: sewain-backend
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    image: alif10231056/sewain-backend:v2
     restart: unless-stopped
     env_file:
       - ./backend/.env.docker
@@ -94,11 +92,7 @@ services:
   # ----------------------------------------------------------
   frontend:
     container_name: sewain-frontend
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      args:
-        VITE_API_URL: http://localhost:8000
+    image: alif10231056/sewain-frontend:v2
     restart: unless-stopped
     ports:
       - "3000:80"
