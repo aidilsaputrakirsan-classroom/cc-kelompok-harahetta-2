@@ -55,7 +55,7 @@ services:
   # ----------------------------------------------------------
   backend:
     container_name: sewain-backend
-    image: alif10231056/sewain-backend:v2
+    build: ./backend
     restart: unless-stopped
     env_file:
       - ./backend/.env.docker
