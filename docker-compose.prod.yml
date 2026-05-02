@@ -1,0 +1,34 @@
+# ============================================================
+# docker-compose.prod.yml — Production Overrides Sewain App
+#
+# File ini TIDAK bisa dijalankan sendiri. Digunakan sebagai
+# override di atas docker-compose.yml untuk environment production.
+#
+# Cara pakai:
+#   docker compose --profile prod \
+#     -f docker-compose.yml \
+#     -f docker-compose.prod.yml \
+#     up -d
+#
+# Perbedaan prod vs dev:
+#   - Backend: tanpa --reload, APP_ENV=production
+#   - Database: port TIDAK di-expose ke host (lebih aman)
+#   - Semua service: restart: always
+# ============================================================
+
+services:
+
+  backend:
+    environment:
+      APP_ENV: production
+      DEBUG: "false"
+    restart: always
+    command:
+      ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+  frontend:
+    restart: always
+
+  db:
+    restart: always
+    ports: !reset []
