@@ -1,0 +1,64 @@
+# ============================================================
+# Frontend Dependencies — Sewain Platform
+# Stack: React 19 + Vite 7 + Tailwind CSS 3
+# ============================================================
+# Install semua dependensi dengan perintah:
+#   npm install
+#
+# Jalankan development server:
+#   npm run dev
+#
+# Build untuk production:
+#   npm run build
+# ============================================================
+
+# ── Runtime Dependencies ─────────────────────────────────────
+
+# Core — React
+react@^19.2.0
+react-dom@^19.2.0
+react-router-dom@^7.14.0
+
+# UI — Radix UI primitives (headless components)
+@radix-ui/react-dialog@^1.1.15
+@radix-ui/react-scroll-area@^1.2.10
+@radix-ui/react-select@^2.2.6
+@radix-ui/react-separator@^1.1.8
+@radix-ui/react-slot@^1.2.4
+@radix-ui/react-tabs@^1.1.13
+@radix-ui/react-tooltip@^1.2.8
+
+# Animasi
+framer-motion@^12.38.0
+
+# Ikon
+lucide-react@^1.8.0
+
+# Notifikasi / Toast
+sonner@^2.0.7
+
+# Styling — Tailwind CSS & utilities
+tailwindcss@^3.4.19
+tailwindcss-animate@^1.0.7
+autoprefixer@^10.4.27
+postcss@^8.5.9
+class-variance-authority@^0.7.1
+clsx@^2.1.1
+tailwind-merge@^3.5.0
+
+# ── Dev Dependencies ─────────────────────────────────────────
+
+# Build tool
+vite@^7.3.1
+@vitejs/plugin-react@^5.1.1
+
+# Linting
+eslint@^9.39.1
+@eslint/js@^9.39.1
+eslint-plugin-react-hooks@^7.0.1
+eslint-plugin-react-refresh@^0.4.24
+globals@^16.5.0
+
+# TypeScript types (untuk type hints di editor)
+@types/react@^19.2.7
+@types/react-dom@^19.2.3
