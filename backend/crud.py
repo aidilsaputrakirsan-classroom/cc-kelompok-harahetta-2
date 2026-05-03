@@ -497,6 +497,8 @@ def get_items(
     """
     Ambil daftar barang sewa dengan pagination, search, dan filter.
     - search: cari di nama & deskripsi
+    - category_id: filter by ID kategori
+    - category: filter by nama kategori (contoh: 'electronics')
     - admin_id: filter by penyedia (untuk admin melihat barang miliknya)
     - status: filter by status (available, rented, unavailable)
     """
