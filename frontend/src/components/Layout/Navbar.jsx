@@ -9,6 +9,7 @@ import { useState } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { useAuth } from "../../context/AuthContext"
 import { Button } from "../ui/Button"
+import ThemeToggle from "../ui/ThemeToggle"
 import { AnimatePresence, motion } from "framer-motion"
 import {
   Menu, X, LayoutDashboard, LogOut, BookOpen, ChevronRight, Package,
@@ -107,8 +108,9 @@ export default function Navbar({ links = [], breadcrumb = null, className }) {
           )}
         </div>
 
-        {/* Right — auth */}
+        {/* Right — theme toggle + auth */}
         <div className="hidden md:flex items-center gap-3 flex-shrink-0">
+          <ThemeToggle />
           {isAuthenticated ? (
             <>
               <span className="text-sm text-muted-foreground hidden lg:block">
@@ -136,11 +138,13 @@ export default function Navbar({ links = [], breadcrumb = null, className }) {
           )}
         </div>
 
-        {/* Mobile hamburger */}
-        <button
-          className="md:hidden p-1.5 rounded-lg text-foreground hover:bg-muted/60 transition-colors"
-          onClick={() => setOpen(!open)}
-        >
+        {/* Mobile: theme toggle + hamburger */}
+        <div className="md:hidden flex items-center gap-1.5">
+          <ThemeToggle />
+          <button
+            className="p-1.5 rounded-lg text-foreground hover:bg-muted/60 transition-colors"
+            onClick={() => setOpen(!open)}
+          >
           <AnimatePresence mode="wait" initial={false}>
             <motion.span
               key={open ? "close" : "open"}
@@ -152,7 +156,8 @@ export default function Navbar({ links = [], breadcrumb = null, className }) {
               {open ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </motion.span>
           </AnimatePresence>
-        </button>
+          </button>
+        </div>
       </div>
 
       {/* Mobile menu */}

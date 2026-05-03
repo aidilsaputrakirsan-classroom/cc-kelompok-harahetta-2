@@ -3,9 +3,10 @@ import { Link, useLocation, useNavigate, Routes } from "react-router-dom"
 import { useAuth } from "../../context/AuthContext"
 import { cn } from "../../lib/utils"
 import { motion, AnimatePresence } from "framer-motion"
+import ThemeToggle from "../ui/ThemeToggle"
 import {
   Home, User, LogOut, Menu, X, ShoppingCart, BookOpen,
-  ChevronDown, Bell, Package,
+  ChevronDown, Package,
 } from "lucide-react"
 
 const NAV_LINKS = [
@@ -35,7 +36,7 @@ function UserNavbar() {
       initial={{ y: -64, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
       transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-      className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-xl border-b border-slate-200/80 shadow-sm"
+      className="fixed top-0 left-0 right-0 z-50 bg-card/95 backdrop-blur-xl border-b border-border shadow-sm"
     >
       {/* Thin accent bar at top */}
       <div className="h-0.5 bg-gradient-to-r from-primary via-primary/60 to-transparent" />
@@ -57,7 +58,7 @@ function UserNavbar() {
               }}
             />
           </motion.div>
-          <span className="font-bold text-lg text-slate-800 group-hover:text-primary transition-colors">Sewain</span>
+          <span className="font-bold text-lg text-foreground group-hover:text-primary transition-colors">Sewain</span>
         </Link>
 
         {/* Desktop nav links */}
@@ -71,8 +72,8 @@ function UserNavbar() {
                 className={cn(
                   "relative flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200",
                   active
-                    ? "text-primary bg-primary/8"
-                    : "text-slate-500 hover:text-slate-800 hover:bg-slate-100/80"
+                    ? "text-primary bg-primary/10"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
                 )}
               >
                 <Icon className="w-4 h-4" />
@@ -91,6 +92,7 @@ function UserNavbar() {
 
         {/* Desktop right */}
         <div className="hidden md:flex items-center gap-2 flex-shrink-0">
+          <ThemeToggle />
           {/* Sewa cepat */}
           <motion.button
             whileHover={{ scale: 1.03 }}
@@ -130,30 +132,30 @@ function UserNavbar() {
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.95, y: -4 }}
                   transition={{ duration: 0.15, ease: "easeOut" }}
-                  className="absolute right-0 mt-2 w-52 bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden"
+                  className="absolute right-0 mt-2 w-52 bg-card border border-border rounded-2xl shadow-xl overflow-hidden"
                 >
-                  <div className="px-4 py-3 border-b border-slate-100">
-                    <p className="text-sm font-semibold text-slate-800 truncate">{user?.nama}</p>
-                    <p className="text-xs text-slate-400 truncate">{user?.email}</p>
+                  <div className="px-4 py-3 border-b border-border">
+                    <p className="text-sm font-semibold text-foreground truncate">{user?.nama}</p>
+                    <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
                   </div>
                   <div className="p-1.5">
                     <Link
                       to="/profile"
                       onClick={() => setUserMenuOpen(false)}
-                      className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-800 transition-colors"
+                      className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
                     >
                       <User className="w-4 h-4" /> Profil Saya
                     </Link>
                     <Link
                       to="/rentals/my"
                       onClick={() => setUserMenuOpen(false)}
-                      className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-800 transition-colors"
+                      className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
                     >
                       <Package className="w-4 h-4" /> Riwayat Sewa
                     </Link>
                     <button
                       onClick={handleLogout}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm text-destructive hover:bg-red-50 transition-colors"
+                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm text-destructive hover:bg-destructive/10 transition-colors"
                     >
                       <LogOut className="w-4 h-4" /> Keluar
                     </button>
@@ -164,11 +166,13 @@ function UserNavbar() {
           </div>
         </div>
 
-        {/* Mobile hamburger */}
-        <button
-          className="md:hidden p-1.5 rounded-lg text-slate-600 hover:bg-slate-100 transition-colors"
-          onClick={() => setOpen(!open)}
-        >
+        {/* Mobile: theme toggle + hamburger */}
+        <div className="md:hidden flex items-center gap-1">
+          <ThemeToggle />
+          <button
+            className="p-1.5 rounded-lg text-foreground hover:bg-muted/60 transition-colors"
+            onClick={() => setOpen(!open)}
+          >
           <AnimatePresence mode="wait" initial={false}>
             <motion.span
               key={open ? "close" : "open"}
@@ -180,7 +184,8 @@ function UserNavbar() {
               {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </motion.span>
           </AnimatePresence>
-        </button>
+          </button>
+        </div>
       </div>
 
       {/* Mobile menu */}
@@ -191,17 +196,17 @@ function UserNavbar() {
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.28, ease: "easeInOut" }}
-            className="md:hidden overflow-hidden bg-white border-t border-slate-100"
+            className="md:hidden overflow-hidden bg-card border-t border-border"
           >
             <div className="px-4 py-3 space-y-1">
               {/* User info */}
-              <div className="flex items-center gap-3 px-3 py-3 mb-2 bg-slate-50 rounded-xl">
+              <div className="flex items-center gap-3 px-3 py-3 mb-2 bg-muted/50 rounded-xl">
                 <div className="w-9 h-9 rounded-xl bg-primary text-white font-bold flex items-center justify-center flex-shrink-0">
                   {initial}
                 </div>
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-slate-800 truncate">{user?.nama}</p>
-                  <p className="text-xs text-slate-400 truncate">{user?.email}</p>
+                  <p className="text-sm font-semibold text-foreground truncate">{user?.nama}</p>
+                  <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
                 </div>
               </div>
 
@@ -243,7 +248,7 @@ function UserNavbar() {
 
 export default function UserLayout({ children }) {
   return (
-    <div className="min-h-screen bg-[#f5f5f0]">
+    <div className="min-h-screen bg-page">
       <UserNavbar />
       <main className="pt-[60px] max-w-7xl mx-auto px-4 py-6 md:py-8">
         <motion.div

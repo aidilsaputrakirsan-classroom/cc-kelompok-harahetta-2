@@ -5,6 +5,7 @@
 @tailwind utilities;
 
 @layer base {
+  /* ── Light mode ─────────────────────────────────────────── */
   :root {
     --background: 150 10% 97%;
     --foreground: 200 25% 10%;
@@ -40,7 +41,53 @@
     --warning-foreground: 38 92% 15%;
     --info: 210 80% 55%;
     --info-foreground: 0 0% 100%;
+    /* custom section alt */
+    --section-alt: 155 30% 95%;
+    /* custom catalog/user bg */
+    --page-bg: 150 20% 97%;
+
     font-family: "Plus Jakarta Sans", sans-serif;
+  }
+
+  /* ── Dark mode ──────────────────────────────────────────── */
+  .dark {
+    --background: 200 22% 7%;
+    --foreground: 200 12% 92%;
+    --card: 200 20% 10%;
+    --card-foreground: 200 12% 92%;
+    --popover: 200 20% 10%;
+    --popover-foreground: 200 12% 92%;
+    --primary: 168 55% 48%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 168 20% 16%;
+    --secondary-foreground: 168 40% 78%;
+    --muted: 200 16% 15%;
+    --muted-foreground: 200 10% 55%;
+    --accent: 35 85% 55%;
+    --accent-foreground: 35 90% 12%;
+    --destructive: 0 62% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 200 16% 18%;
+    --input: 200 16% 18%;
+    --ring: 168 55% 48%;
+    --sidebar-background: 200 25% 6%;
+    --sidebar-foreground: 200 10% 75%;
+    --sidebar-primary: 168 55% 50%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 200 20% 12%;
+    --sidebar-accent-foreground: 200 10% 88%;
+    --sidebar-border: 200 20% 14%;
+    --sidebar-ring: 168 55% 50%;
+    --success: 142 60% 40%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 85% 50%;
+    --warning-foreground: 38 90% 10%;
+    --info: 210 70% 55%;
+    --info-foreground: 0 0% 100%;
+    /* custom section alt dark */
+    --section-alt: 200 22% 9%;
+    /* custom catalog/user bg dark */
+    --page-bg: 200 22% 8%;
   }
 
   * {
@@ -49,6 +96,11 @@
 
   body {
     @apply bg-background text-foreground antialiased;
+  }
+
+  /* Smooth theme transition */
+  *, *::before, *::after {
+    transition: background-color 0.2s ease, border-color 0.2s ease, color 0.1s ease;
   }
 }
 
@@ -66,7 +118,12 @@
       radial-gradient(ellipse 60% 40% at 80% 100%, hsl(35 90% 55% / 0.06), transparent);
   }
 
+  /* Ganti hardcoded hex dengan CSS variable agar dark mode aware */
   .bg-section-alt {
-    background-color: #f3f7f6;
+    background-color: hsl(var(--section-alt));
+  }
+
+  .bg-page {
+    background-color: hsl(var(--page-bg));
   }
 }

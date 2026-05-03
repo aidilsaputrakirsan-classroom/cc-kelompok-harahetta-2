@@ -41,7 +41,7 @@ function ItemCard({ item, onRent, index }) {
       whileHover={{ y: -6 }}
       layout
     >
-      <div className="group bg-white rounded-3xl overflow-hidden border border-slate-100 shadow-sm hover:shadow-xl transition-shadow duration-300 flex flex-col h-full">
+      <div className="group bg-card rounded-3xl overflow-hidden border border-border shadow-sm hover:shadow-xl transition-shadow duration-300 flex flex-col h-full">
         {/* Image */}
         <div
           className="relative aspect-[4/3] overflow-hidden bg-slate-50 cursor-pointer"
@@ -50,7 +50,7 @@ function ItemCard({ item, onRent, index }) {
           <motion.img
             src={item.foto_url || imgFallback}
             alt={item.nama}
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover bg-muted"
             whileHover={{ scale: 1.07 }}
             transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
             onError={(e) => { e.target.src = imgFallback }}
@@ -87,18 +87,18 @@ function ItemCard({ item, onRent, index }) {
         {/* Info */}
         <div className="p-4 flex flex-col flex-1">
           <h3
-            className="font-bold text-slate-800 line-clamp-1 text-base cursor-pointer hover:text-primary transition-colors"
+            className="font-bold text-foreground line-clamp-1 text-base cursor-pointer hover:text-primary transition-colors"
             onClick={() => navigate(`/items/${item.id}`)}
           >
             {item.nama}
           </h3>
           {item.deskripsi && (
-            <p className="text-xs text-slate-500 line-clamp-2 mt-1 flex-1 leading-relaxed">{item.deskripsi}</p>
+            <p className="text-xs text-muted-foreground line-clamp-2 mt-1 flex-1 leading-relaxed">{item.deskripsi}</p>
           )}
           <div className="flex items-end justify-between mt-4">
             <div>
               <div className="text-xl font-extrabold text-primary">{formatPrice(item.harga_per_hari)}</div>
-              <div className="text-xs text-slate-400">/ hari &middot; Stok {item.stok}</div>
+              <div className="text-xs text-muted-foreground">/ hari &middot; Stok {item.stok}</div>
             </div>
             <div className="flex gap-1.5">
               <button
@@ -134,7 +134,7 @@ function SkeletonCard({ index }) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ delay: index * 0.04 }}
-      className="bg-white rounded-3xl overflow-hidden border border-slate-100 shadow-sm"
+      className="bg-card rounded-3xl overflow-hidden border border-border shadow-sm"
     >
       <div className="aspect-[4/3] bg-slate-100 animate-pulse" />
       <div className="p-4 space-y-2">
@@ -232,7 +232,7 @@ export default function CatalogPage({ addToast }) {
   const hasFilter = search || categoryId || statusFilter
 
   return (
-    <div className="min-h-screen bg-[#f8f8f6]">
+    <div className="min-h-screen bg-page">
       <Navbar breadcrumb={catalogBreadcrumb} />
 
       {/* ── HERO SEARCH ─────────────────────────────────── */}
@@ -346,7 +346,7 @@ export default function CatalogPage({ addToast }) {
       </section>
 
       {/* ── FILTER BAR ──────────────────────────────────── */}
-      <div className="sticky top-16 z-30 bg-white/95 backdrop-blur border-b border-slate-200 shadow-sm">
+      <div className="sticky top-16 z-30 bg-card/95 backdrop-blur border-b border-border shadow-sm">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
           <div className="flex gap-2 flex-wrap">
             {[
@@ -481,7 +481,7 @@ export default function CatalogPage({ addToast }) {
 
       {/* ── FOOTER ──────────────────────────────────────── */}
       <motion.footer
-        className="border-t bg-white mt-8 py-7"
+        className="border-t bg-card mt-8 py-7"
         initial={{ opacity: 0 }}
         whileInView={{ opacity: 1 }}
         viewport={{ once: true }}
