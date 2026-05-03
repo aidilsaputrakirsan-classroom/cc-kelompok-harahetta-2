@@ -20,7 +20,7 @@ import {
 import {
   Users, Package, ClipboardList, FolderOpen, ShieldCheck, Crown,
   BarChart3, Plus, Trash2, UserCheck, UserX, CheckCircle, XCircle,
-  Calendar, DollarSign, Eye, ImageOff, RefreshCw,
+  Calendar, DollarSign, Eye, ImageOff, RefreshCw, Pencil,
 } from "lucide-react"
 
 function StatCard({ icon: Icon, label, value, description }) {
@@ -57,6 +57,10 @@ export default function SuperAdminPanel({ addToast }) {
   const [imgPreview, setImgPreview] = useState(null)
   const [verifLoading, setVerifLoading] = useState(false)
   const [verifLastUpdated, setVerifLastUpdated] = useState(null)
+  // Edit User Modal
+  const [editUser, setEditUser] = useState(null)  // user object yang sedang diedit
+  const [editForm, setEditForm] = useState({ nama: "", role: "user", is_active: true })
+  const [savingEdit, setSavingEdit] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -114,6 +118,31 @@ export default function SuperAdminPanel({ addToast }) {
     if (!confirm("Yakin hapus user ini?")) return
     try { await deleteUser(id); addToast?.("User dihapus", "success"); load() }
     catch (err) { addToast?.(err.message, "error") }
+  }
+
+  const openEditUser = (u) => {
+    setEditUser(u)
+    setEditForm({ nama: u.nama, role: u.role, is_active: u.is_active })
+  }
+
+  const handleSaveEditUser = async (e) => {
+    e.preventDefault()
+    // Validasi: hanya user terverifikasi yang bisa dijadikan admin
+    if (editForm.role === "admin" && !editUser.is_verified) {
+      addToast?.("User harus terverifikasi terlebih dahulu sebelum dijadikan Admin.", "error")
+      return
+    }
+    setSavingEdit(true)
+    try {
+      await updateUser(editUser.id, editForm)
+      addToast?.("User berhasil diupdate", "success")
+      setEditUser(null)
+      load()
+    } catch (err) {
+      addToast?.(err.message, "error")
+    } finally {
+      setSavingEdit(false)
+    }
   }
 
   const handleVerify = async (userId, status) => {
@@ -228,10 +257,13 @@ export default function SuperAdminPanel({ addToast }) {
                     <TableCell><StatusBadge status={u.is_verified ? "disetujui" : "menunggu"} label={u.is_verified ? "Verified" : "Unverified"} /></TableCell>
                     <TableCell>
                       <div className="flex gap-1.5">
-                        <Button size="sm" variant={u.is_active ? "destructive" : "success"} onClick={() => handleToggleActive(u)}>
+                        <Button size="sm" variant="outline" onClick={() => openEditUser(u)} title="Edit user">
+                          <Pencil className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button size="sm" variant={u.is_active ? "destructive" : "success"} onClick={() => handleToggleActive(u)} title={u.is_active ? "Nonaktifkan" : "Aktifkan"}>
                           {u.is_active ? <UserX className="w-3.5 h-3.5" /> : <UserCheck className="w-3.5 h-3.5" />}
                         </Button>
-                        <Button size="sm" variant="destructive" onClick={() => handleDeleteUser(u.id)}>
+                        <Button size="sm" variant="destructive" onClick={() => handleDeleteUser(u.id)} title="Hapus user">
                           <Trash2 className="w-3.5 h-3.5" />
                         </Button>
                       </div>
@@ -411,6 +443,60 @@ export default function SuperAdminPanel({ addToast }) {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Edit User Dialog */}
+      <Dialog open={!!editUser} onOpenChange={(open) => { if (!open) setEditUser(null) }}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Edit User — {editUser?.nama}</DialogTitle>
+            <DialogDescription>Ubah nama, role, atau status aktif user ini.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSaveEditUser} className="space-y-4">
+            <div className="space-y-2">
+              <Label>Nama</Label>
+              <Input
+                value={editForm.nama}
+                onChange={(e) => setEditForm(p => ({ ...p, nama: e.target.value }))}
+                required minLength={2}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Role</Label>
+              <select
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
+                value={editForm.role}
+                onChange={(e) => setEditForm(p => ({ ...p, role: e.target.value }))}
+              >
+                <option value="user">User (Penyewa)</option>
+                <option value="admin" disabled={!editUser?.is_verified}>
+                  Admin (Penyedia Barang){!editUser?.is_verified ? " — Butuh Verifikasi" : ""}
+                </option>
+              </select>
+              {!editUser?.is_verified && (
+                <p className="text-xs text-red-500">🔒 Role Admin hanya bisa diberikan ke user yang sudah <strong>Verified</strong>. Verifikasi user ini terlebih dahulu di tab Verifikasi.</p>
+              )}
+              {editForm.role === "admin" && editUser?.is_verified && (
+                <p className="text-xs text-amber-600">⚠️ Pastikan user ini sudah memiliki profil usaha setelah diubah menjadi Admin.</p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label>Status Akun</Label>
+              <select
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                value={String(editForm.is_active)}
+                onChange={(e) => setEditForm(p => ({ ...p, is_active: e.target.value === "true" }))}
+              >
+                <option value="true">Aktif</option>
+                <option value="false">Nonaktif</option>
+              </select>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setEditUser(null)}>Batal</Button>
+              <Button type="submit" loading={savingEdit}>Simpan Perubahan</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* Image Preview Dialog */}
       <Dialog open={!!imgPreview} onOpenChange={() => setImgPreview(null)}>

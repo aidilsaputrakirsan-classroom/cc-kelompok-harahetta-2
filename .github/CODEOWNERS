@@ -1,0 +1,22 @@
+# =============================================
+# CODEOWNERS — harahetta-2
+# =============================================
+# Setiap baris: pola file → username GitHub reviewer
+# Reviewer otomatis ditambahkan saat PR mengubah file terkait
+
+# Backend — Lead Backend
+/backend/                @ZannSamaa
+
+# Frontend — Lead Frontend
+/frontend/               @ZakiZaidan
+
+# Docker & Infrastructure — Lead DevOps
+docker-compose.yml       @shoryuwu
+/backend/Dockerfile      @shoryuwu
+/frontend/Dockerfile     @shoryuwu
+Makefile                 @shoryuwu
+
+# Documentation — Lead QA & Docs
+README.md                @riqqahkhalda
+/docs/                   @riqqahkhalda
+

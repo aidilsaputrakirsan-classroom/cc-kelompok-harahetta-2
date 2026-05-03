@@ -240,22 +240,22 @@ export default function PaymentPage({ addToast }) {
 
       {/* ── Admin payment info */}
       {hasPayInfo && (
-        <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-3xl p-5 space-y-4">
+        <div className="bg-white border border-slate-200 rounded-3xl p-5 space-y-4">
           <div>
-            <p className="text-white font-bold text-sm">Transfer ke</p>
-            <p className="text-slate-400 text-xs mt-0.5">{adminInfo.nama_usaha}</p>
+            <p className="text-slate-800 font-bold text-sm">Transfer ke</p>
+            <p className="text-slate-500 text-xs mt-0.5">{adminInfo.nama_usaha}</p>
           </div>
 
           {adminInfo.nomor_rekening && (
-            <div className="bg-white/10 rounded-2xl p-4">
+            <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4">
               <div className="flex items-center gap-1.5 text-xs text-slate-400 mb-2">
                 <Building2 className="w-3.5 h-3.5" /> Nomor Rekening / Bank
               </div>
               <div className="flex items-center gap-3">
-                <p className="font-black text-white text-base flex-1">{adminInfo.nomor_rekening}</p>
+                <p className="font-black text-slate-800 text-base flex-1">{adminInfo.nomor_rekening}</p>
                 <button
                   onClick={copyRek}
-                  className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl bg-primary/20 text-primary hover:bg-primary/30 transition flex-shrink-0"
+                  className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl bg-primary/10 text-primary hover:bg-primary/20 transition flex-shrink-0"
                 >
                   {copied
                     ? <><CheckCircle className="w-3.5 h-3.5" /> Tersalin!</>
@@ -271,7 +271,7 @@ export default function PaymentPage({ addToast }) {
               <div className="flex items-center gap-1.5 text-xs text-slate-400 mb-2">
                 <QrCode className="w-3.5 h-3.5" /> QRIS — Scan dengan app pembayaranmu
               </div>
-              <div className="bg-white rounded-2xl p-4 flex justify-center">
+              <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 flex justify-center">
                 <img
                   src={adminInfo.foto_qris}
                   alt="QRIS"
@@ -282,7 +282,7 @@ export default function PaymentPage({ addToast }) {
           )}
 
           {adminInfo.nomor_telepon && (
-            <p className="text-slate-400 text-xs">
+            <p className="text-slate-500 text-xs">
               Konfirmasi ke penyedia: {adminInfo.nomor_telepon}
             </p>
           )}
