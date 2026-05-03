@@ -644,6 +644,7 @@ def list_items(
     limit: int = Query(20, ge=1, le=100),
     search: str = Query(None, description="Cari nama atau deskripsi barang"),
     category_id: int = Query(None, description="Filter by ID kategori"),
+    category: str = Query(None, description="Filter by nama kategori, contoh: electronics"),
     item_status: str = Query(None, alias="status", description="Filter: available | rented | unavailable"),
     db: Session = Depends(get_db),
 ):
@@ -654,7 +655,8 @@ def list_items(
     
     **Filter tersedia:**
     - `search`: Cari nama atau deskripsi barang
-    - `category_id`: Filter berdasarkan kategori
+    - `category_id`: Filter berdasarkan ID kategori
+    - `category`: Filter berdasarkan nama kategori (contoh: `electronics`, `outdoor`)
     - `status`: Filter berdasarkan ketersediaan (available, rented, unavailable)
     - `skip` & `limit`: Pagination
     """
@@ -664,6 +666,7 @@ def list_items(
         limit=limit,
         search=search,
         category_id=category_id,
+        category=category,
         status=item_status,
     )
 
@@ -1285,90 +1288,6 @@ def platform_payment_stats(
             "cancelled": count_cancelled,
         },
         "completion_rate": f"{completion_rate:.2f}%",
-    }
-
-
-@app.get(
-    "/superadmin/users/search",
-    tags=["👑 Super Admin"],
-    summary="[Super Admin] Search & filter user dengan detail",
-)
-def search_users(
-    keyword: str = Query(None, description="Cari nama atau email user"),
-    role: str = Query(None, description="Filter: super_admin | admin | user"),
-    is_active: bool = Query(None, description="Filter: True = aktif, False = nonaktif"),
-    is_verified: bool = Query(None, description="Filter: True = terverifikasi, False = belum"),
-    skip: int = Query(0, ge=0),
-    limit: int = Query(20, ge=1, le=100),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_super_admin),
-):
-    """
-    Super Admin mencari dan memfilter user dengan berbagai kriteria.
-
-    **Filter tersedia:**
-    - `keyword`: Cari berdasarkan nama atau email
-    - `role`: Filter berdasarkan role (super_admin, admin, user)
-    - `is_active`: Filter user aktif / nonaktif
-    - `is_verified`: Filter user yang sudah / belum verifikasi identitas
-    - `skip` & `limit`: Pagination
-    """
-    from models import UserProfile
-
-    query = db.query(User)
-
-    # Filter keyword (nama atau email)
-    if keyword:
-        query = query.filter(
-            (User.nama.ilike(f"%{keyword}%")) |
-            (User.email.ilike(f"%{keyword}%"))
-        )
-
-    # Filter role
-    if role:
-        from models import UserRole
-        try:
-            role_enum = UserRole(role)
-            query = query.filter(User.role == role_enum)
-        except ValueError:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Role '{role}' tidak valid. Pilih: super_admin, admin, user"
-            )
-
-    # Filter is_active
-    if is_active is not None:
-        query = query.filter(User.is_active == is_active)
-
-    # Filter is_verified
-    if is_verified is not None:
-        query = query.filter(User.is_verified == is_verified)
-
-    total = query.count()
-    users = query.offset(skip).limit(limit).all()
-
-    return {
-        "total": total,
-        "skip": skip,
-        "limit": limit,
-        "filters": {
-            "keyword": keyword,
-            "role": role,
-            "is_active": is_active,
-            "is_verified": is_verified,
-        },
-        "users": [
-            {
-                "id": u.id,
-                "nama": u.nama,
-                "email": u.email,
-                "role": u.role,
-                "is_active": u.is_active,
-                "is_verified": u.is_verified,
-                "created_at": u.created_at,
-            }
-            for u in users
-        ],
     }
 
 #penambahan sesuatu yang baru yaitu fitur statistik pembayaran untuk super admin
