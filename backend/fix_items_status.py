@@ -68,3 +68,6 @@ def fix_all_items_status():
 
 if __name__ == "__main__":
     fix_all_items_status()
+
+# Penambahan fitur baru: Rental Status Transition
+# Fitur ini akan otomatis memperbarui status rental berdasarkan tanggal sewa dan pengembalian
