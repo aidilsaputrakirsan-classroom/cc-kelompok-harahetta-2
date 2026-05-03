@@ -21,6 +21,7 @@ import OnboardingPage from "./pages/OnboardingPage"
 import ItemDetailPage from "./pages/ItemDetailPage"
 import AdminOnboardingPage from "./pages/AdminOnboardingPage"
 import AdminPaymentsPage from "./pages/AdminPaymentsPage"
+import AboutPage from "./pages/AboutPage"
 
 function RedirectToStatic404() {
   if (typeof window !== "undefined") {
@@ -126,6 +127,7 @@ function AppContent() {
       <Routes>
         {/* Public pages */}
         <Route path="/" element={<LandingPage />} />
+        <Route path="/about" element={<AboutPage />} />
         <Route path="/catalog" element={<CatalogPage addToast={addToast} />} />
         <Route path="/items/:itemId" element={<ItemDetailPage addToast={addToast} />} />
         <Route path="/login" element={
