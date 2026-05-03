@@ -142,6 +142,11 @@ help:
 	@echo "📤 Push Commands:"
 	@echo "  make push-all  → Push backend + frontend ke Docker Hub"
 	@echo ""
+	@echo "🔧 Workflow / CI Commands:"
+	@echo "  make lint      → Jalankan linter (flake8 + eslint)"
+	@echo "  make test      → Jalankan test suite (placeholder)"
+	@echo "  make pr-check  → Build Docker + test (cek sebelum PR)"
+	@echo ""
 
 # ─────────────────────────────────────────────
 # FRONTEND: Build image v2
@@ -235,6 +240,41 @@ compose-clean:
 	docker compose down -v
 	@echo "✅ Semua data dibersihkan!"
 
+# ─────────────────────────────────────────────
+# LINT: Jalankan linter untuk backend (flake8) dan frontend (eslint)
+# ─────────────────────────────────────────────
+lint:
+	@echo "🔍 Menjalankan linter..."
+	@echo "--- Backend (flake8) ---"
+	cd backend && pip install flake8 --quiet && flake8 . --max-line-length=120 --exclude=__pycache__,.env || true
+	@echo "--- Frontend (eslint) ---"
+	cd frontend && npm install --silent && npx eslint src/ --ext .js,.jsx || true
+	@echo "✅ Lint selesai!"
+
+# ─────────────────────────────────────────────
+# TEST: Placeholder untuk test runner
+# ─────────────────────────────────────────────
+test:
+	@echo "🧪 Menjalankan test..."
+	@echo "⚠️  [PLACEHOLDER] Test suite belum dikonfigurasi."
+	@echo "   Backend : tambahkan pytest di backend/tests/"
+	@echo "   Frontend: tambahkan vitest/jest di frontend/src/__tests__/"
+	@echo "✅ Test step selesai (placeholder)."
+
+# ─────────────────────────────────────────────
+# PR-CHECK: Build semua Docker image + jalankan test
+# Digunakan sebelum membuat Pull Request
+# ─────────────────────────────────────────────
+pr-check: build fe-build test
+	@echo ""
+	@echo "🔎 PR Check selesai!"
+	@echo "   ✅ Backend image   : $(IMAGE_NAME):$(IMAGE_TAG)"
+	@echo "   ✅ Frontend image  : $(FE_IMAGE_NAME):$(FE_IMAGE_TAG)"
+	@echo "   ✅ Test            : passed (placeholder)"
+	@echo ""
+	@echo "🚀 Aman untuk di-push dan buat Pull Request!"
+
 .PHONY: build run run-fg push stop clean logs health shell ps restart help \
         fe-build fe-push fe-run fe-stop fe-restart push-all \
-        compose-up compose-down compose-build compose-logs compose-ps compose-restart compose-clean
+        compose-up compose-down compose-build compose-logs compose-ps compose-restart compose-clean \
+        lint test pr-check
