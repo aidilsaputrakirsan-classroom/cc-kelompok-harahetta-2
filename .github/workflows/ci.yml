@@ -78,10 +78,12 @@ jobs:
           node-version: "20"
 
       - name: 📥 Install dependencies
-        # Menggunakan npm install (bukan npm ci) karena package-lock.json di-generate
-        # di Windows sehingga tidak menyertakan optional binary Linux (@rollup/rollup-linux-x64-gnu).
-        # npm install akan resolve optional deps sesuai platform runner (linux-x64).
-        run: npm install
+        # Hapus package-lock.json terlebih dahulu karena di-generate di Windows
+        # sehingga tidak menyertakan optional binary Linux (@rollup/rollup-linux-x64-gnu).
+        # Dengan menghapusnya, npm akan generate lock file baru sesuai platform CI (linux-x64).
+        run: |
+          rm -f package-lock.json
+          npm install
 
       - name: 🧪 Run tests
         run: npm test
