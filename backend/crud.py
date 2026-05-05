@@ -490,13 +490,15 @@ def get_items(
     limit: int = 20,
     search: Optional[str] = None,
     category_id: Optional[int] = None,
+    category: Optional[str] = None,
     admin_id: Optional[int] = None,
     status: Optional[str] = None,
 ) -> dict:
     """
     Ambil daftar barang sewa dengan pagination, search, dan filter.
     - search: cari di nama & deskripsi
-    - category_id: filter by kategori
+    - category_id: filter by ID kategori
+    - category: filter by nama kategori (contoh: 'electronics')
     - admin_id: filter by penyedia (untuk admin melihat barang miliknya)
     - status: filter by status (available, rented, unavailable)
     """
@@ -510,6 +512,10 @@ def get_items(
 
     if category_id:
         query = query.filter(Item.category_id == category_id)
+
+    # Filter by nama kategori (case-insensitive, partial match)
+    if category:
+        query = query.join(Category).filter(Category.nama.ilike(f"%{category}%"))
 
     if admin_id:
         query = query.filter(Item.admin_id == admin_id)
