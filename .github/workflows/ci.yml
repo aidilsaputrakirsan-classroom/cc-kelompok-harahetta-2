@@ -75,11 +75,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: "npm"
-          cache-dependency-path: frontend/package-lock.json
 
       - name: 📥 Install dependencies
-        run: npm ci
+        # Menggunakan npm install (bukan npm ci) karena package-lock.json di-generate
+        # di Windows sehingga tidak menyertakan optional binary Linux (@rollup/rollup-linux-x64-gnu).
+        # npm install akan resolve optional deps sesuai platform runner (linux-x64).
+        run: npm install
 
       - name: 🧪 Run tests
         run: npm test
