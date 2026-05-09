@@ -4,11 +4,17 @@
 # Pipeline ini berjalan otomatis saat:
 # - Push ke branch main
 # - Pull Request ke branch main
-# 
+#
 # Jobs:
-# 1. test-backend: Install deps + run pytest
-# 2. test-frontend: Install deps + run vitest
-# 3. build-docker: Build Docker images (pastikan Dockerfile valid)
+# 1. test-backend  : Install deps + run pytest
+# 2. test-frontend : Install deps + run vitest
+# 3. build-docker  : Build Docker images (pastikan Dockerfile valid)
+# 4. notify-failure: Komentar di PR jika CI gagal
+#
+# Optimasi (feature/ci-optimization):
+# - timeout-minutes: 10 per job → otomatis cancel jika stuck
+# - concurrency group           → cancel run lama saat ada push baru
+# - notify-failure job          → komentar otomatis di PR jika CI gagal
 
 name: CI Pipeline
 
@@ -19,6 +25,15 @@ on:
     branches: [main]
   workflow_dispatch:   # ← Bisa dijalankan manual dari tab GitHub Actions
 
+# ==============================================
+# CONCURRENCY GROUP
+# Batalkan run lama di branch/PR yang sama saat
+# ada push baru, hemat menit runner secara efisien.
+# ==============================================
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   # ================================
   # JOB 1: Test Backend (Python/FastAPI)
@@ -26,6 +41,7 @@ jobs:
   test-backend:
     name: 🐍 Test Backend
     runs-on: ubuntu-latest
+    timeout-minutes: 10   # ← Otomatis gagal jika melebihi 10 menit
 
     defaults:
       run:
@@ -63,6 +79,7 @@ jobs:
   test-frontend:
     name: ⚛️ Test Frontend
     runs-on: ubuntu-latest
+    timeout-minutes: 10   # ← Otomatis gagal jika melebihi 10 menit
 
     defaults:
       run:
@@ -97,6 +114,7 @@ jobs:
   build-docker:
     name: 🐳 Build Docker
     runs-on: ubuntu-latest
+    timeout-minutes: 10   # ← Otomatis gagal jika melebihi 10 menit
     needs: [test-backend, test-frontend]    # Hanya jalan jika kedua test PASS
 
     steps:
@@ -113,3 +131,68 @@ jobs:
         run: |
           echo "✅ All Docker images built successfully!"
           docker images | grep cloudapp
+
+  # ================================
+  # JOB 4: Notifikasi PR Comment (CI Gagal)
+  # ================================
+  notify-failure:
+    name: 💬 Notify PR on Failure
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Jalankan HANYA jika salah satu job gagal DAN ini adalah event Pull Request
+    needs: [test-backend, test-frontend, build-docker]
+    if: >
+      failure() &&
+      github.event_name == 'pull_request'
+
+    permissions:
+      pull-requests: write   # Izin menulis komentar di PR
+
+    steps:
+      - name: 💬 Comment on PR about failure
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { owner, repo } = context.repo;
+            const prNumber = context.payload.pull_request.number;
+            const runUrl = `https://github.com/${owner}/${repo}/actions/runs/${{ github.run_id }}`;
+
+            const jobStatus = {
+              'test-backend':  '${{ needs.test-backend.result }}',
+              'test-frontend': '${{ needs.test-frontend.result }}',
+              'build-docker':  '${{ needs.build-docker.result }}',
+            };
+
+            const failedJobs = Object.entries(jobStatus)
+              .filter(([, status]) => status === 'failure')
+              .map(([name]) => `- ❌ \`${name}\``)
+              .join('\n');
+
+            const skippedJobs = Object.entries(jobStatus)
+              .filter(([, status]) => status === 'skipped')
+              .map(([name]) => `- ⏭️ \`${name}\` (skipped)`)
+              .join('\n');
+
+            const body = [
+              '## ❌ CI Pipeline Gagal',
+              '',
+              `**Workflow run:** [Lihat detail di sini](${runUrl})`,
+              `**Commit:** \`${{ github.sha }}\``,
+              `**Branch:** \`${{ github.head_ref }}\``,
+              '',
+              '### Jobs yang gagal:',
+              failedJobs || '_Tidak ada_',
+              '',
+              skippedJobs ? `### Jobs yang di-skip:\n${skippedJobs}` : '',
+              '',
+              '---',
+              '_Pesan ini dibuat otomatis oleh CI Pipeline. Harap periksa log di atas dan perbaiki error sebelum merge._',
+            ].filter(Boolean).join('\n');
+
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: prNumber,
+              body,
+            });
