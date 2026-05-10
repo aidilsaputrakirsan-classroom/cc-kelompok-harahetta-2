@@ -1,7 +1,8 @@
 # 🛵 SEWAIN — Platform Sewa Barang Online
 
-> Aplikasi web platform penyewaan barang berbasis multi-role, dibangun dengan FastAPI + React + PostgreSQL,
-> dan di-deploy menggunakan Docker.
+![CI Pipeline](https://github.com/harahetta2/sewain/actions/workflows/ci.yml/badge.svg)
+
+> Aplikasi web penyewaan barang multi-role berbasis FastAPI, React, dan PostgreSQL, dengan pengelolaan Docker serta pengujian melalui GitHub Actions, Pytest, dan Vitest untuk memastikan keandalan sistem.
 >
 > **Mata Kuliah:** Komputasi Awan — Sistem Informasi, Institut Teknologi Kalimantan (ITK)
 > **Tim:** Kelompok Harahetta-2
@@ -94,6 +95,11 @@ Bagian ini menjelaskan teknologi yang digunakan untuk membangun dan menjalankan 
 | Docker Compose | Mengelola beberapa container sekaligus |
 | Nginx | Web server untuk frontend |
 | Docker Hub | Penyimpanan image aplikasi |
+| Pytest | Framework pengujian otomatis untuk logika Backend |
+| Vitest | Test runner modern untuk pengujian komponen Frontend |
+| GitHub Actions | Platform CI/CD untuk otomatisasi build dan testing secara cloud |
+| Pytest-cov | Alat untuk mengukur persentase cakupan kode (test coverage) Backend |
+| Testing Library | Library untuk menguji interaksi user pada komponen React |
 
 ---
 
