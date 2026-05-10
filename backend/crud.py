@@ -527,6 +527,34 @@ def get_items(
     return {"total": total, "items": items}
 
 
+def get_items_stats(db: Session) -> dict:
+    """
+    Statistik katalog barang: total, available, rented, unavailable, dan jumlah kategori aktif.
+    Digunakan oleh endpoint GET /items/stats (publik).
+    """
+    total = db.query(func.count(Item.id)).scalar() or 0
+    available = db.query(func.count(Item.id)).filter(
+        Item.status == ItemStatus.available
+    ).scalar() or 0
+    rented = db.query(func.count(Item.id)).filter(
+        Item.status == ItemStatus.rented
+    ).scalar() or 0
+    unavailable = db.query(func.count(Item.id)).filter(
+        Item.status == ItemStatus.unavailable
+    ).scalar() or 0
+    total_categories = db.query(func.count(func.distinct(Item.category_id))).filter(
+        Item.category_id.isnot(None)
+    ).scalar() or 0
+
+    return {
+        "total": total,
+        "available": available,
+        "rented": rented,
+        "unavailable": unavailable,
+        "total_categories": total_categories,
+    }
+
+
 def get_item(db: Session, item_id: int) -> Item | None:
     """Ambil satu barang berdasarkan ID."""
     return (

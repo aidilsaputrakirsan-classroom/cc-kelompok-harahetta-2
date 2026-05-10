@@ -4,8 +4,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-# Load environment variables dari .env
-load_dotenv()
+# Load environment variables dari .env (tidak menimpa env vars yang sudah ada)
+load_dotenv(override=False)
 
 # Ambil DATABASE_URL dari environment
 DATABASE_URL = os.getenv("DATABASE_URL")

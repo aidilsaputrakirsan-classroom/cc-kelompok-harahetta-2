@@ -669,6 +669,27 @@ def list_items(
 
 
 @app.get(
+    "/items/stats",
+    tags=["📦 Items — Barang Sewa"],
+    summary="Statistik katalog barang (PUBLIK - tanpa login)",
+)
+def items_stats(db: Session = Depends(get_db)):
+    """
+    Statistik ringkasan katalog barang sewa.
+
+    **Akses:** Publik (tidak perlu login)
+
+    **Response:**
+    - `total`: jumlah total barang
+    - `available`: barang yang tersedia
+    - `rented`: barang yang sedang disewa
+    - `unavailable`: barang yang tidak tersedia
+    - `total_categories`: jumlah kategori yang aktif digunakan
+    """
+    return crud.get_items_stats(db=db)
+
+
+@app.get(
     "/items/{item_id}",
     response_model=ItemResponse,
     tags=["📦 Items — Barang Sewa"],
