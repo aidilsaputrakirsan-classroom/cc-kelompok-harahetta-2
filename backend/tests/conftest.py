@@ -3,6 +3,7 @@ conftest.py — Test Fixtures untuk Sewain Backend
 Menggunakan SQLite file sementara (test_sewain.db) sebagai database testing.
 
 Strategi:
+- sys.path diset ke backend/ agar import bare (database, main, auth, models) bisa resolved.
 - Set DATABASE_URL ke SQLite file sementara SEBELUM import apapun dari aplikasi.
 - load_dotenv(override=False) memastikan env var ini tidak ditimpa oleh .env.
 - Setiap test mendapat tabel bersih (create_all → test → drop_all).
@@ -10,7 +11,15 @@ Strategi:
 """
 
 import os
+import sys
+from pathlib import Path
 import pytest
+
+# ── Tambah backend/ ke sys.path agar `from database import ...` bisa resolved ──
+# Path absolut ke direktori backend/ (satu level di atas tests/)
+BACKEND_DIR = Path(__file__).resolve().parent.parent
+if str(BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(BACKEND_DIR))
 
 # ── WAJIB: set env vars SEBELUM import aplikasi ────────────────────────────────
 os.environ["DATABASE_URL"] = "sqlite:///./test_sewain.db"
@@ -18,10 +27,10 @@ os.environ["SECRET_KEY"] = "testsecretkey1234567890abcdef"
 os.environ["ALLOWED_ORIGINS"] = "http://localhost:3000"
 
 # Sekarang aman untuk import aplikasi
-from sqlalchemy.orm import sessionmaker          # noqa: E402
-from fastapi.testclient import TestClient        # noqa: E402
-from database import engine, get_db, Base       # noqa: E402
-from main import app                             # noqa: E402
+from sqlalchemy.orm import sessionmaker   # noqa: E402
+from fastapi.testclient import TestClient # noqa: E402
+from database import engine, get_db, Base  # noqa: E402
+from main import app                       # noqa: E402
 
 # Session factory yang menggunakan engine yang sama dengan aplikasi (test_sewain.db)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
