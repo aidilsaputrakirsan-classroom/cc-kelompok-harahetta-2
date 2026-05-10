@@ -1041,6 +1041,6 @@ def get_admin_payment_stats(db: Session, admin_id: int) -> dict:
         "total_received": round(float(total_received), 2),
         "total_pending": round(float(total_pending), 2),
     }
-
+# awkaokwoakwok
 
     #ada  penambahan fitur baru yaitu rental status transition
