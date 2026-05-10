@@ -1,10 +1,16 @@
-"""Test health check endpoint."""
+"""
+test_health.py — Health check endpoint tests (1 test)
+"""
+
+import pytest
 
 
 def test_health_check(client):
-    """Test health endpoint → 200 dan status healthy."""
-    response = client.get("/health")
-    assert response.status_code == 200
-    data = response.json()
+    """GET /health should return status healthy."""
+    resp = client.get("/health")
+    assert resp.status_code == 200
+    data = resp.json()
     assert data["status"] == "healthy"
     assert data["app"] == "Sewain"
+    assert "database" in data
+    assert "version" in data
