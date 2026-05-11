@@ -1,1 +1,1 @@
-# Tests package for Sewain backend
+# Backend tests package

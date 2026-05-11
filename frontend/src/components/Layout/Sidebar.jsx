@@ -18,15 +18,12 @@ const NAV_USER = [
 const NAV_ADMIN = [
   { path: "/dashboard", label: "Katalog", icon: LayoutDashboard },
   { path: "/admin/dashboard", label: "Admin Panel", icon: Store },
-  { path: "/rentals/my", label: "Sewa Saya", icon: ClipboardList },
   { path: "/profile", label: "Profil", icon: User },
 ]
 
 const NAV_SUPER = [
   { path: "/dashboard", label: "Katalog", icon: LayoutDashboard },
-  { path: "/admin/dashboard", label: "Admin Panel", icon: Store },
   { path: "/superadmin", label: "Super Admin", icon: Crown },
-  { path: "/rentals/my", label: "Sewa Saya", icon: ClipboardList },
   { path: "/profile", label: "Profil", icon: User },
 ]
 

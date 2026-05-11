@@ -644,6 +644,7 @@ def list_items(
     limit: int = Query(20, ge=1, le=100),
     search: str = Query(None, description="Cari nama atau deskripsi barang"),
     category_id: int = Query(None, description="Filter by ID kategori"),
+    category: str = Query(None, description="Filter by nama kategori, contoh: electronics"),
     item_status: str = Query(None, alias="status", description="Filter: available | rented | unavailable"),
     db: Session = Depends(get_db),
 ):
@@ -654,7 +655,8 @@ def list_items(
     
     **Filter tersedia:**
     - `search`: Cari nama atau deskripsi barang
-    - `category_id`: Filter berdasarkan kategori
+    - `category_id`: Filter berdasarkan ID kategori
+    - `category`: Filter berdasarkan nama kategori (contoh: `electronics`, `outdoor`)
     - `status`: Filter berdasarkan ketersediaan (available, rented, unavailable)
     - `skip` & `limit`: Pagination
     """
@@ -664,6 +666,7 @@ def list_items(
         limit=limit,
         search=search,
         category_id=category_id,
+        category=category,
         status=item_status,
     )
 
@@ -1307,5 +1310,5 @@ def platform_payment_stats(
         },
         "completion_rate": f"{completion_rate:.2f}%",
     }
-#aoawkwkow
+
 #penambahan sesuatu yang baru yaitu fitur statistik pembayaran untuk super admin

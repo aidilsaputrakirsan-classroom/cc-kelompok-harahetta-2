@@ -1,7 +1,8 @@
 # 🛵 SEWAIN — Platform Sewa Barang Online
 
-> Aplikasi web platform penyewaan barang berbasis multi-role, dibangun dengan FastAPI + React + PostgreSQL,
-> dan di-deploy menggunakan Docker.
+![CI Pipeline](https://github.com/harahetta2/sewain/actions/workflows/ci.yml/badge.svg)
+
+> Aplikasi web penyewaan barang multi-role berbasis FastAPI, React, dan PostgreSQL, dengan pengelolaan Docker serta pengujian melalui GitHub Actions, Pytest, dan Vitest untuk memastikan keandalan sistem.
 >
 > **Mata Kuliah:** Komputasi Awan — Sistem Informasi, Institut Teknologi Kalimantan (ITK)
 > **Tim:** Kelompok Harahetta-2
@@ -16,11 +17,12 @@
 4. [Tech Stack](#4-tech-stack)
 5. [Arsitektur Sistem](#5-arsitektur-sistem)
 6. [Getting Started](#6-getting-started)
-7. [Roadmap](#7-roadmap)
-8. [Project Structure](#8-project-structure)
-9. [API Documentation Testing](#9-api-documentation-testing)
-10. [UI and API Integration Testing](#10-ui-and-api-integration-testing)
-11. [Authentication and CRUD Testing](#11-authentication-and-crud-testing)
+7. [Makefile Workflow Commands](#7-makefile-workflow-commands)
+8. [Roadmap](#8-roadmap)
+9. [Project Structure](#9-project-structure)
+10. [API Documentation Testing](#10-api-documentation-testing)
+11. [UI and API Integration Testing](#11-ui-and-api-integration-testing)
+12. [Authentication and CRUD Testing](#12-authentication-and-crud-testing)
 
 ---
 
@@ -93,6 +95,11 @@ Bagian ini menjelaskan teknologi yang digunakan untuk membangun dan menjalankan 
 | Docker Compose | Mengelola beberapa container sekaligus |
 | Nginx | Web server untuk frontend |
 | Docker Hub | Penyimpanan image aplikasi |
+| Pytest | Framework pengujian otomatis untuk logika Backend |
+| Vitest | Test runner modern untuk pengujian komponen Frontend |
+| GitHub Actions | Platform CI/CD untuk otomatisasi build dan testing secara cloud |
+| Pytest-cov | Alat untuk mengukur persentase cakupan kode (test coverage) Backend |
+| Testing Library | Library untuk menguji interaksi user pada komponen React |
 
 ---
 
@@ -192,7 +199,70 @@ http://localhost:3000
 
 ---
 
-## 7. Roadmap
+## 7. Makefile Workflow Commands
+
+Berikut adalah daftar target `make` yang tersedia untuk mendukung workflow pengembangan dan CI/CD.
+Jalankan perintah ini dari **root direktori** proyek.
+
+### 🔧 CI/CD Targets (Baru)
+
+| Target | Perintah | Deskripsi |
+|--------|----------|-----------|
+| `lint` | `make lint` | Menjalankan linter pada seluruh codebase: **flake8** untuk backend Python dan **eslint** untuk frontend React. Berguna untuk menjaga konsistensi kode sebelum commit. |
+| `test` | `make test` | Placeholder untuk test runner. Saat ini hanya mencetak instruksi konfigurasi. Akan diisi dengan **pytest** (backend) dan **vitest/jest** (frontend) di sprint berikutnya. |
+| `pr-check` | `make pr-check` | Menjalankan full pre-PR check: build Docker image backend → build Docker image frontend → jalankan test. **Wajib dijalankan sebelum membuat Pull Request.** |
+
+### 📦 Cara Penggunaan
+
+```bash
+# Jalankan linter sebelum commit
+make lint
+
+# Jalankan test (placeholder)
+make test
+
+# Full check sebelum membuat PR (build Docker + test)
+make pr-check
+```
+
+> **Catatan DevOps:** Target `pr-check` adalah gatekeeper utama sebelum kode masuk ke branch `main`.
+> Pastikan semua langkah berhasil (exit 0) sebelum membuka Pull Request.
+
+### 🗂️ Semua Target Makefile
+
+| Kategori | Target | Deskripsi |
+|----------|--------|-----------|
+| Backend | `build` | Build Docker image backend |
+| Backend | `run` | Jalankan container backend |
+| Backend | `run-fg` | Jalankan container foreground (debug) |
+| Backend | `push` | Push image backend ke Docker Hub |
+| Backend | `stop` | Stop & hapus container backend |
+| Backend | `clean` | Stop container + hapus image lokal |
+| Backend | `logs` | Lihat log real-time |
+| Backend | `health` | Health check endpoint `/health` |
+| Backend | `shell` | Masuk ke shell container |
+| Backend | `ps` | Status container |
+| Backend | `restart` | Rebuild + rerun |
+| Frontend | `fe-build` | Build Docker image frontend |
+| Frontend | `fe-push` | Push image frontend ke Docker Hub |
+| Frontend | `fe-run` | Jalankan container frontend |
+| Frontend | `fe-stop` | Stop container frontend |
+| Frontend | `fe-restart` | Rebuild + rerun frontend |
+| Compose | `compose-up` | Jalankan semua services |
+| Compose | `compose-down` | Stop semua services |
+| Compose | `compose-build` | Rebuild + jalankan |
+| Compose | `compose-logs` | Log realtime semua services |
+| Compose | `compose-ps` | Status semua services |
+| Compose | `compose-restart` | Restart semua services |
+| Compose | `compose-clean` | Hapus containers, networks, volumes |
+| Push | `push-all` | Push backend + frontend |
+| **CI/CD** | **`lint`** | **Jalankan flake8 + eslint** |
+| **CI/CD** | **`test`** | **Jalankan test (placeholder)** |
+| **CI/CD** | **`pr-check`** | **Build Docker + test (pre-PR gate)** |
+
+---
+
+## 8. Roadmap
 
 | Minggu | Target | Status |
 |--------|--------|--------|

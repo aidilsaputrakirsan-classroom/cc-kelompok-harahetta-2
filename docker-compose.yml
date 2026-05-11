@@ -1,11 +1,21 @@
 # ============================================================
 # docker-compose.yml — Sewain App
 # Menjalankan 3 service: database (PostgreSQL), backend (FastAPI), frontend (React/Nginx)
-# Cara pakai:
-#   - Jalankan semua service : docker compose up -d
-#   - Stop semua service     : docker compose down
-#   - Rebuild + jalankan ulang: docker compose up -d --build
-#   - Lihat log realtime     : docker compose logs -f
+#
+# PROFILES:
+#   Gunakan --profile untuk memilih environment:
+#
+#   Development (hot-reload, port DB terbuka):
+#     docker compose --profile dev up -d --build
+#
+#   Production (no reload, port DB tertutup):
+#     docker compose --profile prod -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Perintah umum:
+#   - Stop semua service       : docker compose --profile dev down
+#   - Rebuild + jalankan ulang : docker compose --profile dev up -d --build
+#   - Lihat log realtime       : docker compose logs -f
+#   - Status services          : docker compose ps
 #
 # Network:
 #   - sewain-network: custom bridge network agar semua container
@@ -26,50 +36,51 @@ services:
   db:
     container_name: sewain-db
     image: postgres:16-alpine
-    restart: unless-stopped             # otomatis restart jika crash, kecuali di-stop manual
+    profiles: [dev, prod]
+    restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: setiawan
-      POSTGRES_DB: data_sewain        # nama database yang dibuat otomatis
+      POSTGRES_DB: data_sewain
     ports:
-      - "15432:5432"                  # akses dari host: localhost:15432
+      - "15432:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data  # persistensi data database
+      - pgdata:/var/lib/postgresql/data
     healthcheck:
-      # Memastikan database benar-benar siap menerima koneksi
-      # sebelum service lain (backend) dijalankan.
       test: ["CMD-SHELL", "pg_isready -U postgres -d data_sewain"]
-      interval: 5s      # cek setiap 5 detik
-      timeout: 5s       # batas waktu tiap pengecekan
-      retries: 10       # maksimal 10 kali percobaan
-      start_period: 10s # tunggu 10 detik sebelum mulai health check
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
     networks:
-      - sewain-network  # bergabung ke custom network
+      - sewain-network
 
   # ----------------------------------------------------------
   # SERVICE: backend
   # REST API berbasis FastAPI (Python), dijalankan dengan Uvicorn.
-  # Image di-pull dari Docker Hub: alif10231056/sewain-backend
+  # Di-build dari Dockerfile lokal di folder ./backend.
   # Membaca konfigurasi dari file .env.docker (API key, secret, dll).
   # Menunggu service `db` sehat (healthy) sebelum start.
   # Port host 8000 → container 8000.
   # ----------------------------------------------------------
   backend:
     container_name: sewain-backend
-    image: alif10231056/sewain-backend:v2  # pull dari Docker Hub
-    restart: unless-stopped                # otomatis restart jika crash, kecuali di-stop manual
+    build: ./backend
+    profiles: [dev, prod]
+    restart: unless-stopped
     env_file:
-      - ./backend/.env.docker              # variabel environment tambahan (API key, dll)
+      - ./backend/.env.docker
     environment:
-      DB_HOST: db                          # nama service db di jaringan internal Docker
+      DB_HOST: db
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: setiawan
       POSTGRES_DB: data_sewain
+      APP_ENV: development
     ports:
-      - "8000:8000"                        # akses API: http://localhost:8000
+      - "8000:8000"
     depends_on:
       db:
-        condition: service_healthy         # backend baru start setelah db siap
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 30s
@@ -77,29 +88,32 @@ services:
       retries: 3
       start_period: 15s
     networks:
-      - sewain-network  # bergabung ke custom network
+      - sewain-network
     command:
-      ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+      ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 
   # ----------------------------------------------------------
   # SERVICE: frontend
   # Aplikasi React yang sudah di-build dan di-serve oleh Nginx.
-  # Image di-pull dari Docker Hub: alif10231056/sewain-frontend
+  # Di-build dari Dockerfile lokal di folder ./frontend.
+  # VITE_API_URL di-inject saat build agar frontend tahu
+  # alamat backend yang benar.
   # Port host 3000 → container 80 (Nginx default port 80).
   # Menunggu backend start terlebih dahulu sebelum dijalankan.
   # Akses aplikasi: http://localhost:3000
   # ----------------------------------------------------------
   frontend:
     container_name: sewain-frontend
-    image: alif10231056/sewain-frontend:v2  # pull dari Docker Hub
-    restart: unless-stopped                 # otomatis restart jika crash, kecuali di-stop manual
+    image: alif10231056/sewain-frontend:v2
+    profiles: [dev, prod]
+    restart: unless-stopped
     ports:
-      - "3000:80"                           # akses frontend: http://localhost:3000
+      - "3000:80"
     depends_on:
       backend:
-        condition: service_healthy          # frontend start setelah backend benar-benar ready
+        condition: service_healthy
     networks:
-      - sewain-network  # bergabung ke custom network
+      - sewain-network
 
 # ============================================================
 # VOLUMES
