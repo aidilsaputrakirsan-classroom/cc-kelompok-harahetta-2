@@ -1,6 +1,6 @@
 # 🛵 SEWAIN — Platform Sewa Barang Online
 
-![CI Pipeline](https://github.com/harahetta2/sewain/actions/workflows/ci.yml/badge.svg)
+![CI Pipeline](https://github.com/harahetta2/cc-kelompok-harahetta-2/actions/workflows/ci.yml/badge.svg)
 
 > Aplikasi web penyewaan barang multi-role berbasis FastAPI, React, dan PostgreSQL, dengan pengelolaan Docker serta pengujian melalui GitHub Actions, Pytest, dan Vitest untuk memastikan keandalan sistem.
 >
@@ -45,7 +45,7 @@ SEWAIN ditujukan bagi pelaku usaha penyewaan khususnya UMKM, serta masyarakat ya
 
 ---
 
-## 3. Fitur Sistem
+## 3. Fitur Utama Sistem
 
 SEWAIN memiliki tiga peran utama dalam sistem:
 
@@ -103,7 +103,7 @@ Bagian ini menjelaskan teknologi yang digunakan untuk membangun dan menjalankan 
 
 ---
 
-## 5. Architecture
+## 5. Arsitektur Sistem
 
 Bagian ini menunjukkan hubungan antar komponen utama dalam aplikasi Sewain, mulai dari pengguna, frontend, backend, hingga database dalam menjalankan sistem.
 
@@ -278,7 +278,7 @@ make pr-check
 
 ---
 
-## 8. Project Structure
+## 9. Project Structure
 
 ```
 cc-kelompok-harahetta-2/
@@ -317,7 +317,7 @@ cc-kelompok-harahetta-2/
 ```
 ---
 
-## 9. API Documentation Testing
+## 10. API Documentation Testing
 
 Berikut adalah ringkasan hasil pengujian endpoint utama pada platform **SEWAIN** berdasarkan integrasi antara Frontend dan Backend. Untuk melihat hasil dan pembahasan lebih detail, silakan buka file berikut ini:
 [Hasil dan Pembahasan API Testing](./docs/testing/api-documentation.md/)
@@ -337,7 +337,7 @@ Berikut adalah ringkasan hasil pengujian endpoint utama pada platform **SEWAIN**
 
 ---
 
-## 10. UI & API Integration Testing
+## 11. UI & API Integration Testing
 
 Berdasarkan hasil pengujian yang telah dilakukan, seluruh fitur CRUD dan interaktivitas aplikasi berjalan dengan baik dan sesuai dengan yang diharapkan. Setiap aksi yang dilakukan pada antarmuka pengguna telah terhubung dengan backend dan database secara sinkron. Untuk melihat hasil dan pembahasan lebih detail, silakan buka file berikut ini:
 [Hasil dan Pembahasan UI Testing](./docs/testing/ui-test-result.md/)
@@ -358,7 +358,7 @@ Berikut adalah ringkasan hasil pengujian yang telah dilakukan:
 
 ---
 
-## 11. Authentication & CRUD Testing
+## 12. Authentication & CRUD Testing
 
 Pengujian sistem dilakukan untuk memastikan seluruh fitur aplikasi berjalan dengan baik sesuai dengan kebutuhan yang telah dirancang. Proses pengujian mencakup fitur autentikasi (authentication), pengelolaan data (CRUD), serta pengujian alur penggunaan secara menyeluruh (end-to-end). Untuk melihat hasil pengujian berupa screenshot, silakan buka folder berikut:
 [Hasil dan Pembahasan Auth Testing](./docs/testing/auth-test-result/)
