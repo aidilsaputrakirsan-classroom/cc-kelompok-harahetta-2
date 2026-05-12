@@ -23,10 +23,12 @@ WORKDIR /app
 # [2] Copy file daftar dependency terlebih dahulu.
 #     Trik ini mempercepat proses build ulang — jika kode
 #     berubah tapi package.json tidak, Docker skip install ulang.
-COPY package.json package-lock.json ./
+COPY package.json ./
 
-# [3] Install semua dependency secara bersih (cocok untuk production)
-RUN npm ci
+# [3] Install dependency — hapus package-lock.json dulu karena di-generate di Windows
+#     sehingga tidak menyertakan optional binary musl untuk Alpine Linux.
+#     npm install akan generate lock baru sesuai platform container (linux-musl).
+RUN npm install
 
 # [4] Setelah dependency siap, baru copy seluruh source code
 COPY . .
