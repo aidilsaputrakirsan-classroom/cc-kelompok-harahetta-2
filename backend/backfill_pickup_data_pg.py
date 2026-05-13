@@ -12,19 +12,16 @@ Requires: pip install psycopg2-binary
 import psycopg2
 import psycopg2.extras
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # ─── Konfigurasi koneksi ───────────────────────────────────────────────────
-DB_CONFIG = {
-    "host":     os.getenv("PG_HOST",   "localhost"),
-    "port":     int(os.getenv("PG_PORT",   "15432")),
-    "dbname":   os.getenv("PG_DBNAME", "data_sewain"),
-    "user":     os.getenv("PG_USER",   "postgres"),
-    "password": os.getenv("PG_PASS",   "setiawan"),
-}
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:setiawan@localhost:15432/data_sewain")
 # ──────────────────────────────────────────────────────────────────────────
 
 def run_backfill():
-    conn = psycopg2.connect(**DB_CONFIG)
+    conn = psycopg2.connect(DATABASE_URL)
     conn.autocommit = False
     cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
@@ -86,7 +83,7 @@ def run_backfill():
 
 # ─── Juga jalankan migration kolom baru jika belum ada ────────────────────
 def ensure_columns():
-    conn = psycopg2.connect(**DB_CONFIG)
+    conn = psycopg2.connect(DATABASE_URL)
     cursor = conn.cursor()
 
     migrations = [
@@ -120,6 +117,6 @@ def ensure_columns():
     print()
 
 if __name__ == "__main__":
-    print(f"[*] Koneksi ke PostgreSQL {DB_CONFIG['host']}:{DB_CONFIG['port']}/{DB_CONFIG['dbname']}\n")
+    print(f"[*] Koneksi ke PostgreSQL menggunakan DATABASE_URL dari .env\n")
     ensure_columns()
     run_backfill()
