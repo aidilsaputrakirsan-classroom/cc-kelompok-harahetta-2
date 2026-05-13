@@ -334,7 +334,10 @@ def update_admin_profile(db: Session, user_id: int, data: AdminProfileUpdate) ->
     if not profile:
         return None
 
+    # Ambil semua field yang dikirim (termasuk yang None agar bisa di-clear)
+    # Khusus latitude/longitude: update jika dikirim eksplisit (bukan unset)
     update_fields = data.model_dump(exclude_unset=True)
+    print(f"[DEBUG] update_fields dari frontend: {update_fields}")
     for field, value in update_fields.items():
         setattr(profile, field, value)
 

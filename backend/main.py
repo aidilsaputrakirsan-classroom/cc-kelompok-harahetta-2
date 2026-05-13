@@ -8,10 +8,12 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, Depends, HTTPException, Query, status
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
 from database import engine, get_db
+import chatbot
 from models import Base, User, AdminProfile
 from schemas import (
     # Auth
@@ -38,7 +40,7 @@ import crud
 
 # ==================== INIT ====================
 
-load_dotenv()
+load_dotenv(override=True)  # override=True agar .env selalu menimpa shell env vars
 
 # Buat semua tabel di database
 Base.metadata.create_all(bind=engine)
@@ -74,6 +76,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# Daftarkan Router Chatbot
+app.include_router(chatbot.router)
+
+
 
 
 # ============================================================
@@ -445,9 +453,11 @@ def update_my_admin_profile(
     current_user: User = Depends(require_admin),
 ):
     """Admin mengupdate profil usahanya."""
+    print(f"[DEBUG] PUT /admin/profile — lat={data.latitude}, lng={data.longitude}, alamat={data.alamat_usaha}")
     updated = crud.update_admin_profile(db=db, user_id=current_user.id, data=data)
     if not updated:
         raise HTTPException(status_code=404, detail="Profil usaha belum dibuat")
+    print(f"[DEBUG] DB setelah update — lat={updated.latitude}, lng={updated.longitude}")
     return updated
 
 

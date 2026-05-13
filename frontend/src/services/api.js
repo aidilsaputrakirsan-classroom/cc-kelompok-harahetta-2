@@ -343,3 +343,13 @@ export async function fetchAllRentals(params = {}) {
   const res = await fetch(`${API_URL}/superadmin/rentals?${q}`, { headers: authOnlyHeaders() })
   return handleResponse(res)
 }
+
+// ==================== CHATBOT AI ====================
+export async function sendChatMessage(message, history = []) {
+  const res = await fetch(`${API_URL}/chatbot`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message, history }),
+  })
+  return handleResponse(res)
+}
