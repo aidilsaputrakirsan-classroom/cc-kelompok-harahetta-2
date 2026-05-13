@@ -104,6 +104,8 @@ class AdminProfile(Base):
     nomor_telepon = Column(String(20), nullable=True)
     nomor_rekening = Column(String(100), nullable=True)   # No. rek / nama bank
     foto_qris = Column(Text, nullable=True)               # base64 gambar QRIS
+    latitude = Column(Float, nullable=True)               # Koordinat lokasi usaha
+    longitude = Column(Float, nullable=True)              # Koordinat lokasi usaha
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships
@@ -222,6 +224,13 @@ class Rental(Base):
     total_harga = Column(Float, nullable=False)  # Kalkulasi otomatis: harga_per_hari × durasi
     status = Column(SAEnum(RentalStatus), nullable=False, default=RentalStatus.pending)
     catatan = Column(Text, nullable=True)        # Catatan dari user atau admin
+    # ── Snapshot alamat pickup (diambil saat rental disetujui)
+    pickup_alamat = Column(Text, nullable=True)
+    pickup_latitude = Column(Float, nullable=True)
+    pickup_longitude = Column(Float, nullable=True)
+    pickup_nama_usaha = Column(String(100), nullable=True)
+    pickup_telepon = Column(String(20), nullable=True)
+    diambil_at = Column(DateTime(timezone=True), nullable=True)  # Timestamp konfirmasi pengambilan
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
 

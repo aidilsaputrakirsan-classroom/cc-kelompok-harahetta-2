@@ -2,14 +2,15 @@ import { useState, useEffect, useRef } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import {
   fetchMyRentals, fetchMyPayments, createPaymentForRental,
-  uploadPaymentProof, fetchAdminPaymentInfo,
+  uploadPaymentProof, fetchAdminPaymentInfo, fetchRentalPickupInfo,
 } from "../services/api"
 import { formatPrice } from "../lib/utils"
 import { Skeleton } from "../components/ui/skeleton"
+import PickupMap from "../components/PickupMap"
 import {
   ArrowLeft, Upload, CreditCard, Building2, QrCode, Copy,
   CheckCircle, Loader2, ImageIcon, X, Calendar, Package,
-  Clock, AlertTriangle, BadgeCheck,
+  Clock, AlertTriangle, BadgeCheck, MapPin, Navigation,
 } from "lucide-react"
 
 // ── Compress image helper
@@ -52,6 +53,7 @@ export default function PaymentPage({ addToast }) {
   const [rental, setRental]         = useState(null)
   const [payment, setPayment]       = useState(null)
   const [adminInfo, setAdminInfo]   = useState(null)
+  const [pickupInfo, setPickupInfo] = useState(null)  // info pickup dari API
   const [loading, setLoading]       = useState(true)
 
   const [buktiPreview, setBuktiPreview] = useState(null) // new file preview
@@ -83,7 +85,14 @@ export default function PaymentPage({ addToast }) {
           const pays = Array.isArray(paymentsData) ? paymentsData : (paymentsData?.payments || [])
           const pay = pays.find(x => x.rental_id === id) || null
           setPayment(pay)
-        }).catch(() => {/* endpoint belum ada di backend v2, abaikan */})
+
+          // ── Jika sudah lunas, coba fetch pickup info dari API (ada fallback ke profil admin)
+          if (pay?.status === "completed" || ["sedang_disewa", "selesai"].includes(r.status)) {
+            fetchRentalPickupInfo(id)
+              .then(info => setPickupInfo(info))
+              .catch(() => {/* koordinat tidak tersedia */})
+          }
+        }).catch(() => {})
 
         // ── admin payment info
         if (r.item?.admin_id) {
@@ -234,6 +243,66 @@ export default function PaymentPage({ addToast }) {
           <div>
             <p className="font-bold text-green-700">Pembayaran Terkonfirmasi</p>
             <p className="text-sm text-green-600 mt-0.5">Admin telah mengkonfirmasi bukti transfermu. Silakan ambil barang sesuai jadwal.</p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Pickup location (tampil setelah bayar, pakai pickupInfo dari API) */}
+      {isPaid && pickupInfo && (
+        <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-5 space-y-4">
+          <div>
+            <p className="font-black text-slate-800 flex items-center gap-2">
+              <MapPin className="w-4 h-4 text-blue-600" />
+              Lokasi Pengambilan Barang
+            </p>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Ambil barang di lokasi berikut sesuai jadwal sewa
+            </p>
+          </div>
+
+          <div className="bg-slate-50 rounded-2xl p-4 space-y-1.5">
+            {pickupInfo.pickup_nama_usaha && (
+              <p className="font-bold text-slate-700">{pickupInfo.pickup_nama_usaha}</p>
+            )}
+            {pickupInfo.pickup_alamat && (
+              <p className="text-sm text-slate-600">{pickupInfo.pickup_alamat}</p>
+            )}
+            {pickupInfo.pickup_telepon && (
+              <p className="text-sm text-slate-500">📞 {pickupInfo.pickup_telepon}</p>
+            )}
+          </div>
+
+          <PickupMap
+            lat={pickupInfo.pickup_latitude}
+            lng={pickupInfo.pickup_longitude}
+            label={pickupInfo.pickup_nama_usaha || "Lokasi Pickup"}
+          />
+
+          <a
+            href={`https://www.google.com/maps?q=${pickupInfo.pickup_latitude},${pickupInfo.pickup_longitude}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full py-3 rounded-2xl bg-blue-600 text-white font-bold text-sm
+                       flex items-center justify-center gap-2 hover:bg-blue-700 transition"
+          >
+            <Navigation className="w-4 h-4" />
+            Buka di Google Maps
+          </a>
+        </div>
+      )}
+
+      {/* Banner jika sudah bayar tapi pickup info tidak tersedia (admin belum isi koordinat) */}
+      {isPaid && !pickupInfo && (
+        <div className="bg-amber-50 border border-amber-200 rounded-3xl p-4 flex items-start gap-3">
+          <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-semibold text-amber-700">Koordinat Lokasi Belum Tersedia</p>
+            <p className="text-xs text-amber-600 mt-0.5">
+              Admin belum mengisi koordinat lokasi usaha. Hubungi penyedia langsung untuk konfirmasi lokasi pengambilan.
+            </p>
+            {adminInfo?.nomor_telepon && (
+              <p className="text-xs font-semibold text-amber-700 mt-1">📞 {adminInfo.nomor_telepon}</p>
+            )}
           </div>
         </div>
       )}

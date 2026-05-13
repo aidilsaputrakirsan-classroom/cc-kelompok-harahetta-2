@@ -20,8 +20,9 @@ import {
 } from "../components/ui/dialog"
 import {
   Package, ClipboardList, Store, Plus, Pencil, Trash2,
-  Calendar, CheckCircle, XCircle, Save, AlertTriangle, ImageIcon, X, Eye, CreditCard,
+  Calendar, CheckCircle, XCircle, Save, AlertTriangle, ImageIcon, X, Eye, CreditCard, MapPin,
 } from "lucide-react"
+import MapPicker from "../components/MapPicker"
 
 const defaultItem = { nama: "", deskripsi: "", harga_per_hari: "", stok: 1, foto_url: "", category_id: "" }
 
@@ -130,7 +131,11 @@ export default function AdminDashboard({ addToast }) {
   const [form, setForm] = useState(defaultItem)
   const [saving, setSaving] = useState(false)
   const [fotoUploading, setFotoUploading] = useState(false)
-  const [profileForm, setProfileForm] = useState({ nama_usaha: "", alamat_usaha: "", nomor_telepon: "", nomor_rekening: "", foto_qris: "" })
+  const [profileForm, setProfileForm] = useState({
+    nama_usaha: "", alamat_usaha: "", nomor_telepon: "",
+    nomor_rekening: "", foto_qris: "",
+    latitude: null, longitude: null,
+  })
   const [qrisUploading, setQrisUploading] = useState(false)
   const [savingProfile, setSavingProfile] = useState(false)
   const [previewBukti, setPreviewBukti] = useState(null)   // payment object
@@ -174,6 +179,8 @@ export default function AdminDashboard({ addToast }) {
           nomor_telepon: p.nomor_telepon || "",
           nomor_rekening: p.nomor_rekening || "",
           foto_qris: p.foto_qris || "",
+          latitude: p.latitude || null,
+          longitude: p.longitude || null,
         })
       }).catch(() => {}),
       fetchCategories().then(setCategories).catch(() => {}),
@@ -268,13 +275,31 @@ export default function AdminDashboard({ addToast }) {
 
   const handleSaveProfile = async (e) => {
     e.preventDefault()
+    // Validasi field wajib
+    if (!profileForm.nama_usaha?.trim()) {
+      addToast?.("Nama usaha wajib diisi", "error"); return
+    }
+    if (!profileForm.alamat_usaha?.trim()) {
+      addToast?.("Alamat usaha wajib diisi", "error"); return
+    }
+    if (!profileForm.nomor_telepon?.trim()) {
+      addToast?.("Nomor telepon wajib diisi", "error"); return
+    }
     setSavingProfile(true)
     try {
       if (profile) await updateAdminProfile(profileForm)
       else await createAdminProfile(profileForm)
       const updated = await fetchAdminProfile()
       setProfile(updated)
-      setProfileForm({ nama_usaha: updated.nama_usaha || "", alamat_usaha: updated.alamat_usaha || "", nomor_telepon: updated.nomor_telepon || "" })
+      setProfileForm({
+        nama_usaha: updated.nama_usaha || "",
+        alamat_usaha: updated.alamat_usaha || "",
+        nomor_telepon: updated.nomor_telepon || "",
+        nomor_rekening: updated.nomor_rekening || "",
+        foto_qris: updated.foto_qris || "",
+        latitude: updated.latitude || null,
+        longitude: updated.longitude || null,
+      })
       addToast?.("Profil usaha disimpan", "success")
     } catch (err) { addToast?.(err.message, "error") }
     finally { setSavingProfile(false) }
@@ -481,19 +506,50 @@ export default function AdminDashboard({ addToast }) {
               <form onSubmit={handleSaveProfile} className="space-y-4">
                 {/* ── Info Dasar */}
                 <div className="space-y-2">
-                  <Label>Nama Usaha *</Label>
+                  <Label>Nama Usaha <span className="text-destructive">*</span></Label>
                   <Input placeholder="Sewa Jaya" value={profileForm.nama_usaha}
                     onChange={(e) => setProfileForm(p => ({ ...p, nama_usaha: e.target.value }))} required />
                 </div>
                 <div className="space-y-2">
-                  <Label>Alamat Usaha</Label>
+                  <Label>Alamat Usaha <span className="text-destructive">*</span></Label>
                   <Input placeholder="Jl. Soekarno-Hatta No.1" value={profileForm.alamat_usaha}
-                    onChange={(e) => setProfileForm(p => ({ ...p, alamat_usaha: e.target.value }))} />
+                    onChange={(e) => setProfileForm(p => ({ ...p, alamat_usaha: e.target.value }))} required />
                 </div>
                 <div className="space-y-2">
-                  <Label>Nomor Telepon</Label>
+                  <Label>Nomor Telepon <span className="text-destructive">*</span></Label>
                   <Input placeholder="08123456789" value={profileForm.nomor_telepon}
-                    onChange={(e) => setProfileForm(p => ({ ...p, nomor_telepon: e.target.value }))} />
+                    onChange={(e) => setProfileForm(p => ({ ...p, nomor_telepon: e.target.value }))} required />
+                </div>
+
+                <Separator />
+
+                {/* ── Titik Lokasi di Peta */}
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-1.5">
+                    <MapPin className="w-4 h-4 text-blue-500" />
+                    Titik Lokasi Usaha di Peta <span className="text-destructive">*</span>
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Klik atau geser pin di peta. Nama jalan &amp; alamat akan terisi otomatis.
+                  </p>
+                  <MapPicker
+                    latitude={profileForm.latitude}
+                    longitude={profileForm.longitude}
+                    onChange={({ latitude, longitude, alamat }) => {
+                      setProfileForm(p => ({
+                        ...p,
+                        latitude,
+                        longitude,
+                        // Selalu update alamat dari reverse geocoding saat pin digeser
+                        ...(alamat ? { alamat_usaha: alamat } : {}),
+                      }))
+                    }}
+                  />
+                  {profileForm.latitude && profileForm.longitude && (
+                    <p className="text-xs text-muted-foreground">
+                      Koordinat: {profileForm.latitude.toFixed(6)}, {profileForm.longitude.toFixed(6)}
+                    </p>
+                  )}
                 </div>
 
                 <Separator />

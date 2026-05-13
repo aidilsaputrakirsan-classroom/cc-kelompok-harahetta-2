@@ -218,6 +218,8 @@ def create_admin_profile(db: Session, user_id: int, data: AdminProfileCreate) ->
         nomor_telepon=data.nomor_telepon,
         nomor_rekening=data.nomor_rekening,
         foto_qris=data.foto_qris,
+        latitude=getattr(data, 'latitude', None),
+        longitude=getattr(data, 'longitude', None),
     )
     db.add(profile)
     db.commit()
@@ -759,6 +761,17 @@ def update_rental_status(
             
             # Auto-create payment saat rental disetujui
             create_payment_auto(db=db, rental_id=rental_id)
+            
+            # ── Snapshot alamat pickup dari profil admin
+            admin_profile = db.query(AdminProfile).filter(
+                AdminProfile.id == item.admin_id
+            ).first()
+            if admin_profile:
+                rental.pickup_alamat = admin_profile.alamat_usaha
+                rental.pickup_latitude = admin_profile.latitude
+                rental.pickup_longitude = admin_profile.longitude
+                rental.pickup_nama_usaha = admin_profile.nama_usaha
+                rental.pickup_telepon = admin_profile.nomor_telepon
             
         elif data.status in [RentalStatus.selesai, RentalStatus.ditolak]:
             # Selesai atau ditolak: kembalikan stok

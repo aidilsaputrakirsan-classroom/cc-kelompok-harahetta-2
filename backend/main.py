@@ -25,7 +25,7 @@ from schemas import (
     # Item
     ItemCreate, ItemUpdate, ItemResponse, ItemListResponse,
     # Rental
-    RentalCreate, RentalStatusUpdate, RentalResponse, RentalListResponse,
+    RentalCreate, RentalStatusUpdate, RentalResponse, RentalListResponse, PickupInfoResponse,
     # Payment
     PaymentCreate, PaymentUpdate, PaymentResponse, PaymentListResponse,
 )
@@ -711,6 +711,7 @@ def create_item(
     Admin menambah barang baru yang akan disewakan.
 
     > ⚠️ Admin harus sudah memiliki profil usaha (`POST /admin/profile`) sebelum bisa menambah barang.
+    > ⚠️ Admin harus sudah mengisi **alamat usaha dan koordinat** (latitude/longitude) di profil.
     """
     # Dapatkan admin_profile dari user yang login
     admin_profile = crud.get_admin_profile(db=db, user_id=current_user.id)
@@ -718,6 +719,12 @@ def create_item(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Buat profil usaha terlebih dahulu di POST /admin/profile",
+        )
+    # Guard: validasi alamat + koordinat wajib sebelum bisa posting barang
+    if not admin_profile.alamat_usaha or not admin_profile.latitude or not admin_profile.longitude:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Lengkapi alamat usaha dan titik koordinat di profil terlebih dahulu sebelum menambah barang.",
         )
     return crud.create_item(db=db, admin_id=admin_profile.id, data=data)
 
@@ -1006,6 +1013,153 @@ def update_rental_status(
         )
     
     return updated
+
+
+# ──────────────────────────────────────────────────────────────
+# PICKUP INFO & KONFIRMASI PENGAMBILAN
+# ──────────────────────────────────────────────────────────────
+
+@app.get(
+    "/rentals/{rental_id}/pickup",
+    response_model=PickupInfoResponse,
+    tags=["📋 Rentals — Penyewaan"],
+    summary="[User] Info lokasi pengambilan barang",
+)
+def get_rental_pickup_info(
+    rental_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """
+    User melihat info lokasi pickup setelah pembayaran dikonfirmasi.
+
+    Menampilkan:
+    - Alamat teks usaha admin (snapshot saat rental disetujui, atau profil admin saat ini sebagai fallback)
+    - Koordinat latitude/longitude untuk tampil di peta
+    - Nama usaha + nomor telepon admin
+    - Tanggal mulai & selesai sewa
+
+    **Catatan:** Endpoint ini hanya tersedia setelah status rental `sedang_disewa`.
+    """
+    from models import UserRole as UR, RentalStatus as RS
+    rental = crud.get_rental(db=db, rental_id=rental_id)
+    if not rental:
+        raise HTTPException(status_code=404, detail=f"Rental ID {rental_id} tidak ditemukan")
+
+    # User hanya bisa lihat rental miliknya
+    if current_user.role == UR.user and rental.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Anda tidak punya akses ke transaksi ini")
+
+    # Pickup info hanya tersedia saat sedang_disewa, selesai,
+    # atau disetujui dengan payment sudah completed
+    from models import Payment as PaymentModel
+    allowed = rental.status in [RS.sedang_disewa, RS.selesai]
+    if not allowed and rental.status == RS.disetujui:
+        # Cek apakah payment sudah completed
+        pay = db.query(PaymentModel).filter(
+            PaymentModel.rental_id == rental_id,
+            PaymentModel.status == "completed",
+        ).first()
+        allowed = pay is not None
+
+    if not allowed:
+        raise HTTPException(
+            status_code=400,
+            detail="Info pickup hanya tersedia setelah pembayaran dikonfirmasi (status: sedang_disewa)",
+        )
+
+    # ── Strategi sumber data:
+    # - disetujui / sedang_disewa → SELALU pakai profil admin terkini (bisa berubah)
+    # - selesai → pakai snapshot (histori, tidak boleh berubah)
+    from models import RentalStatus as RS2
+
+    admin_profile = None
+    if rental.item and rental.item.admin_id:
+        admin_profile = crud.get_admin_profile_by_id(db=db, admin_id=rental.item.admin_id)
+
+    if rental.status in [RS.disetujui, RS.sedang_disewa] and admin_profile:
+        # Rental belum selesai: PAKAI profil admin terkini
+        pickup_lat = admin_profile.latitude
+        pickup_lng = admin_profile.longitude
+        pickup_alamat = admin_profile.alamat_usaha
+        pickup_nama_usaha = admin_profile.nama_usaha
+        pickup_telepon = admin_profile.nomor_telepon
+    else:
+        # Rental selesai: pakai snapshot (data histori saat transaksi)
+        pickup_lat = rental.pickup_latitude
+        pickup_lng = rental.pickup_longitude
+        pickup_alamat = rental.pickup_alamat
+        pickup_nama_usaha = rental.pickup_nama_usaha
+        pickup_telepon = rental.pickup_telepon
+
+        # Fallback ke profil admin jika snapshot kosong
+        if (not pickup_lat or not pickup_lng) and admin_profile:
+            pickup_lat = admin_profile.latitude
+            pickup_lng = admin_profile.longitude
+            pickup_alamat = pickup_alamat or admin_profile.alamat_usaha
+            pickup_nama_usaha = pickup_nama_usaha or admin_profile.nama_usaha
+            pickup_telepon = pickup_telepon or admin_profile.nomor_telepon
+
+    if not pickup_lat or not pickup_lng:
+        raise HTTPException(
+            status_code=404,
+            detail="Koordinat pickup tidak ditemukan. Admin belum mengisi koordinat lokasi usaha.",
+        )
+
+    return {
+        "rental_id": rental.id,
+        "pickup_alamat": pickup_alamat or "",
+        "pickup_latitude": pickup_lat,
+        "pickup_longitude": pickup_lng,
+        "pickup_nama_usaha": pickup_nama_usaha or "",
+        "pickup_telepon": pickup_telepon,
+        "tanggal_mulai": rental.tanggal_mulai,
+        "tanggal_selesai": rental.tanggal_selesai,
+        "item_nama": rental.item.nama if rental.item else "Unknown",
+    }
+
+
+@app.put(
+    "/rentals/{rental_id}/confirm-pickup",
+    tags=["📋 Rentals — Penyewaan"],
+    summary="[Admin] Konfirmasi barang sudah diambil penyewa",
+)
+def confirm_pickup(
+    rental_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    """
+    Admin mengonfirmasi bahwa barang sudah diambil oleh penyewa.
+
+    Menyimpan timestamp `diambil_at` sebagai bukti serah terima digital.
+    Status rental harus `sedang_disewa` sebelum bisa konfirmasi.
+    """
+    from models import RentalStatus as RS
+    from datetime import datetime as dt
+
+    rental = crud.get_rental(db=db, rental_id=rental_id)
+    if not rental:
+        raise HTTPException(status_code=404, detail=f"Rental ID {rental_id} tidak ditemukan")
+
+    if rental.status != RS.sedang_disewa:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Status rental harus 'sedang_disewa', saat ini: '{rental.status.value}'",
+        )
+
+    # Ambil rental langsung dari DB untuk update
+    from models import Rental as RentalModel
+    db_rental = db.query(RentalModel).filter(RentalModel.id == rental_id).first()
+    db_rental.diambil_at = dt.now()
+    db.commit()
+    db.refresh(db_rental)
+
+    return {
+        "message": "Pengambilan barang berhasil dikonfirmasi",
+        "rental_id": rental_id,
+        "diambil_at": db_rental.diambil_at,
+    }
 
 
 # ============================================================
