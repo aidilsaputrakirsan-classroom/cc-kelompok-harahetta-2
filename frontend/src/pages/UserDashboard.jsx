@@ -10,7 +10,7 @@ import {
   Package, CheckCircle, Clock, TrendingUp,
   Calendar, ChevronRight, Sparkles, BadgeCheck, XCircle,
   Upload, ImageIcon, X, CreditCard, Loader2, Building2, QrCode, Copy, AlertTriangle,
-  MapPin, Navigation,
+  MapPin, Navigation, RefreshCw,
 } from "lucide-react"
 import PickupMap from "../components/PickupMap"
 
@@ -511,7 +511,6 @@ export default function UserDashboard({ addToast }) {
                 const needsPayment = r.status === "disetujui" && payment
                 const hasBukti = !!payment?.bukti_pembayaran
                 const isPaid = payment?.status === "completed"
-                const canSeePickup = isPaid && ["disetujui", "sedang_disewa", "selesai"].includes(r.status)
                 return (
                   <div key={r.id} className="p-3 rounded-2xl border border-slate-100 hover:border-slate-200 transition-colors">
                     <div className="flex items-center gap-3">
@@ -549,12 +548,16 @@ export default function UserDashboard({ addToast }) {
                               <CheckCircle className="w-3.5 h-3.5" /> Pembayaran Terkonfirmasi
                             </span>
                           ) : hasBukti ? (
-                            <span className="text-xs text-amber-600 font-medium">Bukti dikirim · menunggu konfirmasi</span>
+                            <span className="text-xs text-amber-600 font-medium">
+                              Menunggu verifikasi pembayaran (Midtrans)
+                            </span>
                           ) : (
-                            <span className="text-xs text-primary font-semibold">Upload bukti transfer</span>
+                            <span className="text-xs text-primary font-semibold">
+                              Siap dibayar · pilih metode di Midtrans
+                            </span>
                           )}
                         </div>
-                        {!hasBukti && !isPaid && (
+                        {!isPaid && (
                           <button
                             onClick={() => navigate(`/payment/${r.id}`)}
                             className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold transition flex-shrink-0 bg-primary text-white hover:bg-primary/90"
@@ -566,15 +569,15 @@ export default function UserDashboard({ addToast }) {
                       </div>
                     )}
 
-                    {/* Tombol Lihat Lokasi Pickup — muncul jika sudah bayar */}
-                    {canSeePickup && (
+                    {/* Aksi setelah bayar: tergantung status rental */}
+                    {isPaid && r.status === "disetujui" && (
                       <div className="mt-2 pt-2 border-t border-slate-100">
                         <button
                           onClick={async () => {
                             setPickupLoading(true)
                             try {
                               const info = await fetchRentalPickupInfo(r.id)
-                              setPickupModal({ ...info, isReturn: r.status === "sedang_disewa" })
+                              setPickupModal({ ...info, isReturn: false })
                             } catch {
                               alert("Koordinat lokasi belum tersedia. Hubungi admin.")
                             } finally {
@@ -584,16 +587,48 @@ export default function UserDashboard({ addToast }) {
                           className="w-full flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 transition border border-blue-200"
                         >
                           <MapPin className="w-3.5 h-3.5" />
-                          {r.status === "sedang_disewa" ? "Alamat Pengembalian Barang" : "Lihat Lokasi Pengambilan"}
+                          Lihat Lokasi Pengambilan
                         </button>
-                        {r.status === "sedang_disewa" && (
-                          <MiniCountdownItem
-                            endDate={r.tanggal_selesai}
-                            onReturnClick={() => {
-                              addToast?.("Notifikasi pengembalian barang berhasil dikirim ke admin!", "success")
-                            }}
-                          />
-                        )}
+                      </div>
+                    )}
+
+                    {r.status === "sedang_disewa" && (
+                      <div className="mt-2 pt-2 border-t border-slate-100">
+                        <button
+                          onClick={async () => {
+                            setPickupLoading(true)
+                            try {
+                              const info = await fetchRentalPickupInfo(r.id)
+                              setPickupModal({ ...info, isReturn: true })
+                            } catch {
+                              alert("Koordinat lokasi belum tersedia. Hubungi admin.")
+                            } finally {
+                              setPickupLoading(false)
+                            }
+                          }}
+                          className="w-full flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 transition border border-blue-200"
+                        >
+                          <MapPin className="w-3.5 h-3.5" />
+                          Alamat Pengembalian Barang
+                        </button>
+                        <MiniCountdownItem
+                          endDate={r.tanggal_selesai}
+                          onReturnClick={() => {
+                            addToast?.("Notifikasi pengembalian barang berhasil dikirim ke admin!", "success")
+                          }}
+                        />
+                      </div>
+                    )}
+
+                    {r.status === "selesai" && (
+                      <div className="mt-2 pt-2 border-t border-slate-100">
+                        <button
+                          onClick={() => navigate(`/items/${r.item_id}`)}
+                          className="w-full flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-semibold bg-primary/10 text-primary hover:bg-primary/20 transition border border-primary/20"
+                        >
+                          <RefreshCw className="w-3.5 h-3.5" />
+                          Sewa Lagi
+                        </button>
                       </div>
                     )}
                   </div>

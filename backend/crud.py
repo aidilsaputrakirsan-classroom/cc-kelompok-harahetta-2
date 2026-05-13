@@ -850,7 +850,7 @@ def create_payment_auto(
         user_id=rental.user_id,
         admin_id=item.admin_id,
         jumlah=rental.total_harga,
-        metode_pembayaran=PaymentMethod.transfer,
+        metode_pembayaran=PaymentMethod.midtrans,
         status=PaymentStatus.pending,
     )
     db.add(payment)
@@ -989,10 +989,9 @@ def update_payment_status(
     if data.status == PaymentStatus.completed:
         payment.tanggal_pembayaran = datetime.now()
 
-        # Auto-update rental status ke 'sedang_disewa' jika belum
-        rental = db.query(Rental).filter(Rental.id == payment.rental_id).first()
-        if rental and rental.status == RentalStatus.disetujui:
-            rental.status = RentalStatus.sedang_disewa
+        # Rental TIDAK otomatis pindah ke sedang_disewa.
+        # Admin tetap harus klik "Proses Sewa" di dashboard setelah
+        # barang benar-benar diambil user.
 
     db.commit()
     db.refresh(payment)
@@ -1038,3 +1037,213 @@ def get_admin_payment_stats(db: Session, admin_id: int) -> dict:
 
 
     #ada  penambahan fitur baru yaitu rental status transition
+
+
+# ============================================================
+# MIDTRANS PAYMENT GATEWAY
+# ============================================================
+
+def _is_snap_token_still_valid(payment: Payment) -> bool:
+    """
+    Heuristik: Snap token Midtrans default expired 24 jam setelah dibuat.
+    Kita anggap masih valid kalau payment.updated_at < 20 jam yang lalu
+    (buffer 4 jam biar tidak mepet).
+    """
+    if not payment.snap_token or not payment.updated_at:
+        return False
+    from datetime import timezone
+    now = datetime.now(tz=timezone.utc)
+    updated = payment.updated_at
+    if updated.tzinfo is None:
+        updated = updated.replace(tzinfo=timezone.utc)
+    age = (now - updated).total_seconds()
+    return age < (20 * 3600)
+
+
+def create_or_get_snap_charge(
+    db: Session,
+    *,
+    rental_id: int,
+    user_id: int,
+) -> dict | None:
+    """
+    Pastikan ada Payment row untuk rental ini, lalu generate/reuse Snap token.
+
+    Preconditions:
+      - Rental milik user_id
+      - Rental.status = disetujui
+      - Payment.status BUKAN completed (idempoten: kalau sudah lunas, return None)
+
+    Return dict:
+      {
+        "payment": Payment,
+        "order_id": str,
+        "snap_token": str,
+        "redirect_url": str,
+      }
+    atau dict {"error": "...", "code": int} kalau gagal.
+    """
+    import midtrans_service
+
+    rental = db.query(Rental).filter(Rental.id == rental_id).first()
+    if not rental:
+        return {"error": "Rental tidak ditemukan", "code": 404}
+    if rental.user_id != user_id:
+        return {"error": "Rental ini bukan milik Anda", "code": 403}
+    if rental.status != RentalStatus.disetujui:
+        return {
+            "error": (
+                "Rental belum disetujui admin. "
+                "Anda hanya bisa membayar setelah admin menyetujui permintaan sewa."
+            ),
+            "code": 400,
+        }
+
+    # Ambil/buat payment
+    payment = db.query(Payment).filter(Payment.rental_id == rental_id).first()
+    if not payment:
+        # Safety net: harusnya sudah di-create saat rental disetujui, tapi
+        # data lama / edge case bisa bikin row payment belum ada.
+        item_for_admin = db.query(Item).filter(Item.id == rental.item_id).first()
+        if not item_for_admin:
+            return {"error": "Item terkait rental tidak ditemukan", "code": 404}
+        payment = Payment(
+            rental_id=rental_id,
+            user_id=rental.user_id,
+            admin_id=item_for_admin.admin_id,
+            jumlah=rental.total_harga,
+            metode_pembayaran=PaymentMethod.midtrans,
+            status=PaymentStatus.pending,
+        )
+        db.add(payment)
+        db.commit()
+        db.refresh(payment)
+
+    if payment.status == PaymentStatus.completed:
+        return {"error": "Pembayaran sudah lunas", "code": 400}
+
+    # Idempotensi: reuse token kalau masih fresh
+    if payment.snap_token and _is_snap_token_still_valid(payment):
+        return {
+            "payment": payment,
+            "order_id": payment.midtrans_order_id,
+            "snap_token": payment.snap_token,
+            "redirect_url": payment.snap_redirect_url or "",
+        }
+
+    # Generate order_id baru + panggil Midtrans
+    order_id = midtrans_service.build_order_id(rental_id)
+
+    # Ambil data item & user untuk payload Midtrans
+    item = db.query(Item).filter(Item.id == rental.item_id).first()
+    user = db.query(User).filter(User.id == rental.user_id).first()
+    user_profile = db.query(UserProfile).filter(UserProfile.user_id == rental.user_id).first()
+    phone = user_profile.nomor_telepon if user_profile else None
+
+    days = max(1, (rental.tanggal_selesai - rental.tanggal_mulai).days)
+    try:
+        snap_resp = midtrans_service.create_snap_transaction(
+            order_id=order_id,
+            gross_amount=int(round(rental.total_harga)),
+            item_name=(item.nama if item else f"Sewa #{rental_id}"),
+            item_qty_days=days,
+            price_per_day=int(round(item.harga_per_hari)) if item else int(round(rental.total_harga)),
+            customer_name=user.nama if user else "Customer",
+            customer_email=user.email if user else "noemail@sewain.local",
+            customer_phone=phone,
+        )
+    except Exception as e:  # noqa: BLE001
+        return {"error": f"Gagal membuat transaksi Midtrans: {e}", "code": 502}
+
+    # Simpan ke payment
+    payment.midtrans_order_id = order_id
+    payment.snap_token = snap_resp["token"]
+    payment.snap_redirect_url = snap_resp["redirect_url"]
+    payment.metode_pembayaran = PaymentMethod.midtrans
+    payment.status = PaymentStatus.pending  # reset ke pending kalau sebelumnya failed/cancelled
+    db.commit()
+    db.refresh(payment)
+
+    return {
+        "payment": payment,
+        "order_id": order_id,
+        "snap_token": snap_resp["token"],
+        "redirect_url": snap_resp["redirect_url"],
+    }
+
+
+def apply_midtrans_notification(db: Session, notification: dict) -> dict:
+    """
+    Handler webhook Midtrans — dipanggil dari endpoint HTTP.
+    Wajib verifikasi signature SEBELUM memanggil fungsi ini.
+
+    Return dict ringkas untuk logging:
+      { "ok": bool, "payment_id": int|None, "new_status": str|None, "reason": str|None }
+    """
+    import json as _json
+    import midtrans_service
+
+    order_id = notification.get("order_id")
+    if not order_id:
+        return {"ok": False, "reason": "order_id kosong"}
+
+    payment = db.query(Payment).filter(Payment.midtrans_order_id == order_id).first()
+    if not payment:
+        return {"ok": False, "reason": f"Payment dengan order_id {order_id} tidak ditemukan"}
+
+    # Map status
+    new_status = midtrans_service.map_midtrans_status(
+        notification.get("transaction_status"),
+        notification.get("fraud_status"),
+    )
+
+    # Update fields
+    payment.status = new_status
+    payment.midtrans_transaction_id = notification.get("transaction_id") or payment.midtrans_transaction_id
+    payment.payment_channel = notification.get("payment_type") or payment.payment_channel
+    payment.fraud_status = notification.get("fraud_status") or payment.fraud_status
+    try:
+        payment.raw_notification = _json.dumps(notification, ensure_ascii=False)[:4000]
+    except (TypeError, ValueError):
+        payment.raw_notification = str(notification)[:4000]
+
+    # Kalau sukses: set tanggal bayar (rental TIDAK otomatis pindah ke
+    # sedang_disewa — admin tetap harus klik "Proses Sewa" setelah barang
+    # benar-benar diambil oleh user)
+    if new_status == PaymentStatus.completed:
+        if payment.tanggal_pembayaran is None:
+            payment.tanggal_pembayaran = datetime.now()
+
+    db.commit()
+    db.refresh(payment)
+
+    return {
+        "ok": True,
+        "payment_id": payment.id,
+        "new_status": new_status.value,
+        "reason": None,
+    }
+
+
+def sync_payment_from_midtrans(db: Session, payment_id: int) -> Payment | None | dict:
+    """
+    Fallback kalau webhook tidak sampai: tarik status dari Midtrans lalu
+    reuse logic apply_midtrans_notification.
+    """
+    import midtrans_service
+
+    payment = db.query(Payment).filter(Payment.id == payment_id).first()
+    if not payment:
+        return None
+    if not payment.midtrans_order_id:
+        return {"error": "Payment ini belum punya order_id Midtrans", "code": 400}
+
+    try:
+        status_resp = midtrans_service.fetch_transaction_status(payment.midtrans_order_id)
+    except Exception as e:  # noqa: BLE001
+        return {"error": f"Gagal query status ke Midtrans: {e}", "code": 502}
+
+    # status_resp sudah berbentuk dict yang sama dgn webhook payload
+    apply_midtrans_notification(db, status_resp)
+    db.refresh(payment)
+    return payment

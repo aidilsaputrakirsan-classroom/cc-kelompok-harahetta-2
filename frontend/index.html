@@ -7,6 +7,18 @@
     <title>Sewain - Platform Sewa Barang</title>
     <!-- Leaflet CSS untuk komponen peta interaktif -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!--
+      Midtrans Snap.js — diload dengan client key sandbox.
+      Saat production, ganti ke https://app.midtrans.com/snap/snap.js
+      dan set data-client-key ke PRODUCTION client key.
+      Client key aman untuk dipublish (public key, bukan server key).
+    -->
+    <script
+      type="text/javascript"
+      src="https://app.sandbox.midtrans.com/snap/snap.js"
+      data-client-key=""
+      id="midtrans-snap-script"
+    ></script>
   </head>
   <body>
     <div id="root"></div>

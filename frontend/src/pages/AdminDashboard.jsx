@@ -67,7 +67,13 @@ function AdminRentalCard({ rental, payment, onUpdateStatus, onViewBukti, onConfi
             {/* Info bukti pembayaran */}
             {payment && (
               <div className="mt-2 flex flex-wrap items-center gap-2">
-                {payment.bukti_pembayaran ? (
+                {payment.metode_pembayaran === "midtrans" ? (
+                  <span className="text-xs text-slate-500 italic">
+                    {payment.status === "completed"
+                      ? `Dibayar otomatis via Midtrans${payment.payment_channel ? ` (${payment.payment_channel.replace(/_/g, " ")})` : ""}`
+                      : "Menunggu pembayaran user via Midtrans"}
+                  </span>
+                ) : payment.bukti_pembayaran ? (
                   <button
                     onClick={() => onViewBukti(payment)}
                     className="inline-flex items-center gap-1 text-xs text-primary underline underline-offset-2 hover:opacity-80"
@@ -93,7 +99,7 @@ function AdminRentalCard({ rental, payment, onUpdateStatus, onViewBukti, onConfi
             )}
             {rental.status === "disetujui" && (
               <>
-                {payment?.status === "pending" && payment?.bukti_pembayaran && (
+                {payment?.status === "pending" && payment?.bukti_pembayaran && payment?.metode_pembayaran !== "midtrans" && (
                   <>
                     <Button size="sm" variant="success" onClick={() => onConfirmPayment(payment.id)}>
                       <CheckCircle className="w-3.5 h-3.5 mr-1" /> Konfirmasi Bayar

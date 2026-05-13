@@ -55,6 +55,7 @@ class PaymentMethod(str, enum.Enum):
     cash = "cash"
     e_wallet = "e_wallet"
     credit_card = "credit_card"
+    midtrans = "midtrans"
 
 
 # ============================================================
@@ -264,6 +265,16 @@ class Payment(Base):
     bukti_pembayaran = Column(Text, nullable=True)  # URL/path bukti transfer
     catatan = Column(Text, nullable=True)           # Catatan dari user atau admin
     tanggal_pembayaran = Column(DateTime(timezone=True), nullable=True)  # Kapan pembayaran dilakukan
+
+    # ── Midtrans integration fields
+    midtrans_order_id = Column(String(100), unique=True, nullable=True, index=True)
+    midtrans_transaction_id = Column(String(100), nullable=True)
+    snap_token = Column(String(255), nullable=True)
+    snap_redirect_url = Column(Text, nullable=True)
+    payment_channel = Column(String(50), nullable=True)   # e.g. gopay, bca_va, qris
+    fraud_status = Column(String(20), nullable=True)
+    raw_notification = Column(Text, nullable=True)        # payload webhook terakhir (audit)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
 

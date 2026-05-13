@@ -52,6 +52,7 @@ class PaymentMethodEnum(str, enum.Enum):
     cash = "cash"
     e_wallet = "e_wallet"
     credit_card = "credit_card"
+    midtrans = "midtrans"
 
 
 # ============================================================
@@ -428,8 +429,28 @@ class PaymentResponse(BaseModel):
     bukti_pembayaran: Optional[str]
     catatan: Optional[str]
     tanggal_pembayaran: Optional[datetime]
+    # ── Midtrans fields
+    midtrans_order_id: Optional[str] = None
+    snap_token: Optional[str] = None
+    snap_redirect_url: Optional[str] = None
+    payment_channel: Optional[str] = None
     created_at: datetime
     updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class MidtransChargeResponse(BaseModel):
+    """Response saat generate Snap token."""
+    payment_id: int
+    rental_id: int
+    order_id: str
+    snap_token: str
+    snap_redirect_url: str
+    client_key: str
+    jumlah: float
+    status: PaymentStatusEnum
 
     class Config:
         from_attributes = True
