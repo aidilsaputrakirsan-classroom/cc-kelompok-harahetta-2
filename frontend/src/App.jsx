@@ -6,6 +6,7 @@ import { Toaster, toast } from "sonner"
 import Sidebar from "./components/Layout/Sidebar"
 import UserLayout from "./components/Layout/UserLayout"
 import { Loader2 } from "lucide-react"
+import ChatbotWidget from "./components/ChatbotWidget"
 
 import LandingPage from "./pages/LandingPage"
 import LoginPage from "./pages/LoginPage"
@@ -145,6 +146,9 @@ function AppContent() {
               : <UserAppLayout addToast={addToast} />
         } />
       </Routes>
+
+      {/* Floating Chatbot Widget — tampil di semua halaman */}
+      {isAuthenticated && <ChatbotWidget />}
     </>
   )
 }

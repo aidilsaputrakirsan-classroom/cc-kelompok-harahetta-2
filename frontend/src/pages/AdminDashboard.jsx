@@ -285,10 +285,23 @@ export default function AdminDashboard({ addToast }) {
     if (!profileForm.nomor_telepon?.trim()) {
       addToast?.("Nomor telepon wajib diisi", "error"); return
     }
+    if (!profileForm.latitude || !profileForm.longitude) {
+      addToast?.("Titik lokasi di peta wajib diisi — geser pin ke lokasi usaha Anda", "error"); return
+    }
     setSavingProfile(true)
     try {
-      if (profile) await updateAdminProfile(profileForm)
-      else await createAdminProfile(profileForm)
+      // Kirim payload eksplisit agar latitude/longitude selalu tersimpan
+      const payload = {
+        nama_usaha: profileForm.nama_usaha,
+        alamat_usaha: profileForm.alamat_usaha,
+        nomor_telepon: profileForm.nomor_telepon,
+        nomor_rekening: profileForm.nomor_rekening || null,
+        foto_qris: profileForm.foto_qris || null,
+        latitude: profileForm.latitude,
+        longitude: profileForm.longitude,
+      }
+      if (profile) await updateAdminProfile(payload)
+      else await createAdminProfile(payload)
       const updated = await fetchAdminProfile()
       setProfile(updated)
       setProfileForm({
