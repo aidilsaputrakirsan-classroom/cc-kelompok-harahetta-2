@@ -117,6 +117,8 @@ class AdminProfileCreate(BaseModel):
     nomor_telepon: Optional[str] = Field(None, max_length=20, examples=["08123456789"])
     nomor_rekening: Optional[str] = Field(None, max_length=100, examples=["BCA 1234567890 a/n Toko Sewa Jaya"])
     foto_qris: Optional[str] = Field(None, examples=["data:image/png;base64,..."])
+    latitude: Optional[float] = Field(None, ge=-90.0, le=90.0, examples=[-1.2654])   # ← Koordinat lokasi
+    longitude: Optional[float] = Field(None, ge=-180.0, le=180.0, examples=[116.8312])  # ← Koordinat lokasi
 
 
 class AdminProfileUpdate(BaseModel):
@@ -126,6 +128,8 @@ class AdminProfileUpdate(BaseModel):
     nomor_telepon: Optional[str] = Field(None, max_length=20)
     nomor_rekening: Optional[str] = Field(None, max_length=100)
     foto_qris: Optional[str] = None
+    latitude: Optional[float] = Field(None, ge=-90.0, le=90.0)    # ← Koordinat lokasi
+    longitude: Optional[float] = Field(None, ge=-180.0, le=180.0)  # ← Koordinat lokasi
 
 
 class AdminProfileResponse(BaseModel):
@@ -137,6 +141,8 @@ class AdminProfileResponse(BaseModel):
     nomor_telepon: Optional[str]
     nomor_rekening: Optional[str]
     foto_qris: Optional[str]
+    latitude: Optional[float]    # ← Koordinat lokasi
+    longitude: Optional[float]   # ← Koordinat lokasi
     created_at: datetime
     user: UserResponse
 
@@ -354,10 +360,33 @@ class RentalResponse(BaseModel):
     total_harga: float
     status: RentalStatusEnum
     catatan: Optional[str]
+    # ── Snapshot info pickup (diisi saat rental disetujui)
+    pickup_alamat: Optional[str] = None
+    pickup_latitude: Optional[float] = None
+    pickup_longitude: Optional[float] = None
+    pickup_nama_usaha: Optional[str] = None
+    pickup_telepon: Optional[str] = None
+    diambil_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
     item: Optional[ItemResponse]
     user: Optional[UserResponse]
+
+    class Config:
+        from_attributes = True
+
+
+class PickupInfoResponse(BaseModel):
+    """Schema response info lokasi pickup untuk user setelah bayar."""
+    rental_id: int
+    pickup_alamat: str
+    pickup_latitude: float
+    pickup_longitude: float
+    pickup_nama_usaha: str
+    pickup_telepon: Optional[str]
+    tanggal_mulai: date
+    tanggal_selesai: date
+    item_nama: str
 
     class Config:
         from_attributes = True

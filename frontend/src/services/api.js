@@ -223,6 +223,20 @@ export async function updateRentalStatus(id, data) {
   return handleResponse(res)
 }
 
+// Ambil info lokasi pickup untuk rental tertentu (setelah sedang_disewa)
+export async function fetchRentalPickupInfo(rentalId) {
+  const res = await fetch(`${API_URL}/rentals/${rentalId}/pickup`, { headers: authOnlyHeaders() })
+  return handleResponse(res)
+}
+
+// Admin konfirmasi barang sudah diambil penyewa
+export async function confirmPickup(rentalId) {
+  const res = await fetch(`${API_URL}/rentals/${rentalId}/confirm-pickup`, {
+    method: "PUT", headers: authHeaders(),
+  })
+  return handleResponse(res)
+}
+
 // ==================== ADMIN PAYMENT INFO (public) ====================
 export async function fetchAdminPaymentInfo(adminId) {
   const res = await fetch(`${API_URL}/admins/${adminId}/payment-info`)

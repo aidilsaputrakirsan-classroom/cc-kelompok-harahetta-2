@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import { useNavigate } from "react-router-dom"
 import { useAuth } from "../context/AuthContext"
-import { fetchMyRentals, fetchItems, fetchMyPayments, createPaymentForRental, uploadPaymentProof, fetchAdminPaymentInfo } from "../services/api"
+import { fetchMyRentals, fetchItems, fetchMyPayments, createPaymentForRental, uploadPaymentProof, fetchAdminPaymentInfo, fetchRentalPickupInfo } from "../services/api"
 import { formatPrice } from "../lib/utils"
 import { Button } from "../components/ui/Button"
 import { Skeleton } from "../components/ui/skeleton"
@@ -10,110 +10,9 @@ import {
   Package, CheckCircle, Clock, TrendingUp,
   Calendar, ChevronRight, Sparkles, BadgeCheck, XCircle,
   Upload, ImageIcon, X, CreditCard, Loader2, Building2, QrCode, Copy, AlertTriangle,
+  MapPin, Navigation,
 } from "lucide-react"
-
-// ── Mini bar chart ──────────────────────────────────────────
-function MiniBarChart({ data = [] }) {
-  const max = Math.max(...data, 1)
-  const labels = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"]
-  return (
-    <div className="flex items-end gap-1 h-10">
-      {data.map((v, i) => (
-        <div key={i} className="flex flex-col items-center gap-0.5 flex-1">
-          <div
-            className="w-full rounded-sm transition-all"
-            style={{
-              height: `${Math.max(8, (v / max) * 36)}px`,
-              background: i === data.length - 1 ? "#1b7e6a" : "#d1fae5",
-            }}
-          />
-          <span className="text-[9px] text-slate-400 hidden sm:block">{labels[i]}</span>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-// ── Countdown Timer ─────────────────────────────────────────────
-function CountdownTimer({ endDate }) {
-  const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 })
-  const [isExpired, setIsExpired] = useState(false)
-
-  useEffect(() => {
-    if (!endDate) return
-
-    const calculateTimeLeft = () => {
-      const now = new Date().getTime()
-      const end = new Date(endDate).getTime()
-      const difference = end - now
-
-      if (difference <= 0) {
-        setIsExpired(true)
-        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 })
-        return
-      }
-
-      setIsExpired(false)
-      setTimeLeft({
-        days: Math.floor(difference / (1000 * 60 * 60 * 24)),
-        hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
-        minutes: Math.floor((difference / 1000 / 60) % 60),
-        seconds: Math.floor((difference / 1000) % 60),
-      })
-    }
-
-    calculateTimeLeft()
-    const timer = setInterval(calculateTimeLeft, 1000)
-
-    return () => clearInterval(timer)
-  }, [endDate])
-
-  if (!endDate) {
-    return (
-      <div className="text-center py-4">
-        <p className="text-xs text-slate-400">Tidak ada sewa aktif</p>
-      </div>
-    )
-  }
-
-  if (isExpired) {
-    return (
-      <div className="text-center py-4">
-        <p className="text-sm font-bold text-red-600">Masa sewa telah berakhir!</p>
-        <p className="text-xs text-slate-400 mt-1">Segera kembalikan barang</p>
-      </div>
-    )
-  }
-
-  return (
-    <div className="grid grid-cols-4 gap-2">
-      <div className="text-center">
-        <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-xl p-2 shadow-md">
-          <p className="text-lg font-black leading-none">{timeLeft.days}</p>
-        </div>
-        <p className="text-[9px] text-slate-400 mt-1 font-medium">HARI</p>
-      </div>
-      <div className="text-center">
-        <div className="bg-gradient-to-br from-teal-500 to-teal-600 text-white rounded-xl p-2 shadow-md">
-          <p className="text-lg font-black leading-none">{String(timeLeft.hours).padStart(2, '0')}</p>
-        </div>
-        <p className="text-[9px] text-slate-400 mt-1 font-medium">JAM</p>
-      </div>
-      <div className="text-center">
-        <div className="bg-gradient-to-br from-orange-500 to-orange-600 text-white rounded-xl p-2 shadow-md">
-          <p className="text-lg font-black leading-none">{String(timeLeft.minutes).padStart(2, '0')}</p>
-        </div>
-        <p className="text-[9px] text-slate-400 mt-1 font-medium">MENIT</p>
-      </div>
-      <div className="text-center">
-        <div className="bg-gradient-to-br from-red-500 to-red-600 text-white rounded-xl p-2 shadow-md animate-pulse">
-          <p className="text-lg font-black leading-none">{String(timeLeft.seconds).padStart(2, '0')}</p>
-        </div>
-        <p className="text-[9px] text-slate-400 mt-1 font-medium">DETIK</p>
-      </div>
-    </div>
-  )
-}
+import PickupMap from "../components/PickupMap"
 
 // ── Status badge inline ──────────────────────────────────────
 const STATUS_LABEL = {
@@ -143,6 +42,63 @@ const RENTAL_STATUS_TABS = [
 ]
 const RENTAL_PAGE_SIZE = 6
 
+function MiniCountdownItem({ endDate, onReturnClick }) {
+  const [timeLeft, setTimeLeft] = useState({ d: 0, h: 0, m: 0, s: 0 })
+  const [isExpired, setIsExpired] = useState(false)
+
+  useEffect(() => {
+    if (!endDate) return
+    const calc = () => {
+      const diff = new Date(endDate).getTime() - new Date().getTime()
+      if (diff <= 0) {
+        setIsExpired(true)
+        return
+      }
+      setIsExpired(false)
+      setTimeLeft({
+        d: Math.floor(diff / (1000 * 60 * 60 * 24)),
+        h: Math.floor((diff / (1000 * 60 * 60)) % 24),
+        m: Math.floor((diff / 1000 / 60) % 60),
+        s: Math.floor((diff / 1000) % 60),
+      })
+    }
+    calc()
+    const timer = setInterval(calc, 1000)
+    return () => clearInterval(timer)
+  }, [endDate])
+
+  return (
+    <div className="mt-2.5 pt-2.5 border-t border-dashed border-slate-100 bg-slate-50/50 rounded-xl p-2.5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <span className="text-xs text-slate-500 font-semibold flex items-center gap-1">
+          <Clock className="w-3.5 h-3.5 text-slate-400" /> Sisa Waktu Sewa:
+        </span>
+        {isExpired ? (
+          <span className="text-xs font-extrabold text-red-600 bg-red-50 px-2.5 py-1 rounded-lg border border-red-100 inline-block text-center animate-pulse">
+            ⚠️ Waktu Sewa Habis
+          </span>
+        ) : (
+          <div className="flex items-center gap-1 self-end sm:self-auto font-mono text-xs font-bold text-slate-700">
+            {timeLeft.d > 0 && <span className="bg-white px-1.5 py-0.5 rounded border shadow-xs">{timeLeft.d}h</span>}
+            <span className="bg-white px-1.5 py-0.5 rounded border shadow-xs">{String(timeLeft.h).padStart(2, '0')}j</span>
+            <span className="bg-white px-1.5 py-0.5 rounded border shadow-xs">{String(timeLeft.m).padStart(2, '0')}m</span>
+            <span className="bg-white px-1.5 py-0.5 rounded border shadow-xs text-primary">{String(timeLeft.s).padStart(2, '0')}s</span>
+          </div>
+        )}
+      </div>
+      {isExpired && (
+        <button
+          onClick={onReturnClick}
+          className="w-full mt-2.5 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-red-500 to-orange-500 text-white shadow-sm hover:opacity-95 transition flex items-center justify-center gap-1.5 animate-bounce"
+        >
+          <CheckCircle className="w-3.5 h-3.5" />
+          Konfirmasi Pengembalian Barang
+        </button>
+      )}
+    </div>
+  )
+}
+
 export default function UserDashboard({ addToast }) {
   const { user, isVerified } = useAuth()
   const navigate = useNavigate()
@@ -161,7 +117,8 @@ export default function UserDashboard({ addToast }) {
   // — Payment / Bukti Bayar state
   const [payments, setPayments]           = useState([])
   const [buktiModal, setBuktiModal]       = useState(null) // { rental, payment | null }
-  const [selectedRentalIndex, setSelectedRentalIndex] = useState(0) // index untuk dropdown countdown
+  const [pickupModal, setPickupModal]     = useState(null) // { info } | null
+  const [pickupLoading, setPickupLoading] = useState(false)
   const [adminPayInfo, setAdminPayInfo]   = useState(null) // admin rekening/qris info
   const [buktiFile, setBuktiFile]         = useState(null) // { preview, base64 }
   const [buktiCatatan, setBuktiCatatan]   = useState("")
@@ -278,34 +235,13 @@ export default function UserDashboard({ addToast }) {
 
   useEffect(() => { loadAllRentals() }, [loadAllRentals])
 
-  // Reset selected rental index jika jumlah active rental berubah
-  useEffect(() => {
-    const activeCount = rentals.filter(r => r.status === "sedang_disewa" || r.status === "disetujui").length
-    if (selectedRentalIndex >= activeCount) {
-      setSelectedRentalIndex(0)
-    }
-  }, [rentals, selectedRentalIndex])
-
   // — derived stats
   const totalSpend = rentals.reduce((s, r) => s + (r.total_harga || 0), 0)
   const active = rentals.filter(r => ["pending","disetujui","sedang_disewa"].includes(r.status))
   const done = rentals.filter(r => r.status === "selesai")
   const pending = rentals.filter(r => r.status === "pending")
   const completionPct = rentals.length ? Math.round((done.length / rentals.length) * 100) : 0
-  const activePct = rentals.length ? Math.round((active.length / rentals.length) * 100) : 0
-  const recentRentals = rentals.slice(0, 5)
-  // Cari semua rental yang sedang berlangsung untuk countdown
   const activeRentals = rentals.filter(r => r.status === "sedang_disewa" || r.status === "disetujui")
-  const selectedRental = activeRentals[selectedRentalIndex] || null
-
-  // — fake weekly bar (counts by day-of-week from real data)
-  const weekBars = [0, 0, 0, 0, 0, 0, 0]
-  rentals.forEach(r => {
-    const d = new Date(r.created_at || r.tanggal_mulai).getDay()
-    weekBars[d] = (weekBars[d] || 0) + 1
-  })
-  // rotate so Mon=0
-  const rotated = [...weekBars.slice(1), weekBars[0]]
 
   const firstName = user?.nama?.split(" ")[0] || "Pengguna"
   const imgFallback = (name) =>
@@ -391,245 +327,112 @@ export default function UserDashboard({ addToast }) {
         </div>
       )}
 
-      {/* ── ROW 1: 3 CARDS ─────────────────────────────────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-
-        {/* Card 1 — Total Pengeluaran (like Balance Statistics) */}
-        <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100 flex flex-col justify-between min-h-[160px]">
+      {/* ── ROW 1: RINGKASAN METRIK ─────────────────────────── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Metrik 1: Total Pengeluaran */}
+        <div className="bg-white rounded-3xl p-5 shadow-xs border border-slate-100 flex flex-col justify-between relative overflow-hidden group hover:shadow-md transition-all">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Statistik Sewa</p>
-            <div className="flex items-center gap-1 text-xs text-green-600 font-semibold bg-green-50 px-2 py-0.5 rounded-full">
-              <TrendingUp className="w-3 h-3" /> {rentals.length} total
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Pengeluaran</p>
+            <div className="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 group-hover:scale-110 transition-transform">
+              <TrendingUp className="w-4 h-4" />
             </div>
           </div>
-          <div>
-            <p className="text-2xl font-black text-slate-800 mt-2">{formatPrice(totalSpend)}</p>
-            <p className="text-xs text-slate-400 mt-0.5">Total pengeluaran sewa</p>
+          <div className="mt-4">
+            <p className="text-2xl font-black text-slate-800 tracking-tight">{formatPrice(totalSpend)}</p>
+            <p className="text-xs text-slate-400 mt-1">
+              Dari <strong>{rentals.length}</strong> transaksi sewa
+            </p>
           </div>
-          <div className="mt-3">
-            <MiniBarChart data={rotated} />
+          {/* subtle accent bar */}
+          <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 to-teal-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+        </div>
+
+        {/* Metrik 2: Sewa Berlangsung/Aktif */}
+        <div className="bg-gradient-to-br from-[#1b7e6a] to-[#0d5c4a] text-white rounded-3xl p-5 shadow-md flex flex-col justify-between relative overflow-hidden group hover:shadow-lg transition-all">
+          {/* subtle background glow/shapes */}
+          <div className="absolute -right-4 -bottom-4 w-24 h-24 rounded-full bg-white/10 group-hover:scale-125 transition-transform" />
+          <div className="flex items-center justify-between relative z-10">
+            <p className="text-xs font-bold text-teal-100 uppercase tracking-wider">Sewa Aktif</p>
+            <div className="w-8 h-8 rounded-xl bg-white/10 backdrop-blur-xs flex items-center justify-center text-white">
+              <Package className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="mt-4 relative z-10">
+            <p className="text-3xl font-black tracking-tight">{active.length}</p>
+            <p className="text-xs text-teal-100/80 mt-0.5 truncate">
+              {activeRentals.length > 0 ? `Terbaru: ${activeRentals[0].item?.nama || "Barang"}` : "Belum ada barang disewa"}
+            </p>
           </div>
         </div>
 
-        {/* Card 2 — Active Rental (like bank card, teal gradient) */}
-        <div className="bg-gradient-to-br from-[#1b7e6a] to-[#0d5c4a] rounded-3xl p-5 shadow-md text-white flex flex-col justify-between min-h-[160px] relative overflow-hidden">
-          {/* decorative circles */}
-          <div className="absolute -top-6 -right-6 w-28 h-28 rounded-full bg-white/10" />
-          <div className="absolute -bottom-8 -left-4 w-24 h-24 rounded-full bg-white/5" />
-
-          <div className="relative">
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold text-white/70 uppercase tracking-wide">Sewa Aktif</p>
-              <Package className="w-4 h-4 text-white/60" />
+        {/* Metrik 3: Menunggu Pembayaran/Konfirmasi */}
+        <div className="bg-white rounded-3xl p-5 shadow-xs border border-slate-100 flex flex-col justify-between relative overflow-hidden group hover:shadow-md transition-all">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Menunggu</p>
+            <div className="w-8 h-8 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600 group-hover:scale-110 transition-transform">
+              <Clock className="w-4 h-4" />
             </div>
-            <p className="text-3xl font-black mt-2">{active.length}</p>
-            <p className="text-xs text-white/60 mt-0.5">Barang sedang disewa</p>
           </div>
-          {activeRentals.length > 0 ? (
-            <div className="relative mt-3 pt-3 border-t border-white/20">
-              <p className="text-xs text-white/70">Terbaru</p>
-              <p className="font-bold text-sm truncate mt-0.5">
-                {activeRentals[0].item?.nama || `Item #${activeRentals[0].item_id}`}
-              </p>
-              <p className="text-xs text-white/60 mt-0.5 flex items-center gap-1">
-                <Calendar className="w-3 h-3" />
-                {new Date(activeRentals[0].tanggal_selesai).toLocaleDateString("id-ID")}
-              </p>
-            </div>
-          ) : (
-            <div className="relative mt-3 pt-3 border-t border-white/20">
-              <p className="text-xs text-white/60">Belum ada sewa aktif</p>
-              <button
-                onClick={() => navigate("/catalog")}
-                className="mt-1 text-xs font-bold text-white/90 underline"
-              >
-                Jelajahi katalog →
-              </button>
-            </div>
-          )}
+          <div className="mt-4">
+            <p className="text-2xl font-black text-slate-800 tracking-tight">{pending.length}</p>
+            <p className="text-xs text-slate-400 mt-1">
+              {pending.length > 0 ? "Perlu bayar/konfirmasi" : "Semua transaksi lancar"}
+            </p>
+          </div>
+          <div className="absolute bottom-0 left-0 right-0 h-1 bg-amber-400 opacity-0 group-hover:opacity-100 transition-opacity" />
         </div>
 
-        {/* Card 3 — Countdown Timer */}
-        <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Countdown Sewa</p>
-            {activeRentals.length > 0 && (
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-teal-100 text-teal-700">
-                {activeRentals.length} Aktif
-              </span>
-            )}
-          </div>
-          
-          {activeRentals.length > 0 ? (
-            <>
-              {/* Dropdown Selector jika ada lebih dari 1 sewa aktif */}
-              {activeRentals.length > 1 && (
-                <div className="mb-3">
-                  <select
-                    value={selectedRentalIndex}
-                    onChange={(e) => setSelectedRentalIndex(Number(e.target.value))}
-                    className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
-                  >
-                    {activeRentals.map((r, idx) => (
-                      <option key={r.id} value={idx}>
-                        {r.item?.nama || `Item #${r.item_id}`} - {new Date(r.tanggal_selesai).toLocaleDateString("id-ID", { day: "2-digit", month: "short" })}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {selectedRental && (
-                <>
-                  <div className="mb-3">
-                    <p className="text-xs text-slate-600 font-semibold truncate">
-                      {selectedRental.item?.nama || `Item #${selectedRental.item_id}`}
-                    </p>
-                    <p className="text-[10px] text-slate-400">
-                      Berakhir: {new Date(selectedRental.tanggal_selesai).toLocaleDateString("id-ID", {
-                        day: "2-digit",
-                        month: "short",
-                        year: "numeric"
-                      })}
-                    </p>
-                  </div>
-                  <CountdownTimer endDate={selectedRental.tanggal_selesai} />
-                </>
-              )}
-            </>
-          ) : (
-            <div className="text-center py-8">
-              <Clock className="w-12 h-12 text-slate-300 mx-auto mb-2" />
-              <p className="text-sm text-slate-400">Tidak ada sewa aktif</p>
-              <p className="text-xs text-slate-400 mt-1">Sewa barang untuk memulai countdown</p>
+        {/* Metrik 4: Transaksi Selesai */}
+        <div className="bg-white rounded-3xl p-5 shadow-xs border border-slate-100 flex flex-col justify-between relative overflow-hidden group hover:shadow-md transition-all">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Selesai</p>
+            <div className="w-8 h-8 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 group-hover:scale-110 transition-transform">
+              <CheckCircle className="w-4 h-4" />
             </div>
-          )}
+          </div>
+          <div className="mt-4">
+            <p className="text-2xl font-black text-slate-800 tracking-tight">{done.length}</p>
+            <p className="text-xs text-slate-400 mt-1">
+              Tingkat penyelesaian: <strong>{completionPct}%</strong>
+            </p>
+          </div>
+          <div className="absolute bottom-0 left-0 right-0 h-1 bg-blue-500 opacity-0 group-hover:opacity-100 transition-opacity" />
         </div>
       </div>
 
-      {/* ── ROW 2: TRANSACTIONS + STATUS + CTA ─────────────── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-        {/* Left — Recent Rentals */}
-        <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100">
-          <div className="flex items-center justify-between mb-4">
-            <p className="text-sm font-bold text-slate-800">Sewa Terbaru</p>
-            <button
-              onClick={() => navigate("/rentals/my")}
-              className="text-xs text-primary font-semibold flex items-center gap-0.5 hover:underline"
-            >
-              Lihat semua <ArrowRight className="w-3 h-3" />
-            </button>
+      {/* ── CTA BANNER ─────────────────────────────────────── */}
+      <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white rounded-3xl p-6 md:p-8 shadow-md flex flex-col sm:flex-row items-center justify-between gap-6 relative overflow-hidden">
+        {/* abstract glowing background blobs */}
+        <div className="absolute top-0 right-1/4 w-64 h-64 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="flex items-center gap-4 relative z-10 w-full sm:w-auto">
+          <div className="w-14 h-14 rounded-2xl bg-primary/20 border border-primary/30 flex items-center justify-center flex-shrink-0">
+            {isVerified
+              ? <BadgeCheck className="w-7 h-7 text-primary" />
+              : <Sparkles className="w-7 h-7 text-amber-400" />
+            }
           </div>
-
-          {recentRentals.length === 0 ? (
-            <div className="text-center py-8">
-              <ClipboardList className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-              <p className="text-sm text-slate-400">Belum ada riwayat sewa</p>
-              <button onClick={() => navigate("/catalog")} className="mt-2 text-xs text-primary underline font-semibold">
-                Mulai sewa sekarang
-              </button>
+          <div>
+            <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-white/10 text-[10px] font-bold tracking-wide uppercase text-slate-300 mb-1">
+              {isVerified ? "Status Akun Terverifikasi" : "Akses Terbatas"}
             </div>
-          ) : (
-            <div className="space-y-3">
-              {recentRentals.map(r => {
-                const item = r.item
-                return (
-                  <div key={r.id} className="flex items-center gap-3">
-                    <img
-                      src={item?.foto_url || imgFallback(item?.nama || "Item")}
-                      alt={item?.nama}
-                      className="w-10 h-10 rounded-xl object-cover flex-shrink-0 bg-slate-100"
-                      onError={(e) => { e.target.src = imgFallback(item?.nama || "Item") }}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-slate-800 truncate">
-                        {item?.nama || `Item #${r.item_id}`}
-                      </p>
-                      <p className="text-xs text-slate-400">
-                        {new Date(r.tanggal_mulai).toLocaleDateString("id-ID")}
-                      </p>
-                    </div>
-                    <div className="flex flex-col items-end gap-1">
-                      <p className="text-sm font-bold text-slate-700">{formatPrice(r.total_harga)}</p>
-                      <Tag status={r.status} />
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Right — Status breakdown + CTA */}
-        <div className="flex flex-col gap-4">
-
-          {/* Status breakdown */}
-          <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100 flex-1">
-            <p className="text-sm font-bold text-slate-800 mb-4">Status Sewa</p>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-2xl font-black text-primary">{activePct}%</p>
-                <p className="text-xs text-slate-400 mt-0.5">Sedang Berjalan</p>
-                <div className="mt-2 h-2 rounded-full bg-slate-100 overflow-hidden">
-                  <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${activePct}%` }} />
-                </div>
-              </div>
-              <div>
-                <p className="text-2xl font-black text-green-500">{completionPct}%</p>
-                <p className="text-xs text-slate-400 mt-0.5">Selesai</p>
-                <div className="mt-2 h-2 rounded-full bg-slate-100 overflow-hidden">
-                  <div className="h-full bg-green-400 rounded-full transition-all" style={{ width: `${completionPct}%` }} />
-                </div>
-              </div>
-            </div>
-
-            {/* quick stats row */}
-            <div className="flex gap-2 mt-4">
-              {[
-                { icon: Clock, label: "Pending", val: pending.length, color: "text-amber-500" },
-                { icon: CheckCircle, label: "Selesai", val: done.length, color: "text-green-500" },
-                { icon: Package, label: "Aktif", val: active.length, color: "text-primary" },
-              ].map((s) => (
-                <div key={s.label} className="flex-1 bg-slate-50 rounded-2xl p-2.5 text-center">
-                  <s.icon className={`w-4 h-4 mx-auto mb-1 ${s.color}`} />
-                  <p className="text-base font-black text-slate-800">{s.val}</p>
-                  <p className="text-[10px] text-slate-400">{s.label}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* CTA card — dark, like Fenco "More features" */}
-          <div className="bg-slate-800 rounded-3xl p-5 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-primary/20 flex items-center justify-center flex-shrink-0">
-                {isVerified
-                  ? <BadgeCheck className="w-5 h-5 text-primary" />
-                  : <Sparkles className="w-5 h-5 text-amber-400" />
-                }
-              </div>
-              <div>
-                <p className="text-white text-sm font-bold">
-                  {isVerified ? "Siap Menyewa!" : "Belum Terverifikasi"}
-                </p>
-                <p className="text-slate-400 text-xs mt-0.5">
-                  {isVerified
-                    ? "Jelajahi barang yang tersedia"
-                    : "Upload KTP untuk mulai menyewa"}
-                </p>
-              </div>
-            </div>
-            <Button
-              size="sm"
-              className="rounded-xl whitespace-nowrap flex-shrink-0"
-              onClick={() => navigate(isVerified ? "/catalog" : "/profile")}
-            >
-              {isVerified ? "Jelajahi" : "Verifikasi"}
-              <ArrowRight className="w-3.5 h-3.5 ml-1" />
-            </Button>
+            <h3 className="text-lg md:text-xl font-black text-white leading-tight">
+              {isVerified ? "Jelajahi & Sewa Barang Impianmu" : "Akun Belum Terverifikasi Lengkap"}
+            </h3>
+            <p className="text-slate-400 text-xs md:text-sm mt-0.5 max-w-xl">
+              {isVerified
+                ? "Temukan berbagai macam pilihan barang berkualitas dengan harga terbaik dari mitra penyedia kami."
+                : "Upload KTP/Identitas resmi pada profil Anda agar bisa mengajukan penyewaan barang di platform."}
+            </p>
           </div>
         </div>
+        <Button
+          size="lg"
+          className="w-full sm:w-auto rounded-2xl font-bold tracking-wide whitespace-nowrap shadow-lg hover:scale-105 transition-transform flex-shrink-0 relative z-10"
+          onClick={() => navigate(isVerified ? "/catalog" : "/profile")}
+        >
+          {isVerified ? "Mulai Jelajahi Katalog" : "Lengkapi Profil Sekarang"}
+          <ArrowRight className="w-4 h-4 ml-2" />
+        </Button>
       </div>
 
       {/* ── SEWA SAYA ─────────────────────────────────────────── */}
@@ -705,10 +508,10 @@ export default function UserDashboard({ addToast }) {
                 const item = r.item
                 const st = STATUS_LABEL[r.status] || { label: r.status, color: "bg-slate-100 text-slate-600" }
                 const payment = payments.find(p => p.rental_id === r.id)
-                // Tampilkan payment section hanya jika rental disetujui DAN payment sudah ada (auto-created)
                 const needsPayment = r.status === "disetujui" && payment
                 const hasBukti = !!payment?.bukti_pembayaran
-                const isActive = r.status === "sedang_disewa"
+                const isPaid = payment?.status === "completed"
+                const canSeePickup = isPaid && ["disetujui", "sedang_disewa", "selesai"].includes(r.status)
                 return (
                   <div key={r.id} className="p-3 rounded-2xl border border-slate-100 hover:border-slate-200 transition-colors">
                     <div className="flex items-center gap-3">
@@ -741,7 +544,7 @@ export default function UserDashboard({ addToast }) {
                       <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between gap-3">
                         <div className="flex items-center gap-2 min-w-0">
                           <CreditCard className="w-4 h-4 text-primary flex-shrink-0" />
-                          {payment?.status === "completed" ? (
+                          {isPaid ? (
                             <span className="text-xs text-green-600 font-bold flex items-center gap-1">
                               <CheckCircle className="w-3.5 h-3.5" /> Pembayaran Terkonfirmasi
                             </span>
@@ -751,7 +554,7 @@ export default function UserDashboard({ addToast }) {
                             <span className="text-xs text-primary font-semibold">Upload bukti transfer</span>
                           )}
                         </div>
-                        {!hasBukti && payment?.status !== "completed" && (
+                        {!hasBukti && !isPaid && (
                           <button
                             onClick={() => navigate(`/payment/${r.id}`)}
                             className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold transition flex-shrink-0 bg-primary text-white hover:bg-primary/90"
@@ -759,6 +562,37 @@ export default function UserDashboard({ addToast }) {
                             <CreditCard className="w-3.5 h-3.5" />
                             Bayar Sekarang
                           </button>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Tombol Lihat Lokasi Pickup — muncul jika sudah bayar */}
+                    {canSeePickup && (
+                      <div className="mt-2 pt-2 border-t border-slate-100">
+                        <button
+                          onClick={async () => {
+                            setPickupLoading(true)
+                            try {
+                              const info = await fetchRentalPickupInfo(r.id)
+                              setPickupModal({ ...info, isReturn: r.status === "sedang_disewa" })
+                            } catch {
+                              alert("Koordinat lokasi belum tersedia. Hubungi admin.")
+                            } finally {
+                              setPickupLoading(false)
+                            }
+                          }}
+                          className="w-full flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 transition border border-blue-200"
+                        >
+                          <MapPin className="w-3.5 h-3.5" />
+                          {r.status === "sedang_disewa" ? "Alamat Pengembalian Barang" : "Lihat Lokasi Pengambilan"}
+                        </button>
+                        {r.status === "sedang_disewa" && (
+                          <MiniCountdownItem
+                            endDate={r.tanggal_selesai}
+                            onReturnClick={() => {
+                              addToast?.("Notifikasi pengembalian barang berhasil dikirim ke admin!", "success")
+                            }}
+                          />
                         )}
                       </div>
                     )}
@@ -795,8 +629,66 @@ export default function UserDashboard({ addToast }) {
 
     </div>
 
+    {/* ── PICKUP LOCATION MODAL ── */}
+    {pickupModal && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+        <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden max-h-[90vh] overflow-y-auto">
+          <div className="flex items-center justify-between p-5 border-b border-slate-100">
+            <div className="flex items-center gap-2">
+              <MapPin className="w-5 h-5 text-blue-600" />
+              <h3 className="font-black text-slate-800">
+                {pickupModal.isReturn ? "Alamat Pengembalian Barang" : "Lokasi Pengambilan"}
+              </h3>
+            </div>
+            <button onClick={() => setPickupModal(null)} className="p-1.5 rounded-xl hover:bg-slate-100 text-slate-400">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="p-5 space-y-4">
+            {/* Info usaha */}
+            <div className="bg-slate-50 rounded-2xl p-4 space-y-1">
+              {pickupModal.pickup_nama_usaha && (
+                <p className="font-bold text-slate-800">{pickupModal.pickup_nama_usaha}</p>
+              )}
+              {pickupModal.pickup_alamat && (
+                <p className="text-sm text-slate-600">{pickupModal.pickup_alamat}</p>
+              )}
+              {pickupModal.pickup_telepon && (
+                <p className="text-sm text-slate-500">📞 {pickupModal.pickup_telepon}</p>
+              )}
+              <p className="text-xs text-slate-400 pt-1">
+                📅 {new Date(pickupModal.tanggal_mulai).toLocaleDateString("id-ID")} —{" "}
+                {new Date(pickupModal.tanggal_selesai).toLocaleDateString("id-ID")}
+              </p>
+            </div>
+
+            {/* Peta */}
+            <PickupMap
+              lat={pickupModal.pickup_latitude}
+              lng={pickupModal.pickup_longitude}
+              label={pickupModal.pickup_nama_usaha || "Lokasi Pickup"}
+            />
+
+            {/* Buka Google Maps */}
+            <a
+              href={`https://www.google.com/maps?q=${pickupModal.pickup_latitude},${pickupModal.pickup_longitude}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full py-3 rounded-2xl bg-blue-600 text-white font-bold text-sm
+                         flex items-center justify-center gap-2 hover:bg-blue-700 transition"
+            >
+              <Navigation className="w-4 h-4" />
+              Buka di Google Maps
+            </a>
+          </div>
+        </div>
+      </div>
+    )}
+
     {/* ── BUKTI BAYAR MODAL (outside main div, inside Fragment) ──────────────────────────────────── */}
     {buktiModal && (
+
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
         <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden">
           {/* Header */}

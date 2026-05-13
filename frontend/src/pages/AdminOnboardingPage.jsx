@@ -6,7 +6,8 @@ import { Input } from "../components/ui/input"
 import { Label } from "../components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card"
 import { Separator } from "../components/ui/separator"
-import { Store, CreditCard, QrCode, ArrowRight, ArrowLeft, CheckCircle, Upload } from "lucide-react"
+import { Store, CreditCard, QrCode, ArrowRight, ArrowLeft, CheckCircle, Upload, MapPin } from "lucide-react"
+import MapPicker from "../components/MapPicker"
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000"
 
@@ -24,6 +25,8 @@ export default function AdminOnboardingPage({ addToast }) {
     nomor_telepon: "",
     nomor_rekening: "",
     foto_qris: "",
+    latitude: null,
+    longitude: null,
   })
 
   useEffect(() => {
@@ -43,6 +46,8 @@ export default function AdminOnboardingPage({ addToast }) {
           nomor_telepon: p.nomor_telepon || "",
           nomor_rekening: p.nomor_rekening || "",
           foto_qris: p.foto_qris || "",
+          latitude: p.latitude || null,
+          longitude: p.longitude || null,
         })
         
         // Cek progress: jika sudah lengkap, skip ke step yang sesuai
@@ -93,6 +98,11 @@ export default function AdminOnboardingPage({ addToast }) {
         addToast?.("Harap lengkapi semua informasi usaha", "error")
         return
       }
+      // Validasi koordinat wajib
+      if (!form.latitude || !form.longitude) {
+        addToast?.("Harap pilih lokasi usaha di peta", "error")
+        return
+      }
       
       // Save step 1 data
       setSaving(true)
@@ -101,6 +111,8 @@ export default function AdminOnboardingPage({ addToast }) {
           nama_usaha: form.nama_usaha,
           alamat_usaha: form.alamat_usaha,
           nomor_telepon: form.nomor_telepon,
+          latitude: form.latitude,
+          longitude: form.longitude,
         }
         
         const method = profile ? "PUT" : "POST"
@@ -284,6 +296,25 @@ export default function AdminOnboardingPage({ addToast }) {
                     <p className="text-xs text-gray-500 mt-1">
                       Nomor ini akan digunakan penyewa untuk konfirmasi pembayaran
                     </p>
+                  </div>
+
+                  {/* Map Picker — Lokasi Usaha */}
+                  <div>
+                    <Label className="flex items-center gap-1.5 mb-2">
+                      <MapPin className="w-4 h-4 text-blue-500" />
+                      Titik Lokasi Usaha di Peta <span className="text-red-500">*</span>
+                    </Label>
+                    <p className="text-xs text-gray-500 mb-3">
+                      Klik pada peta untuk menandai lokasi usaha Anda. 
+                      Koordinat ini digunakan penyewa untuk menemukan tempat pengambilan barang.
+                    </p>
+                    <MapPicker
+                      latitude={form.latitude}
+                      longitude={form.longitude}
+                      onChange={({ latitude, longitude }) =>
+                        setForm(p => ({ ...p, latitude, longitude }))
+                      }
+                    />
                   </div>
                 </div>
               </div>
