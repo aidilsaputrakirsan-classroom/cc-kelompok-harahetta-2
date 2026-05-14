@@ -291,7 +291,11 @@ jobs:
         working-directory: frontend
         run: |
           set -e
-          ${{ steps.nodemeta.outputs.install_cmd }}
+          # Hapus package-lock.json yang di-generate di Windows karena tidak
+          # menyertakan optional binary Linux (@rollup/rollup-linux-x64-gnu).
+          # npm install akan generate ulang lock file sesuai platform CI (linux-x64).
+          rm -f package-lock.json
+          npm install
 
       - name: Build frontend
         if: steps.flags.outputs.do_build == '1'
