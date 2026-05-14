@@ -6,7 +6,7 @@ from pydantic import BaseModel
 router = APIRouter()
 
 # ============================================================
-# CHATBOT AI — Gemini (hanya konteks Sewain)
+# CHATBOT AI — Sumopod (OpenAI-compatible, hanya konteks Sewain)
 # ============================================================
 
 SEWAIN_SYSTEM_PROMPT = """Kamu adalah asisten virtual platform Sewain — platform sewa barang online di Indonesia.
@@ -64,7 +64,7 @@ class ChatMessageSchema(BaseModel):
 )
 async def chatbot(data: ChatMessageSchema):
     """
-    Chatbot AI berbasis Gemini, hanya menjawab pertanyaan seputar platform Sewain.
+    Chatbot AI berbasis Sumopod (OpenAI-compatible), hanya menjawab pertanyaan seputar platform Sewain.
     """
     api_key = os.getenv("GEMINI_API_KEY", "")
     if not api_key or api_key == "your_gemini_api_key_here":
@@ -73,38 +73,38 @@ async def chatbot(data: ChatMessageSchema):
             detail="Fitur chatbot belum dikonfigurasi. Hubungi administrator.",
         )
 
-    model_name = os.getenv("GEMINI_MODEL", "gemini-2.0-flash-lite")
-    print(f"[CHATBOT] model={model_name}, key={api_key[:8]}...")
+    model_name = os.getenv("GEMINI_MODEL", "gemini/gemini-2.5-flash-lite")
+    base_url   = os.getenv("AI_BASE_URL", "https://ai.sumopod.com/v1")
+    print(f"[CHATBOT] model={model_name}, base_url={base_url}, key={api_key[:8]}...")
 
     try:
-        from google import genai
-        from google.genai import types
+        from openai import OpenAI
 
-        client = genai.Client(api_key=api_key)
+        client = OpenAI(api_key=api_key, base_url=base_url)
 
-        # Bangun history percakapan (maks 10 pesan terakhir)
-        chat_history = []
+        # Bangun messages: system prompt + history (maks 10 pesan terakhir) + pesan baru
+        messages = [{"role": "system", "content": SEWAIN_SYSTEM_PROMPT}]
+
         for msg in data.history[-10:]:
-            role = msg.get("role", "user")
+            role    = msg.get("role", "user")
             content = msg.get("content", "")
-            if role in ("user", "model") and content:
-                chat_history.append(
-                    types.Content(role=role, parts=[types.Part(text=content)])
-                )
+            # OpenAI pakai "assistant", Gemini pakai "model" — normalkan
+            if role == "model":
+                role = "assistant"
+            if role in ("user", "assistant") and content:
+                messages.append({"role": role, "content": content})
 
-        # Kirim pesan dengan system instruction
-        response = client.models.generate_content(
+        messages.append({"role": "user", "content": data.message})
+
+        response = client.chat.completions.create(
             model=model_name,
-            contents=chat_history + [
-                types.Content(role="user", parts=[types.Part(text=data.message)])
-            ],
-            config=types.GenerateContentConfig(
-                system_instruction=SEWAIN_SYSTEM_PROMPT,
-                temperature=0.7,
-                max_output_tokens=1024,
-            ),
+            messages=messages,
+            temperature=0.7,
+            max_tokens=1024,
         )
-        return {"reply": response.text}
+
+        reply = response.choices[0].message.content
+        return {"reply": reply}
 
     except Exception as e:
         import traceback
