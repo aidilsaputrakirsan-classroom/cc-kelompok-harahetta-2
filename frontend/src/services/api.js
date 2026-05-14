@@ -294,6 +294,29 @@ export async function confirmPayment(paymentId, statusVal) {
   return handleResponse(res)
 }
 
+// ==================== MIDTRANS PAYMENT GATEWAY ====================
+export async function chargeMidtransForRental(rentalId) {
+  const res = await fetch(`${API_URL}/payments/rentals/${rentalId}/charge`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify({}),
+  })
+  return handleResponse(res)
+}
+
+export async function syncMidtransPayment(paymentId) {
+  const res = await fetch(`${API_URL}/payments/${paymentId}/sync`, {
+    method: "POST",
+    headers: authOnlyHeaders(),
+  })
+  return handleResponse(res)
+}
+
+export async function fetchMidtransConfig() {
+  const res = await fetch(`${API_URL}/payments/config/public`)
+  return handleResponse(res)
+}
+
 // ==================== SUPER ADMIN ====================
 export async function fetchPlatformStats() {
   const res = await fetch(`${API_URL}/superadmin/stats`, { headers: authOnlyHeaders() })

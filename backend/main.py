@@ -30,6 +30,7 @@ from schemas import (
     RentalCreate, RentalStatusUpdate, RentalResponse, RentalListResponse, PickupInfoResponse,
     # Payment
     PaymentCreate, PaymentUpdate, PaymentResponse, PaymentListResponse,
+    MidtransChargeResponse,
 )
 from auth import (
     create_access_token, get_current_user,
@@ -1455,3 +1456,191 @@ def platform_payment_stats(
     }
 
 #penambahan sesuatu yang baru yaitu fitur statistik pembayaran untuk super admin
+
+
+
+# ============================================================
+# MIDTRANS PAYMENT GATEWAY
+# ============================================================
+
+from fastapi import Request  # lokal biar tidak mengganggu import atas
+
+import midtrans_service
+
+
+class MidtransNotificationPayload(BaseModel):
+    """Skema longgar untuk payload webhook Midtrans (banyak field opsional)."""
+    order_id: str
+    transaction_status: str
+    status_code: str
+    gross_amount: str
+    signature_key: str
+    transaction_id: str | None = None
+    payment_type: str | None = None
+    fraud_status: str | None = None
+    transaction_time: str | None = None
+
+    class Config:
+        extra = "allow"
+
+
+@app.post(
+    "/payments/rentals/{rental_id}/charge",
+    response_model=MidtransChargeResponse,
+    tags=["💳 Payments — Pembayaran"],
+    summary="[User] Generate Snap token Midtrans untuk rental yang sudah disetujui",
+)
+def create_midtrans_charge(
+    rental_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_verified_user),
+):
+    """
+    Flow:
+    1. Admin sudah menyetujui rental (status = disetujui)
+    2. User hit endpoint ini → backend panggil Midtrans Snap API
+    3. Backend simpan order_id & snap_token ke Payment row
+    4. Frontend buka popup Snap pakai token yang dikembalikan
+
+    Endpoint ini idempoten: kalau sudah ada snap_token yang masih fresh
+    (< 20 jam), token lama akan digunakan kembali agar user tidak
+    kena double-charge.
+    """
+    result = crud.create_or_get_snap_charge(
+        db=db,
+        rental_id=rental_id,
+        user_id=current_user.id,
+    )
+    if result is None:
+        raise HTTPException(status_code=404, detail="Rental tidak ditemukan")
+    if "error" in result:
+        raise HTTPException(status_code=result["code"], detail=result["error"])
+
+    payment = result["payment"]
+    return MidtransChargeResponse(
+        payment_id=payment.id,
+        rental_id=payment.rental_id,
+        order_id=result["order_id"],
+        snap_token=result["snap_token"],
+        snap_redirect_url=result["redirect_url"],
+        client_key=midtrans_service.get_client_key(),
+        jumlah=payment.jumlah,
+        status=payment.status.value,
+    )
+
+
+@app.post(
+    "/payments/midtrans/notification",
+    tags=["💳 Payments — Pembayaran"],
+    summary="[Midtrans Webhook] Terima notifikasi status pembayaran",
+    include_in_schema=True,
+)
+async def midtrans_notification(request: Request, db: Session = Depends(get_db)):
+    """
+    Endpoint webhook untuk Midtrans. **Tidak memerlukan JWT** — proteksi
+    dilakukan via verifikasi signature SHA512.
+
+    Signature formula:
+        SHA512(order_id + status_code + gross_amount + SERVER_KEY)
+
+    Pasang URL endpoint ini di Midtrans Dashboard
+    → Settings → Configuration → Payment Notification URL.
+
+    Untuk testing lokal, gunakan ngrok:
+        ngrok http 8000
+        → https://xxxxx.ngrok.io/payments/midtrans/notification
+    """
+    try:
+        payload = await request.json()
+    except Exception:  # noqa: BLE001
+        raise HTTPException(status_code=400, detail="Payload JSON tidak valid")
+
+    order_id = payload.get("order_id")
+    status_code = payload.get("status_code")
+    gross_amount = payload.get("gross_amount")
+    signature_key = payload.get("signature_key")
+
+    if not all([order_id, status_code, gross_amount, signature_key]):
+        raise HTTPException(
+            status_code=400,
+            detail="Payload tidak lengkap (order_id/status_code/gross_amount/signature_key wajib)",
+        )
+
+    # Verifikasi signature — tolak kalau tidak cocok
+    if not midtrans_service.verify_signature(
+        order_id=order_id,
+        status_code=status_code,
+        gross_amount=gross_amount,
+        signature_key=signature_key,
+    ):
+        raise HTTPException(status_code=403, detail="Signature Midtrans tidak valid")
+
+    result = crud.apply_midtrans_notification(db=db, notification=payload)
+    if not result.get("ok"):
+        # Tetap kembalikan 200 agar Midtrans tidak retry berulang untuk
+        # order_id yang memang tidak kita kenali, tapi catat reason-nya.
+        return {"status": "ignored", "reason": result.get("reason")}
+
+    return {
+        "status": "ok",
+        "payment_id": result["payment_id"],
+        "payment_status": result["new_status"],
+    }
+
+
+@app.post(
+    "/payments/{payment_id}/sync",
+    response_model=PaymentResponse,
+    tags=["💳 Payments — Pembayaran"],
+    summary="[User/Admin] Sinkronkan status pembayaran dari Midtrans",
+)
+def sync_payment_status(
+    payment_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """
+    Fallback kalau webhook Midtrans tidak sampai (ngrok mati, firewall, dsb).
+    Endpoint ini menarik status terbaru langsung dari Midtrans Core API.
+
+    Akses:
+    - User: hanya payment miliknya
+    - Admin: hanya payment untuk barangnya
+    - Super admin: semua
+    """
+    from models import UserRole as UR
+
+    payment = crud.get_payment(db=db, payment_id=payment_id)
+    if not payment:
+        raise HTTPException(status_code=404, detail=f"Payment ID {payment_id} tidak ditemukan")
+
+    # Access control
+    if current_user.role == UR.user and payment.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Anda tidak punya akses ke pembayaran ini")
+    if current_user.role == UR.admin:
+        admin_profile = crud.get_admin_profile(db=db, user_id=current_user.id)
+        if not admin_profile or payment.admin_id != admin_profile.id:
+            raise HTTPException(status_code=403, detail="Pembayaran ini bukan untuk barang Anda")
+
+    result = crud.sync_payment_from_midtrans(db=db, payment_id=payment_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"Payment ID {payment_id} tidak ditemukan")
+    if isinstance(result, dict) and "error" in result:
+        raise HTTPException(status_code=result["code"], detail=result["error"])
+    return result
+
+
+@app.get(
+    "/payments/config/public",
+    tags=["💳 Payments — Pembayaran"],
+    summary="Info konfigurasi publik Midtrans (client key)",
+)
+def midtrans_public_config():
+    """
+    Endpoint publik untuk frontend mengambil `client_key` Midtrans tanpa
+    perlu hardcode. Tidak mengembalikan server_key.
+    """
+    return {
+        "client_key": midtrans_service.get_client_key(),
+        "is_production": midtrans_service.is_production(),
+    }
