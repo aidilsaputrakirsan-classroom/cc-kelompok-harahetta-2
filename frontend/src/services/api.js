@@ -376,3 +376,33 @@ export async function sendChatMessage(message, history = []) {
   })
   return handleResponse(res)
 }
+
+// ==================== WALLET & WITHDRAWAL ====================
+export async function fetchWallet() {
+  const res = await fetch(`${API_URL}/admin/wallet`, { headers: authOnlyHeaders() })
+  return handleResponse(res)
+}
+
+export async function fetchWalletTransactions(params = {}) {
+  const q = new URLSearchParams()
+  q.append("skip", params.skip ?? 0)
+  q.append("limit", params.limit ?? 20)
+  const res = await fetch(`${API_URL}/admin/wallet/transactions?${q}`, { headers: authOnlyHeaders() })
+  return handleResponse(res)
+}
+
+export async function requestWithdrawal(data) {
+  const res = await fetch(`${API_URL}/admin/wallet/withdraw`, {
+    method: "POST", headers: authHeaders(), body: JSON.stringify(data),
+  })
+  return handleResponse(res)
+}
+
+export async function fetchMyWithdrawals(params = {}) {
+  const q = new URLSearchParams()
+  if (params.status) q.append("status", params.status)
+  q.append("skip", params.skip ?? 0)
+  q.append("limit", params.limit ?? 20)
+  const res = await fetch(`${API_URL}/admin/wallet/withdrawals?${q}`, { headers: authOnlyHeaders() })
+  return handleResponse(res)
+}

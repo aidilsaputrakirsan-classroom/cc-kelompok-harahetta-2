@@ -6,6 +6,7 @@ import {
   fetchAdminRentals, updateRentalStatus,
   fetchAdminProfile, createAdminProfile, updateAdminProfile,
   fetchCategories, fetchAdminPayments, confirmPayment,
+  fetchWallet, fetchWalletTransactions, requestWithdrawal, fetchMyWithdrawals,
 } from "../services/api"
 import { Button } from "../components/ui/Button"
 import { Input } from "../components/ui/input"
@@ -21,6 +22,7 @@ import {
 import {
   Package, ClipboardList, Store, Plus, Pencil, Trash2,
   Calendar, CheckCircle, XCircle, Save, AlertTriangle, ImageIcon, X, Eye, CreditCard, MapPin,
+  Wallet, ArrowDownToLine, Clock, Ban,
 } from "lucide-react"
 import MapPicker from "../components/MapPicker"
 
@@ -147,6 +149,15 @@ export default function AdminDashboard({ addToast }) {
   const [previewBukti, setPreviewBukti] = useState(null)   // payment object
   const [paymentMap, setPaymentMap] = useState({})          // rental_id -> payment
 
+  // Wallet state
+  const [wallet, setWallet] = useState(null)
+  const [walletTransactions, setWalletTransactions] = useState([])
+  const [withdrawals, setWithdrawals] = useState([])
+  const [wdModalOpen, setWdModalOpen] = useState(false)
+  const [wdForm, setWdForm] = useState({ jumlah: "", bank_name: "", account_number: "", account_holder: "" })
+  const [wdSubmitting, setWdSubmitting] = useState(false)
+  const [walletLoading, setWalletLoading] = useState(false)
+
   const loadItems = useCallback(async () => {
     try { const data = await fetchMyItems(); setItems(data.items) } catch {}
   }, [])
@@ -171,6 +182,24 @@ export default function AdminDashboard({ addToast }) {
       setRentalsLoading(false)
     }
   }, [rentalFilter])
+
+  const loadWallet = useCallback(async () => {
+    setWalletLoading(true)
+    try {
+      const [walletData, txData, wdData] = await Promise.all([
+        fetchWallet(),
+        fetchWalletTransactions({ limit: 10 }),
+        fetchMyWithdrawals({ limit: 20 }),
+      ])
+      setWallet(walletData)
+      setWalletTransactions(txData.transactions || [])
+      setWithdrawals(wdData.withdrawals || [])
+    } catch (err) {
+      console.error("Error loading wallet:", err)
+    } finally {
+      setWalletLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
     setLoading(true)
@@ -277,6 +306,24 @@ export default function AdminDashboard({ addToast }) {
       setPreviewBukti(null)
       await loadRentals()
     } catch (err) { addToast?.(err.message, "error") }
+  }
+
+  const handleWithdraw = async (e) => {
+    e.preventDefault()
+    setWdSubmitting(true)
+    try {
+      await requestWithdrawal({
+        jumlah: parseFloat(wdForm.jumlah),
+        bank_name: wdForm.bank_name,
+        account_number: wdForm.account_number,
+        account_holder: wdForm.account_holder,
+      })
+      addToast?.("Request penarikan berhasil diajukan", "success")
+      setWdModalOpen(false)
+      setWdForm({ jumlah: "", bank_name: "", account_number: "", account_holder: "" })
+      await loadWallet()
+    } catch (err) { addToast?.(err.message, "error") }
+    finally { setWdSubmitting(false) }
   }
 
   const handleSaveProfile = async (e) => {
@@ -409,6 +456,7 @@ export default function AdminDashboard({ addToast }) {
         <TabsList>
           <TabsTrigger value="items"><Package className="w-4 h-4 mr-1" /> Barang ({items.length})</TabsTrigger>
           <TabsTrigger value="rentals" onClick={loadRentals}><ClipboardList className="w-4 h-4 mr-1" /> Sewa Masuk</TabsTrigger>
+          <TabsTrigger value="wallet" onClick={loadWallet}><Wallet className="w-4 h-4 mr-1" /> Saldo</TabsTrigger>
           <TabsTrigger value="profile"><Store className="w-4 h-4 mr-1" /> Profil Usaha</TabsTrigger>
         </TabsList>
 
@@ -512,6 +560,126 @@ export default function AdminDashboard({ addToast }) {
                 />
               ))}
             </div>
+          )}
+        </TabsContent>
+
+        {/* === WALLET / SALDO === */}
+        <TabsContent value="wallet" className="space-y-4 mt-4">
+          {walletLoading ? (
+            <div className="space-y-3">
+              <Skeleton className="h-32 w-full max-w-md" />
+              <Skeleton className="h-20 w-full" />
+            </div>
+          ) : (
+            <>
+              {/* Saldo Card */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <Card className="bg-gradient-to-br from-emerald-500 to-emerald-700 text-white">
+                  <CardContent className="p-5">
+                    <p className="text-sm opacity-80">Saldo Tersedia</p>
+                    <p className="text-2xl font-bold mt-1">{formatPrice(wallet?.saldo || 0)}</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-5">
+                    <p className="text-sm text-muted-foreground">Total Pendapatan</p>
+                    <p className="text-xl font-bold text-foreground mt-1">{formatPrice(wallet?.total_pendapatan || 0)}</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-5">
+                    <p className="text-sm text-muted-foreground">Total Ditarik</p>
+                    <p className="text-xl font-bold text-foreground mt-1">{formatPrice(wallet?.total_withdrawn || 0)}</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Tombol Tarik Saldo */}
+              <div>
+                <Button onClick={() => setWdModalOpen(true)} disabled={!wallet || wallet.saldo < 50000}>
+                  <ArrowDownToLine className="w-4 h-4 mr-1" /> Tarik Saldo
+                </Button>
+                {wallet && wallet.saldo < 50000 && (
+                  <p className="text-xs text-muted-foreground mt-1">Minimal penarikan Rp 50.000</p>
+                )}
+              </div>
+
+              <Separator />
+
+              {/* Riwayat Penarikan */}
+              <div>
+                <h3 className="text-lg font-semibold mb-3">Riwayat Penarikan</h3>
+                {withdrawals.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Belum ada riwayat penarikan</p>
+                ) : (
+                  <div className="space-y-2">
+                    {withdrawals.map(wd => (
+                      <Card key={wd.id}>
+                        <CardContent className="p-4 flex items-center justify-between">
+                          <div>
+                            <p className="font-semibold text-foreground">{formatPrice(wd.jumlah)}</p>
+                            <p className="text-sm text-muted-foreground">{wd.bank_name} • {wd.account_number} • {wd.account_holder}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {new Date(wd.created_at).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
+                            </p>
+                            {wd.rejected_reason && <p className="text-xs text-destructive mt-1">Alasan: {wd.rejected_reason}</p>}
+                          </div>
+                          <div>
+                            {wd.status === "pending" && (
+                              <span className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-yellow-100 text-yellow-800">
+                                <Clock className="w-3 h-3" /> Menunggu
+                              </span>
+                            )}
+                            {wd.status === "processing" && (
+                              <span className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-blue-100 text-blue-800">
+                                <Clock className="w-3 h-3" /> Diproses (1-3 hari)
+                              </span>
+                            )}
+                            {wd.status === "completed" && (
+                              <span className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-green-100 text-green-800">
+                                <CheckCircle className="w-3 h-3" /> Berhasil
+                              </span>
+                            )}
+                            {wd.status === "rejected" && (
+                              <span className="inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-red-100 text-red-800">
+                                <Ban className="w-3 h-3" /> Ditolak
+                              </span>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <Separator />
+
+              {/* Riwayat Pemasukan */}
+              <div>
+                <h3 className="text-lg font-semibold mb-3">Riwayat Pemasukan</h3>
+                {walletTransactions.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Belum ada pemasukan. Saldo akan masuk otomatis saat rental selesai.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {walletTransactions.map((tx, i) => (
+                      <Card key={i}>
+                        <CardContent className="p-4 flex items-center justify-between">
+                          <div>
+                            <p className="font-semibold text-foreground">{tx.item_nama}</p>
+                            <p className="text-sm text-muted-foreground">Penyewa: {tx.penyewa}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {new Date(tx.tanggal).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
+                            </p>
+                          </div>
+                          <p className="text-lg font-bold text-emerald-600">+{formatPrice(tx.jumlah)}</p>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
           )}
         </TabsContent>
 
@@ -805,6 +973,60 @@ export default function AdminDashboard({ addToast }) {
           </div>
         </div>
       )}
+
+      {/* ── WITHDRAWAL MODAL ── */}
+      <Dialog open={wdModalOpen} onOpenChange={setWdModalOpen}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle>Tarik Saldo</DialogTitle>
+            <DialogDescription>
+              Masukkan jumlah dan rekening tujuan. Proses 1-3 hari kerja.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleWithdraw} className="space-y-4">
+            <div className="space-y-2">
+              <Label>Jumlah Penarikan (Rp) *</Label>
+              <Input type="number" min="50000" max={wallet?.saldo || 0} placeholder="100000"
+                value={wdForm.jumlah}
+                onChange={(e) => setWdForm(p => ({ ...p, jumlah: e.target.value }))} required />
+              <p className="text-xs text-muted-foreground">Saldo tersedia: {formatPrice(wallet?.saldo || 0)} • Min: Rp 50.000</p>
+            </div>
+            <div className="space-y-2">
+              <Label>Bank Tujuan *</Label>
+              <select className="flex h-9 w-full rounded-md border border-input bg-background text-foreground px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring appearance-none cursor-pointer"
+                value={wdForm.bank_name}
+                onChange={(e) => setWdForm(p => ({ ...p, bank_name: e.target.value }))} required>
+                <option value="" className="bg-background text-muted-foreground">Pilih Bank</option>
+                <option value="BCA" className="bg-background text-foreground">BCA</option>
+                <option value="BNI" className="bg-background text-foreground">BNI</option>
+                <option value="BRI" className="bg-background text-foreground">BRI</option>
+                <option value="Mandiri" className="bg-background text-foreground">Mandiri</option>
+                <option value="BSI" className="bg-background text-foreground">BSI</option>
+                <option value="CIMB Niaga" className="bg-background text-foreground">CIMB Niaga</option>
+                <option value="Permata" className="bg-background text-foreground">Permata</option>
+                <option value="Danamon" className="bg-background text-foreground">Danamon</option>
+                <option value="DANA" className="bg-background text-foreground">DANA</option>
+                <option value="OVO" className="bg-background text-foreground">OVO</option>
+                <option value="GoPay" className="bg-background text-foreground">GoPay</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label>Nomor Rekening *</Label>
+              <Input placeholder="1234567890" value={wdForm.account_number}
+                onChange={(e) => setWdForm(p => ({ ...p, account_number: e.target.value }))} required />
+            </div>
+            <div className="space-y-2">
+              <Label>Nama Pemilik Rekening *</Label>
+              <Input placeholder="Nama sesuai buku tabungan" value={wdForm.account_holder}
+                onChange={(e) => setWdForm(p => ({ ...p, account_holder: e.target.value }))} required />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setWdModalOpen(false)}>Batal</Button>
+              <Button type="submit" loading={wdSubmitting}>Ajukan Penarikan</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
