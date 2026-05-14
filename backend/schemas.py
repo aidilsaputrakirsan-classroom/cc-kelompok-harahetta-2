@@ -467,3 +467,77 @@ class PaymentDetailResponse(BaseModel):
     payment: PaymentResponse
     rental: RentalResponse
     user: UserResponse
+
+# ============================================================
+# WALLET & WITHDRAWAL SCHEMAS
+# ============================================================
+
+class WithdrawalStatusEnum(str, enum.Enum):
+    pending = "pending"
+    processing = "processing"
+    completed = "completed"
+    rejected = "rejected"
+
+
+class WalletResponse(BaseModel):
+    """Schema response wallet admin."""
+    id: int
+    admin_id: int
+    saldo: float
+    total_pendapatan: float
+    total_withdrawn: float
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class WalletTransactionResponse(BaseModel):
+    """Schema response riwayat transaksi masuk ke wallet."""
+    rental_id: int
+    item_nama: str
+    jumlah: float
+    tanggal: datetime
+    penyewa: str
+
+
+class WithdrawalCreate(BaseModel):
+    """Schema untuk request withdrawal."""
+    jumlah: float = Field(..., gt=0, examples=[500000.0])
+    bank_name: str = Field(..., min_length=2, max_length=50, examples=["BCA"])
+    account_number: str = Field(..., min_length=5, max_length=50, examples=["1234567890"])
+    account_holder: str = Field(..., min_length=2, max_length=100, examples=["Toko Sewa Jaya"])
+    catatan: Optional[str] = Field(None, examples=["Penarikan bulanan"])
+
+
+class WithdrawalResponse(BaseModel):
+    """Schema response withdrawal."""
+    id: int
+    wallet_id: int
+    admin_id: int
+    jumlah: float
+    bank_name: str
+    account_number: str
+    account_holder: str
+    status: WithdrawalStatusEnum
+    catatan: Optional[str]
+    rejected_reason: Optional[str]
+    completed_at: Optional[datetime]
+    created_at: datetime
+    updated_at: Optional[datetime]
+
+    class Config:
+        from_attributes = True
+
+
+class WithdrawalListResponse(BaseModel):
+    """Response untuk list withdrawal dengan total count."""
+    total: int
+    withdrawals: List[WithdrawalResponse]
+
+
+class WithdrawalActionByAdmin(BaseModel):
+    """Schema untuk super admin memproses withdrawal."""
+    status: WithdrawalStatusEnum = Field(..., examples=["processing"])
+    catatan: Optional[str] = Field(None, examples=["Sedang diproses ke rekening tujuan"])
+    rejected_reason: Optional[str] = Field(None, examples=["Nomor rekening tidak valid"])

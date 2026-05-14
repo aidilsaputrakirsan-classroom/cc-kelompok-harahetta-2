@@ -10,6 +10,7 @@ from sqlalchemy import or_, func
 
 from models import User, AdminProfile, UserProfile, Category, Item, Rental, Payment
 from models import UserRole, VerificationStatus, ItemStatus, RentalStatus, PaymentStatus, PaymentMethod
+from models import Wallet, Withdrawal, WithdrawalStatus
 from schemas import (
     UserCreate, UserUpdateByAdmin,
     AdminProfileCreate, AdminProfileUpdate,
@@ -782,6 +783,15 @@ def update_rental_status(
                 item.stok += 1
             _recalculate_item_status(db, item)
 
+            # Jika selesai & payment sudah completed → tambah saldo wallet admin
+            if data.status == RentalStatus.selesai:
+                payment_check = db.query(Payment).filter(
+                    Payment.rental_id == rental_id,
+                    Payment.status == PaymentStatus.completed,
+                ).first()
+                if payment_check:
+                    add_wallet_balance(db, item.admin_id, payment_check.jumlah)
+
     db.commit()
     db.refresh(rental)
     return db.query(Rental).options(
@@ -1247,3 +1257,186 @@ def sync_payment_from_midtrans(db: Session, payment_id: int) -> Payment | None |
     apply_midtrans_notification(db, status_resp)
     db.refresh(payment)
     return payment
+
+
+
+# ============================================================
+# WALLET & WITHDRAWAL CRUD
+# ============================================================
+
+from schemas import WithdrawalCreate, WithdrawalActionByAdmin
+
+
+def get_or_create_wallet(db: Session, admin_id: int) -> Wallet:
+    """Ambil atau buat wallet untuk admin. Auto-create jika belum ada."""
+    wallet = db.query(Wallet).filter(Wallet.admin_id == admin_id).first()
+    if not wallet:
+        wallet = Wallet(admin_id=admin_id, saldo=0.0, total_pendapatan=0.0, total_withdrawn=0.0)
+        db.add(wallet)
+        db.commit()
+        db.refresh(wallet)
+    return wallet
+
+
+def add_wallet_balance(db: Session, admin_id: int, amount: float) -> Wallet:
+    """
+    Tambah saldo wallet admin setelah rental selesai.
+    Dipanggil saat rental status berubah ke 'selesai' DAN payment sudah completed.
+    """
+    wallet = get_or_create_wallet(db, admin_id)
+    wallet.saldo += amount
+    wallet.total_pendapatan += amount
+    db.commit()
+    db.refresh(wallet)
+    return wallet
+
+
+def get_wallet_transactions(db: Session, admin_id: int, skip: int = 0, limit: int = 20) -> dict:
+    """
+    Ambil riwayat transaksi masuk ke wallet (dari rental yang selesai).
+    Berdasarkan payments yang completed untuk admin ini.
+    """
+    query = (
+        db.query(Payment)
+        .options(
+            joinedload(Payment.rental).joinedload(Rental.item),
+            joinedload(Payment.user)
+        )
+        .filter(
+            Payment.admin_id == admin_id,
+            Payment.status == PaymentStatus.completed,
+        )
+    )
+    total = query.count()
+    payments = query.order_by(Payment.tanggal_pembayaran.desc()).offset(skip).limit(limit).all()
+
+    transactions = []
+    for p in payments:
+        transactions.append({
+            "rental_id": p.rental_id,
+            "item_nama": p.rental.item.nama if p.rental and p.rental.item else "Unknown",
+            "jumlah": p.jumlah,
+            "tanggal": p.tanggal_pembayaran or p.created_at,
+            "penyewa": p.user.nama if p.user else "Unknown",
+        })
+
+    return {"total": total, "transactions": transactions}
+
+
+def create_withdrawal(db: Session, admin_id: int, data: WithdrawalCreate) -> dict | Withdrawal:
+    """
+    Buat request withdrawal dari wallet admin.
+    Validasi: saldo harus cukup, minimal WD Rp 50.000.
+    """
+    MIN_WITHDRAWAL = 50000.0
+
+    wallet = get_or_create_wallet(db, admin_id)
+
+    if data.jumlah < MIN_WITHDRAWAL:
+        return {"error": f"Minimal penarikan Rp {int(MIN_WITHDRAWAL):,}", "code": 400}
+
+    if data.jumlah > wallet.saldo:
+        return {"error": f"Saldo tidak cukup. Saldo saat ini: Rp {wallet.saldo:,.0f}", "code": 400}
+
+    # Kurangi saldo langsung (hold)
+    wallet.saldo -= data.jumlah
+
+    withdrawal = Withdrawal(
+        wallet_id=wallet.id,
+        admin_id=admin_id,
+        jumlah=data.jumlah,
+        bank_name=data.bank_name,
+        account_number=data.account_number,
+        account_holder=data.account_holder,
+        status=WithdrawalStatus.pending,
+        catatan=data.catatan,
+    )
+    db.add(withdrawal)
+    db.commit()
+    db.refresh(withdrawal)
+    return withdrawal
+
+
+def get_withdrawals(
+    db: Session,
+    skip: int = 0,
+    limit: int = 20,
+    admin_id: Optional[int] = None,
+    status: Optional[str] = None,
+) -> dict:
+    """Ambil daftar withdrawal dengan filter."""
+    query = db.query(Withdrawal)
+
+    if admin_id:
+        query = query.filter(Withdrawal.admin_id == admin_id)
+
+    if status:
+        try:
+            status_enum = WithdrawalStatus(status)
+            query = query.filter(Withdrawal.status == status_enum)
+        except ValueError:
+            pass
+
+    total = query.count()
+    withdrawals = query.order_by(Withdrawal.created_at.desc()).offset(skip).limit(limit).all()
+    return {"total": total, "withdrawals": withdrawals}
+
+
+def get_withdrawal(db: Session, withdrawal_id: int) -> Withdrawal | None:
+    """Ambil satu withdrawal berdasarkan ID."""
+    return db.query(Withdrawal).filter(Withdrawal.id == withdrawal_id).first()
+
+
+def update_withdrawal_status(
+    db: Session,
+    withdrawal_id: int,
+    data: WithdrawalActionByAdmin,
+) -> Withdrawal | None | dict:
+    """
+    Super admin memproses withdrawal.
+    - pending → processing: sedang diproses (1-3 hari)
+    - processing → completed: uang sudah ditransfer
+    - pending/processing → rejected: ditolak, saldo dikembalikan
+    """
+    withdrawal = db.query(Withdrawal).filter(Withdrawal.id == withdrawal_id).first()
+    if not withdrawal:
+        return None
+
+    old_status = withdrawal.status
+
+    # Validasi transisi
+    valid_transitions = {
+        WithdrawalStatus.pending: [WithdrawalStatus.processing, WithdrawalStatus.rejected],
+        WithdrawalStatus.processing: [WithdrawalStatus.completed, WithdrawalStatus.rejected],
+        WithdrawalStatus.completed: [],
+        WithdrawalStatus.rejected: [],
+    }
+
+    if data.status not in valid_transitions.get(old_status, []):
+        return {
+            "error": f"Tidak dapat mengubah status dari '{old_status.value}' ke '{data.status.value}'",
+            "code": 400,
+        }
+
+    withdrawal.status = data.status
+
+    if data.catatan:
+        withdrawal.catatan = data.catatan
+
+    if data.status == WithdrawalStatus.rejected:
+        withdrawal.rejected_reason = data.rejected_reason
+        # Kembalikan saldo ke wallet
+        wallet = db.query(Wallet).filter(Wallet.id == withdrawal.wallet_id).first()
+        if wallet:
+            wallet.saldo += withdrawal.jumlah
+
+    if data.status == WithdrawalStatus.completed:
+        withdrawal.completed_at = datetime.now()
+        # Update total_withdrawn di wallet
+        wallet = db.query(Wallet).filter(Wallet.id == withdrawal.wallet_id).first()
+        if wallet:
+            wallet.total_withdrawn += withdrawal.jumlah
+
+    db.commit()
+    db.refresh(withdrawal)
+    return withdrawal

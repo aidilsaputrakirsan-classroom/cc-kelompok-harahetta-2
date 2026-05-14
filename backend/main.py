@@ -31,6 +31,9 @@ from schemas import (
     # Payment
     PaymentCreate, PaymentUpdate, PaymentResponse, PaymentListResponse,
     MidtransChargeResponse,
+    # Wallet & Withdrawal
+    WalletResponse, WithdrawalCreate, WithdrawalResponse,
+    WithdrawalListResponse, WithdrawalActionByAdmin,
 )
 from auth import (
     create_access_token, get_current_user,
@@ -1644,3 +1647,163 @@ def midtrans_public_config():
         "client_key": midtrans_service.get_client_key(),
         "is_production": midtrans_service.is_production(),
     }
+
+
+
+# ============================================================
+# WALLET & WITHDRAWAL — Saldo & Penarikan Admin
+# ============================================================
+
+@app.get(
+    "/admin/wallet",
+    response_model=WalletResponse,
+    tags=["💰 Wallet — Saldo Admin"],
+    summary="[Admin] Lihat saldo wallet saya",
+)
+def get_my_wallet(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    """
+    Admin melihat saldo wallet-nya.
+
+    Saldo bertambah otomatis setiap kali rental selesai (status = selesai)
+    dan pembayaran sudah completed.
+    """
+    admin_profile = crud.get_admin_profile(db=db, user_id=current_user.id)
+    if not admin_profile:
+        raise HTTPException(status_code=404, detail="Profil usaha tidak ditemukan")
+    wallet = crud.get_or_create_wallet(db=db, admin_id=admin_profile.id)
+    return wallet
+
+
+@app.get(
+    "/admin/wallet/transactions",
+    tags=["💰 Wallet — Saldo Admin"],
+    summary="[Admin] Riwayat pemasukan wallet",
+)
+def get_my_wallet_transactions(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    """
+    Admin melihat riwayat pemasukan ke wallet (dari rental yang selesai & dibayar).
+    """
+    admin_profile = crud.get_admin_profile(db=db, user_id=current_user.id)
+    if not admin_profile:
+        raise HTTPException(status_code=404, detail="Profil usaha tidak ditemukan")
+    return crud.get_wallet_transactions(db=db, admin_id=admin_profile.id, skip=skip, limit=limit)
+
+
+@app.post(
+    "/admin/wallet/withdraw",
+    response_model=WithdrawalResponse,
+    status_code=201,
+    tags=["💰 Wallet — Saldo Admin"],
+    summary="[Admin] Request penarikan saldo ke rekening bank",
+)
+def request_withdrawal(
+    data: WithdrawalCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    """
+    Admin mengajukan penarikan saldo ke rekening bank.
+
+    **Ketentuan:**
+    - Minimal penarikan: Rp 50.000
+    - Saldo harus cukup
+    - Pilih bank tujuan (BCA, BNI, Mandiri, BSI, dll)
+    - Estimasi proses: 1-3 hari kerja
+
+    **Flow:**
+    1. Admin request WD → status `pending`
+    2. Super admin proses → status `processing`
+    3. Transfer selesai → status `completed`
+
+    Jika ditolak, saldo dikembalikan ke wallet.
+    """
+    admin_profile = crud.get_admin_profile(db=db, user_id=current_user.id)
+    if not admin_profile:
+        raise HTTPException(status_code=404, detail="Profil usaha tidak ditemukan")
+
+    result = crud.create_withdrawal(db=db, admin_id=admin_profile.id, data=data)
+
+    if isinstance(result, dict) and "error" in result:
+        raise HTTPException(status_code=result["code"], detail=result["error"])
+
+    return result
+
+
+@app.get(
+    "/admin/wallet/withdrawals",
+    response_model=WithdrawalListResponse,
+    tags=["💰 Wallet — Saldo Admin"],
+    summary="[Admin] Riwayat penarikan saldo saya",
+)
+def my_withdrawals(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    wd_status: str = Query(None, alias="status", description="Filter: pending | processing | completed | rejected"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    """Admin melihat riwayat penarikan saldo."""
+    admin_profile = crud.get_admin_profile(db=db, user_id=current_user.id)
+    if not admin_profile:
+        return {"total": 0, "withdrawals": []}
+    return crud.get_withdrawals(db=db, skip=skip, limit=limit, admin_id=admin_profile.id, status=wd_status)
+
+
+# ── Super Admin: Kelola Withdrawal
+
+@app.get(
+    "/superadmin/withdrawals",
+    response_model=WithdrawalListResponse,
+    tags=["👑 Super Admin"],
+    summary="[Super Admin] Semua request penarikan",
+)
+def all_withdrawals(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    wd_status: str = Query(None, alias="status", description="Filter: pending | processing | completed | rejected"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_super_admin),
+):
+    """Super Admin melihat semua request penarikan saldo dari admin."""
+    return crud.get_withdrawals(db=db, skip=skip, limit=limit, status=wd_status)
+
+
+@app.put(
+    "/superadmin/withdrawals/{withdrawal_id}",
+    response_model=WithdrawalResponse,
+    tags=["👑 Super Admin"],
+    summary="[Super Admin] Proses/tolak penarikan saldo",
+)
+def process_withdrawal(
+    withdrawal_id: int,
+    data: WithdrawalActionByAdmin,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_super_admin),
+):
+    """
+    Super Admin memproses request penarikan saldo admin.
+
+    **Flow status:**
+    - `pending` → `processing` (sedang diproses, estimasi 1-3 hari)
+    - `processing` → `completed` (transfer berhasil)
+    - `pending`/`processing` → `rejected` (ditolak, saldo dikembalikan)
+
+    Jika ditolak, sertakan `rejected_reason` agar admin tahu alasannya.
+    """
+    result = crud.update_withdrawal_status(db=db, withdrawal_id=withdrawal_id, data=data)
+
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"Withdrawal ID {withdrawal_id} tidak ditemukan")
+
+    if isinstance(result, dict) and "error" in result:
+        raise HTTPException(status_code=result["code"], detail=result["error"])
+
+    return result

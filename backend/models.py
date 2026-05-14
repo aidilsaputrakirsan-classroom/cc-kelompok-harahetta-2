@@ -58,6 +58,13 @@ class PaymentMethod(str, enum.Enum):
     midtrans = "midtrans"
 
 
+class WithdrawalStatus(str, enum.Enum):
+    pending = "pending"
+    processing = "processing"
+    completed = "completed"
+    rejected = "rejected"
+
+
 # ============================================================
 # TABEL users — Semua Pengguna Platform
 # ============================================================
@@ -285,3 +292,63 @@ class Payment(Base):
 
     def __repr__(self):
         return f"<Payment(id={self.id}, rental_id={self.rental_id}, status='{self.status}', jumlah={self.jumlah})>"
+
+
+# ============================================================
+# TABEL wallets — Saldo Admin Penyewa
+# ============================================================
+
+class Wallet(Base):
+    """
+    Wallet internal untuk admin penyewa.
+    Saldo bertambah otomatis saat rental selesai (payment completed).
+    """
+    __tablename__ = "wallets"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    admin_id = Column(Integer, ForeignKey("admins.id", ondelete="CASCADE"), unique=True, nullable=False)
+    saldo = Column(Float, nullable=False, default=0.0)
+    total_pendapatan = Column(Float, nullable=False, default=0.0)  # Akumulasi semua pendapatan
+    total_withdrawn = Column(Float, nullable=False, default=0.0)   # Akumulasi semua WD berhasil
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
+
+    # Relationships
+    admin = relationship("AdminProfile", backref="wallet")
+    withdrawals = relationship("Withdrawal", back_populates="wallet")
+
+    def __repr__(self):
+        return f"<Wallet(id={self.id}, admin_id={self.admin_id}, saldo={self.saldo})>"
+
+
+# ============================================================
+# TABEL withdrawals — Penarikan Saldo
+# ============================================================
+
+class Withdrawal(Base):
+    """
+    Request penarikan saldo dari wallet admin ke rekening bank.
+    Status flow: pending → processing → completed (atau rejected)
+    Estimasi waktu: 1-3 hari kerja (simulasi).
+    """
+    __tablename__ = "withdrawals"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    wallet_id = Column(Integer, ForeignKey("wallets.id", ondelete="CASCADE"), nullable=False)
+    admin_id = Column(Integer, ForeignKey("admins.id", ondelete="CASCADE"), nullable=False)
+    jumlah = Column(Float, nullable=False)
+    bank_name = Column(String(50), nullable=False)          # Nama bank tujuan (BCA, BNI, Mandiri, dll)
+    account_number = Column(String(50), nullable=False)     # Nomor rekening tujuan
+    account_holder = Column(String(100), nullable=False)    # Nama pemilik rekening
+    status = Column(SAEnum(WithdrawalStatus), nullable=False, default=WithdrawalStatus.pending)
+    catatan = Column(Text, nullable=True)                   # Catatan admin/super_admin
+    rejected_reason = Column(Text, nullable=True)           # Alasan ditolak (jika rejected)
+    completed_at = Column(DateTime(timezone=True), nullable=True)  # Kapan WD selesai diproses
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
+
+    # Relationships
+    wallet = relationship("Wallet", back_populates="withdrawals")
+    admin = relationship("AdminProfile", foreign_keys=[admin_id])
+
+    def __repr__(self):
+        return f"<Withdrawal(id={self.id}, admin_id={self.admin_id}, jumlah={self.jumlah}, status='{self.status}')>"
