@@ -608,37 +608,68 @@ def update_item_superadmin(db: Session, item_id: int, data: ItemUpdate) -> Item 
 def delete_item(db: Session, item_id: int, admin_id: int) -> bool:
     """
     Hapus atau nonaktifkan barang.
-    - Jika tidak ada rental terkait: hapus permanen.
-    - Jika ada rental terkait: set status 'unavailable' (soft-delete).
+    - Jika ada rental aktif (pending/disetujui/sedang_disewa) yang pembayarannya
+      belum failed/cancelled: soft-delete (nonaktifkan).
+    - Jika tidak ada rental aktif: hapus permanen (termasuk rental & payment terkait).
     """
     item = db.query(Item).filter(Item.id == item_id, Item.admin_id == admin_id).first()
     if not item:
         return False
-    from models import Rental
-    has_rentals = db.query(Rental).filter(Rental.item_id == item_id).first()
-    if has_rentals:
-        # Soft-delete: nonaktifkan barang, set stok 0
+    from models import Rental, RentalStatus, Payment, PaymentStatus
+    active_rentals = db.query(Rental).outerjoin(Payment, Payment.rental_id == Rental.id).filter(
+        Rental.item_id == item_id,
+        Rental.status.in_([RentalStatus.pending, RentalStatus.disetujui, RentalStatus.sedang_disewa]),
+        or_(
+            Payment.id.is_(None),
+            Payment.status.notin_([PaymentStatus.failed, PaymentStatus.cancelled]),
+        ),
+    ).first()
+    if active_rentals:
+        # Ada proses sewa berjalan → nonaktifkan saja
         item.status = "unavailable"
         item.stok = 0
         db.commit()
     else:
+        # Tidak ada proses aktif → hapus permanen beserta rental & payment terkait
+        rentals = db.query(Rental).filter(Rental.item_id == item_id).all()
+        for rental in rentals:
+            db.query(Payment).filter(Payment.rental_id == rental.id).delete()
+            db.delete(rental)
         db.delete(item)
         db.commit()
     return True
 
 
 def delete_item_superadmin(db: Session, item_id: int) -> bool:
-    """Hapus atau nonaktifkan barang oleh super admin."""
+    """
+    Hapus atau nonaktifkan barang oleh super admin.
+    - Jika ada rental aktif (pending/disetujui/sedang_disewa) yang pembayarannya
+      belum failed/cancelled: soft-delete (nonaktifkan).
+    - Jika tidak ada rental aktif: hapus permanen (termasuk rental & payment terkait).
+    """
     item = db.query(Item).filter(Item.id == item_id).first()
     if not item:
         return False
-    from models import Rental
-    has_rentals = db.query(Rental).filter(Rental.item_id == item_id).first()
-    if has_rentals:
+    from models import Rental, RentalStatus, Payment, PaymentStatus
+    active_rentals = db.query(Rental).outerjoin(Payment, Payment.rental_id == Rental.id).filter(
+        Rental.item_id == item_id,
+        Rental.status.in_([RentalStatus.pending, RentalStatus.disetujui, RentalStatus.sedang_disewa]),
+        or_(
+            Payment.id.is_(None),
+            Payment.status.notin_([PaymentStatus.failed, PaymentStatus.cancelled]),
+        ),
+    ).first()
+    if active_rentals:
+        # Ada proses sewa berjalan → nonaktifkan saja
         item.status = "unavailable"
         item.stok = 0
         db.commit()
     else:
+        # Tidak ada proses aktif → hapus permanen beserta rental & payment terkait
+        rentals = db.query(Rental).filter(Rental.item_id == item_id).all()
+        for rental in rentals:
+            db.query(Payment).filter(Payment.rental_id == rental.id).delete()
+            db.delete(rental)
         db.delete(item)
         db.commit()
     return True
@@ -659,6 +690,7 @@ def create_rental(db: Session, user_id: int, data: RentalCreate) -> dict | None:
     Buat permintaan sewa baru.
     - User harus terverifikasi
     - Barang harus available
+    - Stok langsung dikurangi saat rental dibuat (reservasi)
     - Total harga dihitung otomatis
     Return dict dengan 'error' jika gagal, atau Rental object jika sukses.
     """
@@ -687,6 +719,11 @@ def create_rental(db: Session, user_id: int, data: RentalCreate) -> dict | None:
         catatan=data.catatan,
     )
     db.add(rental)
+
+    # Reservasi: kurangi stok saat rental dibuat
+    item.stok = max(0, item.stok - 1)
+    _recalculate_item_status(db, item)
+
     db.commit()
     db.refresh(rental)
 
@@ -789,10 +826,8 @@ def update_rental_status(
     item = db.query(Item).filter(Item.id == rental.item_id).first()
     if item:
         if data.status == RentalStatus.disetujui and old_status == RentalStatus.pending:
-            # Disetujui: kurangi stok
-            item.stok = max(0, item.stok - 1)
-            _recalculate_item_status(db, item)
-            
+            # Stok sudah dikurangi saat rental dibuat (pending), tidak perlu kurangi lagi.
+
             # Auto-create payment saat rental disetujui
             create_payment_auto(db=db, rental_id=rental_id)
             
@@ -808,10 +843,23 @@ def update_rental_status(
                 rental.pickup_telepon = admin_profile.nomor_telepon
             
         elif data.status in [RentalStatus.selesai, RentalStatus.ditolak]:
-            # Selesai atau ditolak: kembalikan stok
-            if old_status in [RentalStatus.disetujui, RentalStatus.sedang_disewa]:
+            # Selesai atau ditolak: kembalikan stok yang ter-reservasi
+            if old_status in [
+                RentalStatus.pending,
+                RentalStatus.disetujui,
+                RentalStatus.sedang_disewa,
+            ]:
                 item.stok += 1
             _recalculate_item_status(db, item)
+
+            # Jika ditolak, batalkan juga payment yang masih pending
+            if data.status == RentalStatus.ditolak:
+                pending_payment = db.query(Payment).filter(
+                    Payment.rental_id == rental_id,
+                    Payment.status == PaymentStatus.pending,
+                ).first()
+                if pending_payment:
+                    pending_payment.status = PaymentStatus.cancelled
 
             # Jika selesai & payment sudah completed → tambah saldo wallet admin
             if data.status == RentalStatus.selesai:
@@ -1032,6 +1080,21 @@ def update_payment_status(
         # Rental TIDAK otomatis pindah ke sedang_disewa.
         # Admin tetap harus klik "Proses Sewa" di dashboard setelah
         # barang benar-benar diambil user.
+
+    # Jika pembayaran ditolak/dibatalkan → otomatis tolak rental
+    # dan kembalikan stok agar barang tidak tertahan sebagai "rental aktif".
+    if data.status in (PaymentStatus.failed, PaymentStatus.cancelled) and old_status != data.status:
+        rental = db.query(Rental).filter(Rental.id == payment.rental_id).first()
+        if rental and rental.status in (RentalStatus.pending, RentalStatus.disetujui):
+            old_rental_status = rental.status
+            rental.status = RentalStatus.ditolak
+            item = db.query(Item).filter(Item.id == rental.item_id).first()
+            if item:
+                # Stok di-reservasi sejak rental dibuat (pending),
+                # jadi kembalikan untuk pending atau disetujui.
+                if old_rental_status in (RentalStatus.pending, RentalStatus.disetujui):
+                    item.stok += 1
+                _recalculate_item_status(db, item)
 
     db.commit()
     db.refresh(payment)
