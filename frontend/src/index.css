@@ -1,129 +1,227 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Instrument+Serif&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* ─────────────────────────────────────────────────────────────
+   Sewain · Modern Minimal Green Theme
+   Single base palette (deep emerald + clean white) — hindari
+   noise warna; pakai aksen hijau saja. Status pakai warna
+   tetap (amber/rose) tapi muted.
+───────────────────────────────────────────────────────────── */
+
 @layer base {
-  /* ── Light mode ─────────────────────────────────────────── */
+  /* ── Light ──────────────────────────────────────────────── */
   :root {
-    --background: 150 10% 97%;
-    --foreground: 200 25% 10%;
-    --card: 0 0% 100%;
-    --card-foreground: 200 25% 10%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 200 25% 10%;
-    --primary: 168 65% 38%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 168 30% 92%;
-    --secondary-foreground: 168 65% 25%;
-    --muted: 200 10% 94%;
-    --muted-foreground: 200 10% 45%;
-    --accent: 35 90% 55%;
-    --accent-foreground: 35 90% 15%;
-    --destructive: 0 72% 51%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 200 15% 89%;
-    --input: 200 15% 89%;
-    --ring: 168 65% 38%;
-    --radius: 0.75rem;
-    --sidebar-background: 200 25% 10%;
-    --sidebar-foreground: 200 10% 80%;
-    --sidebar-primary: 168 65% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 200 20% 16%;
-    --sidebar-accent-foreground: 200 10% 90%;
-    --sidebar-border: 200 20% 18%;
-    --sidebar-ring: 168 65% 48%;
-    --success: 142 71% 45%;
-    --success-foreground: 0 0% 100%;
-    --warning: 38 92% 50%;
-    --warning-foreground: 38 92% 15%;
-    --info: 210 80% 55%;
-    --info-foreground: 0 0% 100%;
-    /* custom section alt */
-    --section-alt: 155 30% 95%;
-    /* custom catalog/user bg */
-    --page-bg: 150 20% 97%;
+    /* Surfaces */
+    --background:           0 0% 100%;
+    --foreground:           160 35% 10%;
 
-    font-family: "Plus Jakarta Sans", sans-serif;
+    --card:                 0 0% 100%;
+    --card-foreground:      160 35% 10%;
+
+    --popover:              0 0% 100%;
+    --popover-foreground:   160 35% 10%;
+
+    /* Brand · deep elegant emerald */
+    --primary:              160 84% 24%;
+    --primary-foreground:   0 0% 100%;
+
+    /* Soft mint tint */
+    --secondary:            150 38% 96%;
+    --secondary-foreground: 160 60% 18%;
+
+    --muted:                150 20% 96%;
+    --muted-foreground:     160 10% 40%;
+
+    /* Accent shares the brand tone */
+    --accent:               150 50% 92%;
+    --accent-foreground:    160 60% 18%;
+
+    --destructive:          0 70% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border:               150 15% 91%;
+    --input:                150 15% 91%;
+    --ring:                 160 84% 24%;
+
+    --radius:               0.875rem;
+
+    /* Sidebar (admin/superadmin) — dark forest */
+    --sidebar-background:           160 35% 8%;
+    --sidebar-foreground:           150 15% 80%;
+    --sidebar-primary:              150 70% 48%;
+    --sidebar-primary-foreground:   0 0% 100%;
+    --sidebar-accent:               160 30% 14%;
+    --sidebar-accent-foreground:    150 25% 92%;
+    --sidebar-border:               160 30% 16%;
+    --sidebar-ring:                 150 70% 48%;
+
+    /* Status — kept muted */
+    --success:              152 65% 38%;
+    --success-foreground:   0 0% 100%;
+    --warning:              38 92% 50%;
+    --warning-foreground:   38 92% 12%;
+    --info:                 200 55% 45%;
+    --info-foreground:      0 0% 100%;
+
+    /* Custom helpers */
+    --section-alt:          150 35% 98%;
+    --page-bg:              150 30% 99%;
+    --hero-deep:            160 60% 12%;
+
+    font-family: "Plus Jakarta Sans", system-ui, sans-serif;
   }
 
-  /* ── Dark mode ──────────────────────────────────────────── */
+  /* ── Dark ───────────────────────────────────────────────── */
   .dark {
-    --background: 200 22% 7%;
-    --foreground: 200 12% 92%;
-    --card: 200 20% 10%;
-    --card-foreground: 200 12% 92%;
-    --popover: 200 20% 10%;
-    --popover-foreground: 200 12% 92%;
-    --primary: 168 55% 48%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 168 20% 16%;
-    --secondary-foreground: 168 40% 78%;
-    --muted: 200 16% 15%;
-    --muted-foreground: 200 10% 55%;
-    --accent: 35 85% 55%;
-    --accent-foreground: 35 90% 12%;
-    --destructive: 0 62% 55%;
+    --background:           160 25% 6%;
+    --foreground:           150 12% 92%;
+
+    --card:                 160 22% 9%;
+    --card-foreground:      150 12% 92%;
+
+    --popover:              160 22% 9%;
+    --popover-foreground:   150 12% 92%;
+
+    --primary:              150 70% 50%;
+    --primary-foreground:   160 50% 8%;
+
+    --secondary:            160 22% 14%;
+    --secondary-foreground: 150 30% 80%;
+
+    --muted:                160 18% 14%;
+    --muted-foreground:     150 10% 58%;
+
+    --accent:               160 25% 18%;
+    --accent-foreground:    150 35% 88%;
+
+    --destructive:          0 65% 55%;
     --destructive-foreground: 0 0% 100%;
-    --border: 200 16% 18%;
-    --input: 200 16% 18%;
-    --ring: 168 55% 48%;
-    --sidebar-background: 200 25% 6%;
-    --sidebar-foreground: 200 10% 75%;
-    --sidebar-primary: 168 55% 50%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 200 20% 12%;
-    --sidebar-accent-foreground: 200 10% 88%;
-    --sidebar-border: 200 20% 14%;
-    --sidebar-ring: 168 55% 50%;
-    --success: 142 60% 40%;
-    --success-foreground: 0 0% 100%;
-    --warning: 38 85% 50%;
-    --warning-foreground: 38 90% 10%;
-    --info: 210 70% 55%;
-    --info-foreground: 0 0% 100%;
-    /* custom section alt dark */
-    --section-alt: 200 22% 9%;
-    /* custom catalog/user bg dark */
-    --page-bg: 200 22% 8%;
+
+    --border:               160 20% 18%;
+    --input:                160 20% 18%;
+    --ring:                 150 70% 50%;
+
+    --sidebar-background:           160 35% 5%;
+    --sidebar-foreground:           150 12% 78%;
+    --sidebar-primary:              150 70% 52%;
+    --sidebar-primary-foreground:   160 50% 8%;
+    --sidebar-accent:               160 30% 11%;
+    --sidebar-accent-foreground:    150 25% 90%;
+    --sidebar-border:               160 30% 14%;
+    --sidebar-ring:                 150 70% 52%;
+
+    --success:              152 60% 42%;
+    --success-foreground:   0 0% 100%;
+    --warning:              38 88% 55%;
+    --warning-foreground:   38 90% 10%;
+    --info:                 200 55% 55%;
+    --info-foreground:      0 0% 100%;
+
+    --section-alt:          160 25% 8%;
+    --page-bg:              160 25% 6%;
+    --hero-deep:            160 60% 6%;
   }
 
-  * {
-    @apply border-border;
-  }
+  * { @apply border-border; }
 
   body {
     @apply bg-background text-foreground antialiased;
+    font-feature-settings: "ss01", "cv11";
   }
 
-  /* Smooth theme transition */
+  ::selection {
+    background-color: hsl(var(--primary) / 0.18);
+    color: hsl(var(--primary));
+  }
+
+  /* Subtle theme transition */
   *, *::before, *::after {
-    transition: background-color 0.2s ease, border-color 0.2s ease, color 0.1s ease;
+    transition: background-color .18s ease, border-color .18s ease, color .12s ease;
   }
 }
 
+/* ─────────────────────────────────────────────────────────────
+   Utilities
+───────────────────────────────────────────────────────────── */
+
 @layer utilities {
-  .text-gradient-hero {
+  /* Brand gradient text */
+  .text-gradient-brand {
+    background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(150 65% 42%) 60%, hsl(140 70% 55%) 100%);
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
-    background-image: linear-gradient(135deg, #1b7e6a, #15c19f, #f49d25);
   }
 
+  /* Display serif for editorial accents */
+  .font-display {
+    font-family: "Instrument Serif", Georgia, serif;
+    font-style: italic;
+    letter-spacing: -0.01em;
+  }
+
+  /* Section helpers */
+  .bg-section-alt { background-color: hsl(var(--section-alt)); }
+  .bg-page        { background-color: hsl(var(--page-bg)); }
+  .bg-hero-deep   { background-color: hsl(var(--hero-deep)); }
+
+  /* Soft hero backdrop */
   .bg-hero-pattern {
     background-image:
-      radial-gradient(ellipse 80% 50% at 50% -20%, hsl(168 65% 38% / 0.08), transparent),
-      radial-gradient(ellipse 60% 40% at 80% 100%, hsl(35 90% 55% / 0.06), transparent);
+      radial-gradient(ellipse 70% 55% at 50% -10%, hsl(var(--primary) / 0.10), transparent 70%),
+      radial-gradient(ellipse 50% 35% at 100% 100%, hsl(var(--primary) / 0.06), transparent 70%);
   }
 
-  /* Ganti hardcoded hex dengan CSS variable agar dark mode aware */
-  .bg-section-alt {
-    background-color: hsl(var(--section-alt));
+  /* Dotted ambient grid */
+  .bg-dot-grid {
+    background-image: radial-gradient(hsl(var(--foreground) / 0.10) 1px, transparent 1px);
+    background-size: 22px 22px;
+    background-position: 0 0;
   }
 
-  .bg-page {
-    background-color: hsl(var(--page-bg));
+  /* Subtle mesh for hero */
+  .bg-mesh {
+    background:
+      radial-gradient(at 8% 12%, hsl(var(--primary) / 0.10) 0px, transparent 45%),
+      radial-gradient(at 92% 10%, hsl(var(--primary) / 0.06) 0px, transparent 50%),
+      radial-gradient(at 50% 100%, hsl(var(--primary) / 0.08) 0px, transparent 55%);
   }
+
+  /* Card lift */
+  .lift {
+    transition: transform .35s cubic-bezier(.22,1,.36,1), box-shadow .35s cubic-bezier(.22,1,.36,1);
+  }
+  .lift:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 18px 36px -18px hsl(var(--primary) / 0.18);
+  }
+
+  /* Elevated chip (soft shadow) */
+  .chip {
+    @apply inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold
+           bg-secondary text-secondary-foreground border border-border/60;
+  }
+
+  /* Remove visible scrollbar but keep functional */
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+  /* Native select/option dark mode fix */
+  select option {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+  }
+
+  /* Underline that grows from 0 */
+  .link-underline {
+    background-image: linear-gradient(currentColor, currentColor);
+    background-size: 0 1px;
+    background-repeat: no-repeat;
+    background-position: 0 100%;
+    transition: background-size .3s ease;
+  }
+  .link-underline:hover { background-size: 100% 1px; }
 }

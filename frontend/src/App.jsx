@@ -1,10 +1,11 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom"
 import { useCallback } from "react"
 import { AuthProvider, useAuth } from "./context/AuthContext"
 import { ThemeProvider } from "./context/ThemeContext"
 import { Toaster, toast } from "sonner"
 import Sidebar from "./components/Layout/Sidebar"
 import UserLayout from "./components/Layout/UserLayout"
+import Navbar from "./components/Layout/Navbar"
 import { Loader2 } from "lucide-react"
 import ChatbotWidget from "./components/ChatbotWidget"
 
@@ -71,6 +72,23 @@ function LoadingScreen() {
   )
 }
 
+// ── Shared layout for public pages: persistent Navbar ────────
+const PUBLIC_NAV_LINKS = [
+  { label: "Beranda", to: "/" },
+  { label: "Katalog", to: "/catalog" },
+  { label: "Tentang", to: "/about" },
+  { label: "Mulai",   to: "/login" },
+]
+
+function PublicLayout() {
+  return (
+    <>
+      <Navbar links={PUBLIC_NAV_LINKS} />
+      <Outlet />
+    </>
+  )
+}
+
 // ── Layout for admin/superadmin: sidebar ─────────────────────
 function AdminLayout({ addToast }) {
   return (
@@ -103,6 +121,8 @@ function UserAppLayout({ addToast }) {
     <UserLayout>
       <Routes>
         <Route path="/home" element={<RequireAuth><UserDashboard addToast={addToast} /></RequireAuth>} />
+        <Route path="/catalog" element={<CatalogPage addToast={addToast} />} />
+        <Route path="/items/:itemId" element={<ItemDetailPage addToast={addToast} />} />
         <Route path="/onboarding" element={<RequireAuth><OnboardingPage addToast={addToast} /></RequireAuth>} />
         <Route path="/rentals/new" element={<RequireAuth><RentalPage addToast={addToast} /></RequireAuth>} />
         <Route path="/rentals/my" element={<RequireAuth><MyRentalsPage addToast={addToast} /></RequireAuth>} />
@@ -127,14 +147,23 @@ function AppContent() {
     <>
       <Toaster position="top-right" richColors closeButton />
       <Routes>
-        {/* Public pages */}
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/about" element={<AboutPage />} />
-        <Route path="/catalog" element={<CatalogPage addToast={addToast} />} />
-        <Route path="/items/:itemId" element={<ItemDetailPage addToast={addToast} />} />
-        <Route path="/login" element={
-          isAuthenticated ? <Navigate to={homeRoute} replace /> : <LoginPage addToast={addToast} />
-        } />
+        {/* 
+          Public layout: Landing, About, Login
+          Catalog/Items: only shown here for guests; logged-in users get it in their own layout
+        */}
+        <Route path="/" element={<PublicLayout />}>
+          <Route index element={<LandingPage />} />
+          <Route path="about" element={<AboutPage />} />
+          {!isAuthenticated && (
+            <>
+              <Route path="catalog" element={<CatalogPage addToast={addToast} />} />
+              <Route path="items/:itemId" element={<ItemDetailPage addToast={addToast} />} />
+            </>
+          )}
+          <Route path="login" element={
+            isAuthenticated ? <Navigate to={homeRoute} replace /> : <LoginPage addToast={addToast} />
+          } />
+        </Route>
         <Route path="/404" element={<RedirectToStatic404 />} />
 
         {/* Authenticated routes — split by role */}

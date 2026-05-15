@@ -12,6 +12,7 @@ export default defineConfig(({ mode }) => {
     // Development server configuration
     server: {
       port: 5173,
+      strictPort: true,
       // Proxy configuration to avoid CORS issues during development
       proxy: {
         '/api': {

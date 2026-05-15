@@ -70,7 +70,7 @@ app = FastAPI(
 
 # ==================== CORS ====================
 
-allowed_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:5173")
+allowed_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:5173,http://localhost:5174")
 origins_list = [origin.strip() for origin in allowed_origins.split(",")]
 
 app.add_middleware(
@@ -784,7 +784,7 @@ def delete_item(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin),
 ):
-    """Admin menghapus barang dari katalog."""
+    """Admin menghapus/menonaktifkan barang dari katalog."""
     from models import UserRole as UR
     if current_user.role == UR.super_admin:
         success = crud.delete_item_superadmin(db=db, item_id=item_id)
