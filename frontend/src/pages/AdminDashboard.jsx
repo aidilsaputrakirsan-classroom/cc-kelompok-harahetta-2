@@ -226,7 +226,7 @@ export default function AdminDashboard({ addToast }) {
     setModalOpen(true)
   }
   const handleDelete = async (id) => {
-    if (!confirm("Yakin hapus/nonaktifkan barang ini? Jika ada rental terkait, barang akan dinonaktifkan (tidak dihapus permanen).")) return
+    if (!confirm("Yakin hapus barang ini? Jika ada proses sewa aktif (pending/disetujui/sedang disewa), barang akan dinonaktifkan. Jika tidak ada, barang akan dihapus permanen.")) return
     setDeletingId(id)
     try {
       await deleteItem(id)
