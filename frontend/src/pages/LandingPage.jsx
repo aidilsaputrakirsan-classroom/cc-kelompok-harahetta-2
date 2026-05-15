@@ -1,353 +1,469 @@
+/**
+ * LandingPage — Sewain
+ * Modern minimalist · base hijau pekat + putih.
+ * Card-card siap diisi gambar / video dengan attribute data-media-slot.
+ */
 import { Link } from "react-router-dom"
 import { Button } from "../components/ui/Button"
-import { Card, CardContent } from "../components/ui/card"
-import { motion, useScroll, useTransform, AnimatePresence } from "framer-motion"
+import { motion } from "framer-motion"
 import Navbar from "../components/Layout/Navbar"
+import Footer from "../components/Layout/Footer"
 import {
-  ArrowRight, ShieldCheck, Package, MousePointerClick,
-  Search, BadgeCheck, Clock, Heart, Tv, TreePine, PartyPopper, Car,
-  Rocket, BookOpen,
+  ArrowRight, ArrowUpRight, Search, ShieldCheck, Sparkles, Star,
+  Wallet, MapPin, MessageSquare, Camera, Tent, Zap, Box, ChevronDown,
+  CheckCircle2, Quote,
 } from "lucide-react"
 
-/* ─── Animation helpers ──────────────────────────────────── */
-
+/* ─── motion helpers ──────────────────────────────────────── */
 const ease = [0.22, 1, 0.36, 1]
 
 const fadeUp = (delay = 0) => ({
-  initial: { opacity: 0, y: 36 },
+  initial: { opacity: 0, y: 24 },
   whileInView: { opacity: 1, y: 0 },
-  viewport: { once: true, margin: "-60px" },
-  transition: { duration: 0.65, ease, delay },
+  viewport: { once: true, margin: "-80px" },
+  transition: { duration: 0.7, ease, delay },
 })
 
-const staggerChildren = {
-  hidden: {},
-  show: { transition: { staggerChildren: 0.1 } },
+const stagger = {
+  hidden: { opacity: 0 },
+  show: { opacity: 1, transition: { staggerChildren: 0.08, delayChildren: 0.1 } },
 }
 
-const childFadeUp = {
-  hidden: { opacity: 0, y: 32 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.6, ease } },
+const child = {
+  hidden: { opacity: 0, y: 18 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.55, ease } },
 }
 
-/* ─── Data ───────────────────────────────────────────────── */
+/* ─── reusable: MediaSlot ─────────────────────────────────────
+   Card kosong dengan border halus, siap kamu isi gambar/video.
+   Tinggal ganti `<MediaSlot src="...gambar.jpg" />` atau pakai
+   <MediaSlot video="...video.mp4" />.
+─────────────────────────────────────────────────────────────── */
+function MediaSlot({
+  src,
+  video,
+  alt = "",
+  label = "Media",
+  ratio = "aspect-[4/3]",
+  className = "",
+  rounded = "rounded-3xl",
+  children,
+  poster,
+}) {
+  return (
+    <div
+      className={`relative ${ratio} ${rounded} overflow-hidden border border-border bg-secondary/40 ${className}`}
+      data-media-slot={label}
+    >
+      {/* Real media */}
+      {video ? (
+        <video
+          src={video}
+          poster={poster}
+          autoPlay
+          muted
+          loop
+          playsInline
+          className="absolute inset-0 w-full h-full object-cover"
+        />
+      ) : src ? (
+        <img
+          src={src}
+          alt={alt}
+          className="absolute inset-0 w-full h-full object-cover"
+          loading="lazy"
+        />
+      ) : (
+        /* Placeholder pattern */
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-primary-50 via-background to-secondary text-center px-6">
+          <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
+            <Camera className="w-6 h-6" />
+          </div>
+          <div className="space-y-0.5">
+            <p className="text-xs font-semibold tracking-widest uppercase text-primary">
+              Media Slot
+            </p>
+            <p className="text-sm text-muted-foreground max-w-[18ch]">
+              {label}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Optional overlay content (badge, caption) */}
+      {children}
+
+      {/* Decorative border glow on hover */}
+      <div className="pointer-events-none absolute inset-0 rounded-[inherit] ring-1 ring-inset ring-border/0 group-hover:ring-primary/20 transition" />
+    </div>
+  )
+}
+
+/* ─── data ────────────────────────────────────────────────── */
 
 const stats = [
-  { value: "500+", label: "Barang Tersedia" },
-  { value: "1.2K", label: "Penyewa Aktif" },
-  { value: "50+",  label: "Penyedia Terpercaya" },
-  { value: "4.8★", label: "Rating Pengguna" },
-]
-
-const aboutCards = [
-  { icon: ShieldCheck,      title: "Terpercaya", desc: "Setiap penyewa wajib verifikasi KTP sehingga transaksi lebih aman untuk semua pihak." },
-  { icon: Package,          title: "Lengkap",    desc: "Dari elektronik hingga peralatan outdoor, temukan ratusan barang dari berbagai penyedia." },
-  { icon: MousePointerClick,title: "Mudah",      desc: "Proses sewa yang simpel — pilih, ajukan, dan gunakan. Semudah belanja online." },
+  { value: "1K+",  label: "Barang siap sewa" },
+  { value: "500+", label: "Mitra penyedia" },
+  { value: "50K+", label: "Transaksi sukses" },
+  { value: "4.9",  label: "Rating pengguna" },
 ]
 
 const features = [
-  { icon: Search,     title: "Cari & Filter",  desc: "Temukan barang yang kamu butuhkan dengan pencarian cepat dan filter kategori." },
-  { icon: BadgeCheck, title: "Terverifikasi",  desc: "Semua penyewa diverifikasi KTP untuk keamanan transaksi sewa." },
-  { icon: Clock,      title: "Sewa Fleksibel", desc: "Pilih durasi sewa sesuai kebutuhanmu, mulai dari harian." },
-  { icon: Heart,      title: "Komunitas",      desc: "Bergabung dengan ribuan penyewa dan penyedia barang terpercaya." },
+  {
+    icon: ShieldCheck,
+    title: "Verifikasi KTP berlapis",
+    desc: "Setiap penyewa diverifikasi e-KTP + selfie supaya transaksi aman.",
+  },
+  {
+    icon: Wallet,
+    title: "Pembayaran aman via Midtrans",
+    desc: "Bayar lewat e-wallet, VA, kartu kredit, atau QRIS — semua otomatis terverifikasi.",
+  },
+  {
+    icon: MapPin,
+    title: "Lokasi pickup di peta",
+    desc: "Tahu persis titik ambil & kembali barang lewat peta interaktif.",
+  },
+  {
+    icon: MessageSquare,
+    title: "Asisten chat 24/7",
+    desc: "Chatbot pintar siap bantu cari barang dan jawab pertanyaan kamu.",
+  },
 ]
 
 const categories = [
-  { icon: Tv,          name: "Elektronik" },
-  { icon: TreePine,    name: "Outdoor" },
-  { icon: PartyPopper, name: "Pesta" },
-  { icon: Car,         name: "Kendaraan" },
+  { icon: Camera, name: "Elektronik",  desc: "Kamera, drone, audio.",          img: "/images/categories/elektronik.png" },
+  { icon: Tent,   name: "Outdoor",     desc: "Camping, hiking, sport.",         img: "/images/categories/outdoor.png" },
+  { icon: Zap,    name: "Event",       desc: "Lighting, sound, panggung.",      img: "/images/categories/pesta.png" },
+  { icon: Box,    name: "Lainnya",     desc: "Alat masak, kostum, dll.",        img: "/images/categories/lainnya.png" },
 ]
 
 const steps = [
-  { num: "01", title: "Daftar & Verifikasi", desc: "Buat akun dan lengkapi profil dengan KTP untuk verifikasi." },
-  { num: "02", title: "Pilih Barang",        desc: "Jelajahi katalog dan temukan barang yang kamu butuhkan." },
-  { num: "03", title: "Ajukan Sewa",         desc: "Pilih tanggal sewa, lihat total biaya, dan ajukan permintaan." },
-  { num: "04", title: "Selesai!",            desc: "Setelah disetujui penyedia, ambil barang dan nikmati!" },
+  { n: "01", title: "Verifikasi akun",      desc: "Daftar dan unggah KTP + selfie. Beres dalam beberapa menit.", icon: ShieldCheck },
+  { n: "02", title: "Pilih barang",         desc: "Telusuri katalog, banding harga, pilih dari mitra terdekat.", icon: Search },
+  { n: "03", title: "Bayar & ambil",        desc: "Bayar lewat metode pilihanmu, ambil sesuai titik di peta.",   icon: Wallet },
+  { n: "04", title: "Nikmati & kembalikan", desc: "Pakai sepuasnya, kembalikan tepat waktu — done.",             icon: CheckCircle2 },
 ]
 
-const landingLinks = [
-  { label: "Fitur",    href: "#features" },
-  { label: "Kategori", href: "#categories" },
-  { label: "Tentang",  to: "/about" },
-  { label: "Katalog",  to: "/catalog", primary: true },
+const testimonials = [
+  {
+    quote: "Sewa drone untuk acara kantor cuma butuh dua jam dari ajukan sampai diterima.",
+    name: "Rana",
+    role: "Event organizer",
+  },
+  {
+    quote: "Verifikasi KTP-nya bikin tenang. Penyewa serius, barang balik lengkap.",
+    name: "Bagas",
+    role: "Mitra penyedia",
+  },
+  {
+    quote: "UI-nya bersih, peta pickup-nya akurat. Jadi enggak nyasar saat ambil barang.",
+    name: "Citra",
+    role: "Mahasiswa",
+  },
 ]
 
-/* ─── Floating blobs background ─────────────────────────── */
+/* ─── page ────────────────────────────────────────────────── */
 
-function HeroBlobs() {
-  return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none">
-      <motion.div
-        className="absolute -top-40 -right-40 w-[500px] h-[500px] rounded-full bg-primary/8 blur-3xl"
-        animate={{ scale: [1, 1.2, 1], opacity: [0.5, 0.8, 0.5] }}
-        transition={{ duration: 9, repeat: Infinity, ease: "easeInOut" }}
-      />
-      <motion.div
-        className="absolute -bottom-20 -left-20 w-96 h-96 rounded-full bg-primary/6 blur-3xl"
-        animate={{ scale: [1.1, 1, 1.1], opacity: [0.4, 0.7, 0.4] }}
-        transition={{ duration: 11, repeat: Infinity, ease: "easeInOut", delay: 2 }}
-      />
-    </div>
-  )
-}
-
-/* ─── Section header ─────────────────────────────────────── */
-
-function SectionHeader({ tag, title, subtitle, light = false }) {
-  return (
-    <div className="text-center max-w-2xl mx-auto">
-      <motion.p
-        {...fadeUp(0)}
-        className={`mb-3 text-sm font-semibold tracking-widest uppercase ${light ? "text-primary-foreground/70" : "text-primary"}`}
-      >
-        {tag}
-      </motion.p>
-      <motion.h2
-        {...fadeUp(0.1)}
-        className={`text-3xl md:text-4xl font-bold ${light ? "text-primary-foreground" : "text-foreground"}`}
-      >
-        {title}
-      </motion.h2>
-      {subtitle && (
-        <motion.p
-          {...fadeUp(0.2)}
-          className={`mt-4 text-base leading-relaxed ${light ? "text-primary-foreground/75" : "text-muted-foreground"}`}
-        >
-          {subtitle}
-        </motion.p>
-      )}
-    </div>
-  )
-}
-
-/* ─── Page ───────────────────────────────────────────────── */
+const navLinks = [
+  { label: "Beranda", to: "/" },
+  { label: "Katalog", to: "/catalog" },
+  { label: "Tentang", to: "/about" },
+  { label: "Mulai",   to: "/login" },
+]
 
 export default function LandingPage() {
   return (
-    <div className="min-h-screen overflow-x-hidden">
-      <Navbar links={landingLinks} />
+    <div className="min-h-screen bg-background text-foreground overflow-x-hidden font-sans">
 
-      {/* ══ HERO ══════════════════════════════════════════════ */}
-      <section className="relative pt-16 bg-hero-pattern overflow-hidden">
-        <HeroBlobs />
-        <div className="relative max-w-7xl mx-auto px-4 py-20 md:py-28 flex flex-col-reverse md:flex-row items-center gap-12">
+      {/* ══════════════════════════════════════════════════════
+          HERO
+      ══════════════════════════════════════════════════════ */}
+      <section className="relative pt-28 pb-20 md:pt-32 md:pb-28 bg-hero-pattern overflow-hidden">
+        {/* dotted ambient */}
+        <div className="absolute inset-0 bg-dot-grid opacity-[0.35] [mask-image:radial-gradient(ellipse_at_center,black_20%,transparent_70%)] pointer-events-none" />
 
-          {/* Text */}
-          <div className="flex-1 text-center md:text-left">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.85 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.5, ease: "backOut" }}
-              className="mb-5"
-            >
-              <span className="text-sm px-4 py-1.5 inline-flex items-center gap-2 rounded-full bg-primary/10 text-primary font-medium">
-                <motion.span
-                  animate={{ rotate: [0, 15, -10, 10, 0] }}
-                  transition={{ duration: 1.5, delay: 0.8 }}
-                >
-                  <Rocket className="w-4 h-4" />
-                </motion.span>
-                Platform Sewa #1 Indonesia
-              </span>
-            </motion.div>
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6">
+          <div className="grid lg:grid-cols-12 gap-12 lg:gap-8 items-center">
+            {/* Copy */}
+            <div className="lg:col-span-7">
+              <motion.div {...fadeUp(0)}>
+                <span className="chip">
+                  <Sparkles className="w-3.5 h-3.5 text-primary" />
+                  Marketplace sewa barang #1 di kampus
+                </span>
+              </motion.div>
 
-            <motion.h1
-              className="text-4xl md:text-5xl lg:text-6xl font-extrabold leading-tight text-foreground"
-              initial={{ opacity: 0, y: 28 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7, delay: 0.15, ease }}
-            >
-              Sewa Apapun,{" "}
-              <motion.span
-                className="text-gradient-hero inline-block"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.7, delay: 0.3, ease }}
+              <motion.h1
+                {...fadeUp(0.05)}
+                className="mt-6 text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight leading-[1.02]"
               >
-                Kapanpun
-              </motion.span>
-            </motion.h1>
+                Sewa apa saja,{" "}
+                <span className="font-display text-primary">tanpa</span>{" "}
+                harus beli.
+              </motion.h1>
 
-            <motion.p
-              className="mt-5 text-lg text-muted-foreground max-w-lg mx-auto md:mx-0 leading-relaxed"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.4 }}
-            >
-              Sewain menghubungkan penyewa dengan penyedia barang terpercaya.
-              Hemat biaya, ramah lingkungan, dan mudah digunakan.
-            </motion.p>
+              <motion.p
+                {...fadeUp(0.1)}
+                className="mt-6 text-lg text-muted-foreground max-w-xl leading-relaxed"
+              >
+                Sewain menghubungkan kamu dengan ribuan penyedia barang terverifikasi.
+                Mulai dari kamera, alat camping, hingga peralatan event — semua dalam
+                satu platform yang aman, cepat, dan transparan.
+              </motion.p>
 
-            <motion.div
-              className="mt-8 flex flex-col sm:flex-row gap-3 justify-center md:justify-start"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.52 }}
-            >
-              <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}>
+              {/* Search bar */}
+              <motion.form
+                {...fadeUp(0.15)}
+                onSubmit={(e) => e.preventDefault()}
+                className="mt-8 flex items-center bg-card border border-border rounded-full p-1.5 pl-5 shadow-soft max-w-xl focus-within:ring-2 focus-within:ring-primary/30 transition"
+              >
+                <Search className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+                <input
+                  type="text"
+                  placeholder="Coba ketik 'kamera Sony' atau 'tenda 4 orang'..."
+                  className="bg-transparent border-none outline-none flex-1 px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground"
+                />
                 <Link to="/catalog">
-                  <Button size="lg" className="text-base px-8 shadow-lg shadow-primary/25">
-                    <BookOpen className="w-4 h-4 mr-2" /> Lihat Katalog
+                  <Button className="rounded-full px-5 h-10">
+                    Cari
                   </Button>
                 </Link>
+              </motion.form>
+
+              {/* Trust line */}
+              <motion.div
+                {...fadeUp(0.2)}
+                className="mt-8 flex flex-wrap items-center gap-6 text-sm text-muted-foreground"
+              >
+                <div className="flex items-center gap-2">
+                  <div className="flex -space-x-2">
+                    {[1, 2, 3, 4].map((i) => (
+                      <div
+                        key={i}
+                        className="w-7 h-7 rounded-full border-2 border-background bg-gradient-to-br from-primary-200 to-primary-400 ring-1 ring-primary/20"
+                      />
+                    ))}
+                  </div>
+                  <span>50.000+ pengguna aktif</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="flex">
+                    {[...Array(5)].map((_, i) => (
+                      <Star key={i} className="w-3.5 h-3.5 fill-primary text-primary" />
+                    ))}
+                  </div>
+                  <span className="font-medium text-foreground">4.9</span>
+                  <span>(2.1k ulasan)</span>
+                </div>
               </motion.div>
-              <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.96 }}>
-                <Link to="/login">
-                  <Button variant="outline" size="lg" className="text-base px-8">
-                    Mulai Sekarang <ArrowRight className="w-4 h-4 ml-2" />
-                  </Button>
-                </Link>
+            </div>
+
+            {/* Hero media · stacked cards */}
+            <div className="lg:col-span-5">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.96 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.8, ease, delay: 0.2 }}
+                className="relative"
+              >
+                {/* Big card */}
+                <MediaSlot
+                  src="/images/hero/orangherobesar.png"
+                  alt="Sewain — Sewa barang apa saja"
+                  label="Hero · video / gambar utama"
+                  ratio="aspect-[4/5]"
+                  className="shadow-glow"
+                >
+                  {/* floating badge */}
+                  <div className="absolute top-4 left-4 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-background/95 backdrop-blur-md text-xs font-semibold border border-border shadow-soft">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
+                    </span>
+                    Live
+                  </div>
+                </MediaSlot>
+
+                {/* Floating mini card kanan bawah */}
+                <motion.div
+                  initial={{ opacity: 0, x: 20, y: 20 }}
+                  animate={{ opacity: 1, x: 0, y: 0 }}
+                  transition={{ delay: 0.6, duration: 0.6, ease }}
+                  className="absolute -right-2 -bottom-6 sm:-right-6 w-44 sm:w-52 rotate-[3deg]"
+                >
+                  <div className="bg-card border border-border rounded-2xl shadow-soft p-3">
+                    <MediaSlot
+                      src="/images/hero/herokecilkamera.png"
+                      alt="Kamera Sony A7"
+                      label="Mini media"
+                      ratio="aspect-square"
+                      rounded="rounded-xl"
+                      className="border-0"
+                    />
+                    <div className="mt-2 flex items-center justify-between">
+                      <div>
+                        <p className="text-xs font-semibold">Kamera Sony A7</p>
+                        <p className="text-[10px] text-muted-foreground">Rp 250rb / hari</p>
+                      </div>
+                      <span className="inline-flex items-center text-[10px] font-semibold text-primary">
+                        Sewa <ArrowUpRight className="w-3 h-3 ml-0.5" />
+                      </span>
+                    </div>
+                  </div>
+                </motion.div>
+
+                {/* Mini stat kiri atas */}
+                <motion.div
+                  initial={{ opacity: 0, x: -20, y: -20 }}
+                  animate={{ opacity: 1, x: 0, y: 0 }}
+                  transition={{ delay: 0.7, duration: 0.6, ease }}
+                  className="absolute -left-2 -top-6 sm:-left-6 bg-card border border-border rounded-2xl shadow-soft p-3 -rotate-[3deg] flex items-center gap-3"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                    <ShieldCheck className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold">Verified</p>
+                    <p className="text-[10px] text-muted-foreground">100% identitas valid</p>
+                  </div>
+                </motion.div>
               </motion.div>
+            </div>
+          </div>
+
+          {/* Scroll cue */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 1.2, duration: 0.6 }}
+            className="mt-14 flex justify-center"
+          >
+            <motion.div
+              animate={{ y: [0, 6, 0] }}
+              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+              className="flex flex-col items-center gap-1.5 text-muted-foreground"
+            >
+              <span className="text-[10px] tracking-[0.25em] uppercase">Scroll</span>
+              <ChevronDown className="w-4 h-4" />
+            </motion.div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════════════════════
+          FEATURE GRID
+      ══════════════════════════════════════════════════════ */}
+      <section id="features" className="py-24 md:py-32 bg-section-alt">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          <div className="grid md:grid-cols-12 gap-8 md:gap-12 mb-16">
+            <div className="md:col-span-5">
+              <motion.span {...fadeUp(0)} className="chip">
+                Kenapa Sewain
+              </motion.span>
+              <motion.h2
+                {...fadeUp(0.05)}
+                className="mt-4 text-4xl md:text-5xl font-bold tracking-tight leading-tight"
+              >
+                Cara cerdas{" "}
+                <span className="font-display text-primary">menyewa</span>{" "}
+                tanpa drama.
+              </motion.h2>
+            </div>
+            <motion.p
+              {...fadeUp(0.1)}
+              className="md:col-span-6 md:col-start-7 text-lg text-muted-foreground leading-relaxed"
+            >
+              Sewain dirancang dari nol untuk menyederhanakan setiap langkah —
+              dari verifikasi identitas, pencarian, pembayaran, hingga
+              pengembalian. Semua dalam satu alur yang konsisten.
+            </motion.p>
+          </div>
+
+          {/* Feature grid — 2x2 seimbang */}
+          <motion.div
+            variants={stagger}
+            initial="hidden"
+            whileInView="show"
+            viewport={{ once: true, margin: "-80px" }}
+            className="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-6"
+          >
+            {features.map((f, i) => (
+              <motion.div
+                key={i}
+                variants={child}
+                className="group relative overflow-hidden rounded-3xl border border-border bg-card p-7 lift"
+              >
+                <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center text-primary mb-5">
+                  <f.icon className="w-5 h-5" />
+                </div>
+                <h3 className="text-xl font-bold tracking-tight">{f.title}</h3>
+                <p className="mt-2 text-muted-foreground leading-relaxed">
+                  {f.desc}
+                </p>
+                <ArrowUpRight className="absolute top-7 right-7 w-4 h-4 text-muted-foreground/40 group-hover:text-primary transition-colors" />
+              </motion.div>
+            ))}
+          </motion.div>
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════════════════════
+          CATEGORIES
+      ══════════════════════════════════════════════════════ */}
+      <section id="categories" className="py-24 md:py-32">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12 md:mb-16">
+            <div className="max-w-2xl">
+              <motion.span {...fadeUp(0)} className="chip">
+                Kategori
+              </motion.span>
+              <motion.h2 {...fadeUp(0.05)} className="mt-4 text-4xl md:text-5xl font-bold tracking-tight">
+                Mau sewa{" "}
+                <span className="font-display text-primary">apa</span> hari ini?
+              </motion.h2>
+            </div>
+            <motion.div {...fadeUp(0.1)}>
+              <Link to="/catalog" className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary group link-underline">
+                Lihat semua kategori
+                <ArrowUpRight className="w-4 h-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+              </Link>
             </motion.div>
           </div>
 
-          {/* Video */}
           <motion.div
-            className="flex-1 w-full"
-            initial={{ opacity: 0, scale: 0.9, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            transition={{ duration: 0.8, delay: 0.2, ease }}
-          >
-            <motion.div
-              animate={{ y: [0, -10, 0] }}
-              transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
-            >
-              <video
-                src="/sewainVideo.MP4"
-                autoPlay loop muted playsInline
-                className="w-full max-w-md mx-auto rounded-3xl object-cover shadow-2xl shadow-primary/20 ring-1 ring-primary/10"
-              />
-            </motion.div>
-          </motion.div>
-        </div>
-
-        {/* Stats bar */}
-        <div className="relative max-w-5xl mx-auto px-4 pb-16">
-          <motion.div
-            className="grid grid-cols-2 md:grid-cols-4 gap-4"
-            variants={staggerChildren}
+            variants={stagger}
             initial="hidden"
             whileInView="show"
-            viewport={{ once: true, margin: "-40px" }}
-          >
-            {stats.map((s, i) => (
-              <motion.div key={i} variants={childFadeUp}>
-                <Card className="text-center border-none shadow-lg hover:shadow-xl transition-shadow">
-                  <CardContent className="p-5">
-                    <div className="text-2xl md:text-3xl font-extrabold text-primary">{s.value}</div>
-                    <div className="text-xs text-muted-foreground mt-1">{s.label}</div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
-          </motion.div>
-        </div>
-      </section>
-
-      {/* ══ WHY SEWAIN ════════════════════════════════════════ */}
-      <section className="bg-section-alt py-24" id="about">
-        <div className="max-w-7xl mx-auto px-4">
-          <SectionHeader
-            tag="Tentang Kami"
-            title="Kenapa Memilih Sewain?"
-            subtitle="Platform marketplace sewa barang yang mengedepankan kepercayaan, keamanan, dan kemudahan. Tidak perlu membeli, cukup sewa!"
-          />
-          <motion.div
-            className="grid md:grid-cols-3 gap-6 mt-14"
-            variants={staggerChildren}
-            initial="hidden"
-            whileInView="show"
-            viewport={{ once: true, margin: "-60px" }}
-          >
-            {aboutCards.map((c, i) => (
-              <motion.div key={i} variants={childFadeUp} whileHover={{ y: -8 }}>
-                <Card className="h-full hover:shadow-xl transition-all duration-300 border-border/60">
-                  <CardContent className="p-8 text-center">
-                    <motion.div
-                      className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-5"
-                      whileHover={{ rotate: [0, -8, 8, 0], scale: 1.1 }}
-                      transition={{ duration: 0.5 }}
-                    >
-                      <c.icon className="w-8 h-8 text-primary" />
-                    </motion.div>
-                    <h3 className="text-lg font-bold text-foreground">{c.title}</h3>
-                    <p className="text-sm text-muted-foreground mt-3 leading-relaxed">{c.desc}</p>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
-          </motion.div>
-        </div>
-      </section>
-
-      {/* ══ FEATURES ══════════════════════════════════════════ */}
-      <section className="py-24" id="features">
-        <div className="max-w-7xl mx-auto px-4">
-          <SectionHeader
-            tag="Fitur Unggulan"
-            title="Semua yang Kamu Butuhkan"
-            subtitle="Kami menyediakan fitur lengkap untuk pengalaman sewa yang aman, mudah, dan menyenangkan."
-          />
-          <motion.div
-            className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 mt-14"
-            variants={staggerChildren}
-            initial="hidden"
-            whileInView="show"
-            viewport={{ once: true, margin: "-40px" }}
-          >
-            {features.map((f, i) => (
-              <motion.div key={i} variants={childFadeUp} whileHover={{ y: -6 }}>
-                <Card className="h-full group hover:shadow-xl transition-all duration-300 border-border/60">
-                  <CardContent className="p-6 text-center">
-                    <motion.div
-                      className="w-14 h-14 rounded-2xl bg-primary/10 group-hover:bg-primary flex items-center justify-center mx-auto mb-4 transition-colors duration-300"
-                      whileHover={{ scale: 1.1 }}
-                    >
-                      <f.icon className="w-7 h-7 text-primary group-hover:text-primary-foreground transition-colors duration-300" />
-                    </motion.div>
-                    <h3 className="text-base font-bold text-foreground">{f.title}</h3>
-                    <p className="text-sm text-muted-foreground mt-2 leading-relaxed">{f.desc}</p>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
-          </motion.div>
-        </div>
-      </section>
-
-      {/* ══ CATEGORIES ════════════════════════════════════════ */}
-      <section className="bg-section-alt py-24" id="categories">
-        <div className="max-w-7xl mx-auto px-4">
-          <SectionHeader
-            tag="Kategori Populer"
-            title="Jelajahi Kategori"
-            subtitle="Temukan berbagai pilihan barang dari kategori yang beragam sesuai kebutuhanmu."
-          />
-          <motion.div
-            className="grid grid-cols-2 md:grid-cols-4 gap-6 mt-14"
-            variants={staggerChildren}
-            initial="hidden"
-            whileInView="show"
-            viewport={{ once: true, margin: "-60px" }}
+            viewport={{ once: true }}
+            className="grid grid-cols-2 lg:grid-cols-4 gap-5"
           >
             {categories.map((c, i) => (
-              <motion.div key={i} variants={childFadeUp}>
-                <Link to="/catalog">
-                  <motion.div whileHover={{ y: -6, scale: 1.03 }} whileTap={{ scale: 0.97 }}>
-                    <Card className="group cursor-pointer hover:shadow-xl transition-all duration-300 border-border/60">
-                      <CardContent className="p-8 text-center">
-                        <motion.div
-                          className="w-16 h-16 rounded-2xl bg-primary/10 group-hover:bg-primary flex items-center justify-center mx-auto mb-4 transition-colors duration-300"
-                          whileHover={{ rotate: 10, scale: 1.1 }}
-                          transition={{ type: "spring", stiffness: 300 }}
-                        >
-                          <c.icon className="w-8 h-8 text-primary group-hover:text-primary-foreground transition-colors duration-300" />
-                        </motion.div>
-                        <h3 className="font-bold text-foreground">{c.name}</h3>
-                      </CardContent>
-                    </Card>
-                  </motion.div>
+              <motion.div key={i} variants={child}>
+                <Link
+                  to="/catalog"
+                  className="group block relative overflow-hidden rounded-3xl border border-border bg-card lift"
+                >
+                  <MediaSlot
+                    src={c.img}
+                    alt={c.name}
+                    label={`Kategori · ${c.name}`}
+                    ratio="aspect-[4/3]"
+                    rounded="rounded-none"
+                    className="border-0"
+                  />
+                  <div className="p-5">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-primary">
+                          <c.icon className="w-3.5 h-3.5" /> Kategori
+                        </div>
+                        <h3 className="mt-1.5 text-xl font-bold tracking-tight">{c.name}</h3>
+                        <p className="text-xs text-muted-foreground mt-0.5">{c.desc}</p>
+                      </div>
+                      <ArrowUpRight className="w-5 h-5 text-muted-foreground/50 group-hover:text-primary group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all flex-shrink-0" />
+                    </div>
+                  </div>
                 </Link>
               </motion.div>
             ))}
@@ -355,144 +471,166 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ══ HOW IT WORKS ══════════════════════════════════════ */}
-      <section className="py-24">
-        <div className="max-w-7xl mx-auto px-4">
-          <SectionHeader
-            tag="Cara Kerja"
-            title="4 Langkah Mudah"
-            subtitle="Dari daftar sampai dapat barang, semuanya simpel dan cepat."
-          />
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8 mt-16 relative">
-            {/* Connector line */}
-            <div className="hidden lg:block absolute top-8 left-[12.5%] right-[12.5%] h-px">
-              <motion.div
-                className="h-full bg-gradient-to-r from-transparent via-primary/30 to-transparent"
-                initial={{ scaleX: 0 }}
-                whileInView={{ scaleX: 1 }}
-                viewport={{ once: true }}
-                transition={{ duration: 1.2, ease, delay: 0.4 }}
-              />
-            </div>
+      {/* ══════════════════════════════════════════════════════
+          HOW IT WORKS
+      ══════════════════════════════════════════════════════ */}
+      <section className="py-24 md:py-32 bg-hero-deep text-white relative overflow-hidden">
+        <div className="absolute inset-0 bg-mesh opacity-50 pointer-events-none" />
+        <div className="absolute inset-0 bg-dot-grid opacity-[0.05] pointer-events-none" />
 
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6">
+          <div className="text-center max-w-3xl mx-auto mb-16">
+            <motion.span
+              {...fadeUp(0)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-white/10 border border-white/15 text-white/90"
+            >
+              <CheckCircle2 className="w-3.5 h-3.5" /> Empat langkah, selesai
+            </motion.span>
+            <motion.h2
+              {...fadeUp(0.05)}
+              className="mt-5 text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight"
+            >
+              Dari penasaran ke{" "}
+              <span className="font-display text-primary-300">sewa pertama</span>{" "}
+              dalam 5 menit.
+            </motion.h2>
+          </div>
+
+          <motion.div
+            variants={stagger}
+            initial="hidden"
+            whileInView="show"
+            viewport={{ once: true }}
+            className="grid md:grid-cols-2 lg:grid-cols-4 gap-5 relative"
+          >
             {steps.map((s, i) => (
               <motion.div
                 key={i}
-                className="text-center relative"
-                initial={{ opacity: 0, y: 32 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.6, ease, delay: i * 0.15 }}
+                variants={child}
+                className="relative rounded-3xl border border-white/10 bg-white/5 backdrop-blur-md p-7 hover:bg-white/[0.08] transition-colors"
               >
-                <motion.div
-                  className="text-6xl font-black text-primary/12 mb-3 leading-none"
-                  whileInView={{ opacity: [0, 1] }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.5, delay: 0.2 + i * 0.15 }}
-                >
-                  {s.num}
-                </motion.div>
-                <div className="w-12 h-12 rounded-2xl bg-primary/10 border-2 border-primary/20 flex items-center justify-center mx-auto mb-4">
-                  <span className="text-primary font-black text-sm">{i + 1}</span>
+                {/* Arrow connector between cards (desktop only) */}
+                {i < steps.length - 1 && (
+                  <div className="hidden lg:flex absolute -right-3 top-1/2 -translate-y-1/2 z-10 w-6 h-6 rounded-full bg-primary-300 text-primary-900 items-center justify-center">
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </div>
+                )}
+
+                {/* Number + icon inline */}
+                <div className="flex items-center justify-between mb-4">
+                  <div className="font-display text-4xl text-primary-300/60 leading-none">
+                    {s.n}
+                  </div>
+                  <div className="w-10 h-10 rounded-xl bg-primary-300/15 border border-primary-300/20 flex items-center justify-center text-primary-300">
+                    <s.icon className="w-4.5 h-4.5" />
+                  </div>
                 </div>
-                <h3 className="font-bold text-lg text-foreground">{s.title}</h3>
-                <p className="text-sm text-muted-foreground mt-2 leading-relaxed">{s.desc}</p>
+
+                <h3 className="text-xl font-bold tracking-tight">{s.title}</h3>
+                <p className="mt-2 text-sm text-white/70 leading-relaxed">{s.desc}</p>
               </motion.div>
             ))}
-          </div>
+          </motion.div>
         </div>
       </section>
 
-      {/* ══ CTA ═══════════════════════════════════════════════ */}
-      <section className="py-24 bg-primary relative overflow-hidden">
-        {/* Background decoration */}
-        <div className="absolute inset-0 pointer-events-none">
-          <motion.div
-            className="absolute -top-20 -right-20 w-80 h-80 rounded-full bg-white/5 blur-2xl"
-            animate={{ scale: [1, 1.3, 1] }}
-            transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-          />
-          <motion.div
-            className="absolute -bottom-16 -left-16 w-64 h-64 rounded-full bg-white/5 blur-2xl"
-            animate={{ scale: [1.2, 1, 1.2] }}
-            transition={{ duration: 10, repeat: Infinity, ease: "easeInOut", delay: 1.5 }}
-          />
-          {/* Grid pattern */}
-          <div className="absolute inset-0 opacity-[0.04]"
-            style={{ backgroundImage: "radial-gradient(circle, white 1px, transparent 1px)", backgroundSize: "28px 28px" }}
-          />
-        </div>
+      {/* ══════════════════════════════════════════════════════
+          TESTIMONIALS
+      ══════════════════════════════════════════════════════ */}
+      <section className="py-24 md:py-32 bg-section-alt">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          <div className="text-center max-w-2xl mx-auto mb-14">
+            <motion.span {...fadeUp(0)} className="chip">
+              Cerita pengguna
+            </motion.span>
+            <motion.h2 {...fadeUp(0.05)} className="mt-4 text-4xl md:text-5xl font-bold tracking-tight">
+              Mereka yang{" "}
+              <span className="font-display text-primary">sudah</span> coba.
+            </motion.h2>
+          </div>
 
-        <div className="relative max-w-3xl mx-auto px-4 text-center">
-          <motion.h2
+          <motion.div
+            variants={stagger}
+            initial="hidden"
+            whileInView="show"
+            viewport={{ once: true }}
+            className="grid md:grid-cols-3 gap-5"
+          >
+            {testimonials.map((t, i) => (
+              <motion.figure
+                key={i}
+                variants={child}
+                className="rounded-3xl border border-border bg-card p-7 flex flex-col"
+              >
+                <Quote className="w-8 h-8 text-primary/30" />
+                <blockquote className="mt-4 text-lg text-foreground leading-relaxed flex-1">
+                  "{t.quote}"
+                </blockquote>
+                <figcaption className="mt-6 flex items-center gap-3 pt-4 border-t border-border/60">
+                  <div className="w-9 h-9 rounded-full bg-secondary flex items-center justify-center text-muted-foreground">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+                      <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold">{t.name}</p>
+                    <p className="text-xs text-muted-foreground">{t.role}</p>
+                  </div>
+                </figcaption>
+              </motion.figure>
+            ))}
+          </motion.div>
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════════════════════
+          CTA
+      ══════════════════════════════════════════════════════ */}
+      <section className="py-24 md:py-32">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          <motion.div
             {...fadeUp(0)}
-            className="text-3xl md:text-4xl font-bold text-primary-foreground"
+            className="relative overflow-hidden rounded-[2rem] md:rounded-[2.5rem] bg-hero-deep text-white px-8 py-16 md:px-16 md:py-24"
           >
-            Siap Untuk Mulai Menyewa?
-          </motion.h2>
-          <motion.p
-            {...fadeUp(0.1)}
-            className="mt-4 text-primary-foreground/80 text-lg leading-relaxed"
-          >
-            Bergabung sekarang dan nikmati kemudahan sewa barang dari penyedia terpercaya.
-          </motion.p>
-          <motion.div
-            {...fadeUp(0.2)}
-            className="mt-10 flex flex-col sm:flex-row gap-3 justify-center"
-          >
-            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.96 }}>
-              <Link to="/catalog">
-                <Button size="lg" variant="secondary" className="text-base px-8 shadow-xl">
-                  <BookOpen className="w-4 h-4 mr-2" /> Lihat Katalog
-                </Button>
-              </Link>
-            </motion.div>
-            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.96 }}>
-              <Link to="/login">
-                <Button
-                  size="lg" variant="outline"
-                  className="text-base px-8 border-primary-foreground/30 text-primary-foreground hover:bg-primary-foreground/10"
-                >
-                  Daftar Gratis <ArrowRight className="w-4 h-4 ml-2" />
-                </Button>
-              </Link>
-            </motion.div>
+            {/* mesh background */}
+            <div className="absolute inset-0 bg-mesh opacity-60 pointer-events-none" />
+            <div className="absolute inset-0 bg-dot-grid opacity-[0.04] pointer-events-none" />
+
+            <div className="relative grid md:grid-cols-12 gap-8 items-center">
+              <div className="md:col-span-7">
+                <p className="text-sm font-semibold uppercase tracking-[0.25em] text-primary-300">
+                  Mulai hari ini
+                </p>
+                <h2 className="mt-4 text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight leading-[1.05]">
+                  Sewa pertama kamu{" "}
+                  <span className="font-display text-primary-300">menanti</span>.
+                </h2>
+                <p className="mt-5 text-lg text-white/70 max-w-xl">
+                  Buat akun gratis, verifikasi sekali, langsung sewa kapan saja.
+                </p>
+              </div>
+
+              <div className="md:col-span-5 flex md:justify-end">
+                <div className="flex flex-col sm:flex-row md:flex-col gap-3 w-full md:w-auto">
+                  <Link to="/login">
+                    <Button size="lg" className="w-full md:w-auto rounded-full px-8 bg-white text-primary-700 hover:bg-white/90">
+                      Buat akun gratis
+                      <ArrowRight className="w-4 h-4 ml-1" />
+                    </Button>
+                  </Link>
+                  <Link to="/catalog">
+                    <Button size="lg" variant="outline" className="w-full md:w-auto rounded-full px-8 bg-transparent text-white border-white/20 hover:bg-white/10 hover:text-white">
+                      Lihat katalog
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            </div>
           </motion.div>
         </div>
       </section>
 
-      {/* ══ FOOTER ════════════════════════════════════════════ */}
-      <motion.footer
-        className="py-10 border-t"
-        initial={{ opacity: 0 }}
-        whileInView={{ opacity: 1 }}
-        viewport={{ once: true }}
-        transition={{ duration: 0.6 }}
-      >
-        <div className="max-w-7xl mx-auto px-4 text-center">
-          <motion.div
-            className="flex items-center justify-center gap-2 mb-4"
-            whileHover={{ scale: 1.05 }}
-            transition={{ type: "spring", stiffness: 300 }}
-          >
-            <div className="w-8 h-8 rounded-xl bg-primary flex items-center justify-center">
-              <Package className="w-4 h-4 text-primary-foreground" />
-            </div>
-            <span className="font-bold text-xl text-foreground">Sewain</span>
-          </motion.div>
-          <p className="text-sm text-muted-foreground">
-            Platform sewa barang terpercaya di Indonesia. Hemat biaya, ramah lingkungan.
-          </p>
-          <div className="flex items-center justify-center gap-6 mt-5 text-xs text-muted-foreground">
-            <Link to="/catalog" className="hover:text-foreground transition-colors">Katalog</Link>
-            <Link to="/about"   className="hover:text-foreground transition-colors">Tentang</Link>
-            <Link to="/login"   className="hover:text-foreground transition-colors">Masuk</Link>
-          </div>
-          <p className="text-xs text-muted-foreground/60 mt-5">
-            &copy; {new Date().getFullYear()} Sewain Platform &middot; Kelompok Harahetta-2
-          </p>
-        </div>
-      </motion.footer>
+      <Footer />
     </div>
   )
 }

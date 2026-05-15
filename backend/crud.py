@@ -561,12 +561,20 @@ def update_item(db: Session, item_id: int, admin_id: int, data: ItemUpdate) -> I
         return None  # Bukan milik admin ini
 
     update_fields = data.model_dump(exclude_unset=True)
+    
+    # Jika admin eksplisit set status, simpan dulu dan jangan recalculate
+    explicit_status = update_fields.pop("status", None)
+    
     for field, value in update_fields.items():
         setattr(item, field, value)
 
-    # Auto-recalculate status jika stok berubah
-    if "stok" in update_fields:
+    # Recalculate hanya jika stok berubah DAN admin TIDAK set status manual
+    if "stok" in update_fields and explicit_status is None:
         _recalculate_item_status(db, item)
+    
+    # Jika admin eksplisit set status, terapkan terakhir (override apapun)
+    if explicit_status is not None:
+        item.status = explicit_status
 
     db.commit()
     db.refresh(item)
@@ -580,12 +588,17 @@ def update_item_superadmin(db: Session, item_id: int, data: ItemUpdate) -> Item 
         return None
 
     update_fields = data.model_dump(exclude_unset=True)
+    
+    explicit_status = update_fields.pop("status", None)
+    
     for field, value in update_fields.items():
         setattr(item, field, value)
 
-    # Auto-recalculate status jika stok berubah
-    if "stok" in update_fields:
+    if "stok" in update_fields and explicit_status is None:
         _recalculate_item_status(db, item)
+    
+    if explicit_status is not None:
+        item.status = explicit_status
 
     db.commit()
     db.refresh(item)
@@ -594,23 +607,40 @@ def update_item_superadmin(db: Session, item_id: int, data: ItemUpdate) -> Item 
 
 def delete_item(db: Session, item_id: int, admin_id: int) -> bool:
     """
-    Hapus barang. Hanya admin pemilik barang yang bisa hapus.
+    Hapus atau nonaktifkan barang.
+    - Jika tidak ada rental terkait: hapus permanen.
+    - Jika ada rental terkait: set status 'unavailable' (soft-delete).
     """
     item = db.query(Item).filter(Item.id == item_id, Item.admin_id == admin_id).first()
     if not item:
         return False
-    db.delete(item)
-    db.commit()
+    from models import Rental
+    has_rentals = db.query(Rental).filter(Rental.item_id == item_id).first()
+    if has_rentals:
+        # Soft-delete: nonaktifkan barang, set stok 0
+        item.status = "unavailable"
+        item.stok = 0
+        db.commit()
+    else:
+        db.delete(item)
+        db.commit()
     return True
 
 
 def delete_item_superadmin(db: Session, item_id: int) -> bool:
-    """Hapus barang oleh super admin."""
+    """Hapus atau nonaktifkan barang oleh super admin."""
     item = db.query(Item).filter(Item.id == item_id).first()
     if not item:
         return False
-    db.delete(item)
-    db.commit()
+    from models import Rental
+    has_rentals = db.query(Rental).filter(Rental.item_id == item_id).first()
+    if has_rentals:
+        item.status = "unavailable"
+        item.stok = 0
+        db.commit()
+    else:
+        db.delete(item)
+        db.commit()
     return True
 
 

@@ -1,30 +1,34 @@
-import { useLocation, useNavigate } from "react-router-dom"
+/**
+ * Sidebar — Admin & SuperAdmin layout
+ * Forest dark · accent hijau emerald.
+ */
+import { useState } from "react"
+import { useLocation, useNavigate, Link } from "react-router-dom"
 import { useAuth } from "../../context/AuthContext"
 import { cn } from "../../lib/utils"
+import { motion, AnimatePresence } from "framer-motion"
 import {
-  Package, LayoutDashboard, ShoppingCart, ClipboardList, User,
-  Store, Crown, LogOut, ChevronLeft, Menu, Home, BookOpen,
+  Package, LayoutDashboard, User, Store, Crown,
+  LogOut, ChevronLeft, Menu, X, Home, BookOpen,
 } from "lucide-react"
-import { Button } from "../ui/Button"
-import { Separator } from "../ui/separator"
-import { useState } from "react"
+import ThemeToggle from "../ui/ThemeToggle"
 
 const NAV_USER = [
-  { path: "/home", label: "Beranda", icon: Home },
+  { path: "/home",    label: "Beranda", icon: Home },
   { path: "/catalog", label: "Katalog", icon: BookOpen },
-  { path: "/profile", label: "Profil", icon: User },
+  { path: "/profile", label: "Profil",  icon: User },
 ]
 
 const NAV_ADMIN = [
-  { path: "/dashboard", label: "Katalog", icon: LayoutDashboard },
-  { path: "/admin/dashboard", label: "Admin Panel", icon: Store },
-  { path: "/profile", label: "Profil", icon: User },
+  { path: "/dashboard",       label: "Katalog",     icon: LayoutDashboard },
+  { path: "/admin/dashboard", label: "Admin panel", icon: Store },
+  { path: "/profile",         label: "Profil",      icon: User },
 ]
 
 const NAV_SUPER = [
-  { path: "/dashboard", label: "Katalog", icon: LayoutDashboard },
-  { path: "/superadmin", label: "Super Admin", icon: Crown },
-  { path: "/profile", label: "Profil", icon: User },
+  { path: "/dashboard",  label: "Katalog",     icon: LayoutDashboard },
+  { path: "/superadmin", label: "Super admin", icon: Crown },
+  { path: "/profile",    label: "Profil",      icon: User },
 ]
 
 export default function Sidebar() {
@@ -35,70 +39,99 @@ export default function Sidebar() {
   const [mobileOpen, setMobileOpen] = useState(false)
 
   const nav = isSuperAdmin ? NAV_SUPER : isAdmin ? NAV_ADMIN : NAV_USER
+  const initial = (user?.nama || "U")[0].toUpperCase()
 
-  const handleNav = (path) => {
-    navigate(path)
-    setMobileOpen(false)
-  }
+  const handleNav = (path) => { navigate(path); setMobileOpen(false) }
+  const handleLogout = () => { logout(); navigate("/") }
 
-  const handleLogout = () => {
-    logout()
-    navigate("/")
-  }
+  const NavList = (
+    <nav className="flex-1 p-3 space-y-1">
+      {nav.map((item) => {
+        const active = location.pathname === item.path ||
+          (item.path === "/dashboard" && location.pathname.startsWith("/dashboard"))
+        return (
+          <button
+            key={item.path}
+            onClick={() => handleNav(item.path)}
+            className={cn(
+              "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors",
+              active
+                ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
+                : "text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent"
+            )}
+          >
+            <item.icon className="w-4 h-4 flex-shrink-0" />
+            {!collapsed && <span>{item.label}</span>}
+          </button>
+        )
+      })}
+    </nav>
+  )
 
-  const sidebarContent = (
-    <div className="flex h-full w-full flex-col bg-sidebar">
-      {/* Header */}
-      <div className="p-3">
-        <div className="flex items-center gap-2 px-2">
-          <div className="w-8 h-8 rounded-lg bg-sidebar-primary flex items-center justify-center flex-shrink-0">
-            <Package className="w-4 h-4 text-sidebar-primary-foreground" />
+  const SidebarBody = (
+    <div className="flex h-full w-full flex-col bg-sidebar text-sidebar-foreground">
+      {/* Brand */}
+      <div className="p-4 pb-3">
+        <Link to={isAdmin || isSuperAdmin ? "/dashboard" : "/home"} className="flex items-center gap-2.5 group">
+          <img
+            src="/sewainLogo.webp"
+            alt="Sewain"
+            className="w-9 h-9 rounded-xl object-cover flex-shrink-0"
+            onError={(e) => {
+              e.target.style.display = "none"
+              e.target.nextSibling.style.display = "flex"
+            }}
+          />
+          <div className="hidden w-9 h-9 rounded-xl bg-sidebar-primary items-center justify-center flex-shrink-0">
+            <Package className="w-5 h-5 text-sidebar-primary-foreground" />
           </div>
-          {!collapsed && <span className="font-bold text-sidebar-foreground">Sewain</span>}
-        </div>
+          {!collapsed && (
+            <span className="font-bold text-base tracking-tight text-sidebar-foreground">
+              Sewain
+            </span>
+          )}
+        </Link>
       </div>
 
-      {/* User Info */}
+      {/* User block */}
       {!collapsed && (
-        <div className="mb-2 px-5">
-          <div className="text-xs font-medium text-sidebar-foreground truncate">{user?.nama}</div>
-          <div className="text-xs text-sidebar-foreground/60 truncate">{user?.email}</div>
+        <div className="mx-3 mb-3 p-3 rounded-2xl bg-sidebar-accent border border-sidebar-border">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-full bg-sidebar-primary text-sidebar-primary-foreground text-xs font-bold flex items-center justify-center flex-shrink-0">
+              {initial}
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-sidebar-accent-foreground truncate">{user?.nama}</p>
+              <p className="text-[10px] text-sidebar-foreground/60 truncate">
+                {isSuperAdmin ? "Super Admin" : isAdmin ? "Admin" : "User"}
+              </p>
+            </div>
+          </div>
         </div>
       )}
 
-      <Separator className="bg-sidebar-border" />
+      {/* Section label */}
+      {!collapsed && (
+        <div className="px-5 pb-2 text-[10px] font-bold uppercase tracking-widest text-sidebar-foreground/45">
+          Menu
+        </div>
+      )}
 
-      {/* Navigation */}
-      <nav className="flex-1 p-2 space-y-1">
-        {nav.map((item) => {
-          const active = location.pathname === item.path ||
-            (item.path === "/catalog" && location.pathname === "/dashboard")
-          return (
-            <button
-              key={item.path}
-              onClick={() => handleNav(item.path)}
-              className={cn(
-                "w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
-                active
-                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                  : "text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent"
-              )}
-            >
-              <item.icon className="w-4 h-4 flex-shrink-0" />
-              {!collapsed && <span>{item.label}</span>}
-            </button>
-          )
-        })}
-      </nav>
+      {NavList}
 
-      {/* Logout */}
-      <div className="p-2 mt-auto">
-        <Separator className="bg-sidebar-border mb-2" />
+      {/* Footer */}
+      <div className="p-3 mt-auto border-t border-sidebar-border space-y-1">
+        {!collapsed && (
+          <div className="px-2 pb-2 flex items-center justify-between">
+            <span className="text-[10px] uppercase tracking-widest text-sidebar-foreground/45">Tema</span>
+            <ThemeToggle />
+          </div>
+        )}
         <button
           onClick={handleLogout}
-          className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
         >
-          <LogOut className="w-4 h-4" />
+          <LogOut className="w-4 h-4 flex-shrink-0" />
           {!collapsed && <span>Keluar</span>}
         </button>
       </div>
@@ -107,33 +140,62 @@ export default function Sidebar() {
 
   return (
     <>
-      {/* Mobile toggle */}
+      {/* Mobile trigger */}
       <button
         onClick={() => setMobileOpen(true)}
-        className="md:hidden fixed top-3 left-3 z-40 p-2 rounded-md bg-card border shadow-sm"
+        className="md:hidden fixed top-3 left-3 z-40 p-2.5 rounded-2xl bg-card border border-border shadow-soft"
+        aria-label="Buka menu"
       >
         <Menu className="w-5 h-5" />
       </button>
 
-      {/* Mobile overlay */}
-      {mobileOpen && (
-        <div className="md:hidden fixed inset-0 z-50">
-          <div className="absolute inset-0 bg-black/60" onClick={() => setMobileOpen(false)} />
-          <div className="relative w-64 h-full">{sidebarContent}</div>
-        </div>
-      )}
+      {/* Mobile drawer */}
+      <AnimatePresence>
+        {mobileOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="md:hidden fixed inset-0 z-50"
+          >
+            <button
+              onClick={() => setMobileOpen(false)}
+              className="absolute inset-0 bg-foreground/40 backdrop-blur-sm"
+              aria-label="Tutup menu"
+            />
+            <motion.div
+              initial={{ x: "-100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "-100%" }}
+              transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+              className="relative w-72 h-full"
+            >
+              <button
+                onClick={() => setMobileOpen(false)}
+                className="absolute top-3 right-3 z-10 w-9 h-9 rounded-full bg-sidebar-accent text-sidebar-foreground flex items-center justify-center"
+              >
+                <X className="w-4 h-4" />
+              </button>
+              {SidebarBody}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* Desktop sidebar */}
+      {/* Desktop */}
       <aside
         className={cn(
-          "hidden md:block h-svh border-r border-sidebar-border transition-[width] duration-200",
+          "hidden md:block self-stretch border-r border-sidebar-border transition-[width] duration-200 relative flex-shrink-0",
           collapsed ? "w-16" : "w-64"
         )}
       >
-        {sidebarContent}
+        <div className="sticky top-0 h-screen overflow-y-auto">
+          {SidebarBody}
+        </div>
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="absolute -right-3 top-6 z-10 w-6 h-6 rounded-full border bg-card flex items-center justify-center shadow-sm hover:bg-muted"
+          className="absolute -right-3 top-7 z-10 w-6 h-6 rounded-full border border-border bg-card flex items-center justify-center shadow-soft hover:bg-muted transition-colors"
+          aria-label={collapsed ? "Perlebar sidebar" : "Ciutkan sidebar"}
         >
           <ChevronLeft className={cn("w-3.5 h-3.5 transition-transform", collapsed && "rotate-180")} />
         </button>

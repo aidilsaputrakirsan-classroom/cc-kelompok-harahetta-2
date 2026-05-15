@@ -1,5 +1,10 @@
-import { useState } from "react"
-import { Link, useLocation, useNavigate, Routes } from "react-router-dom"
+/**
+ * UserLayout — Sewain
+ * Top navbar khusus user yang sudah login.
+ * Modern minimalist · konsisten dengan halaman publik.
+ */
+import { useState, useEffect } from "react"
+import { Link, useLocation, useNavigate } from "react-router-dom"
 import { useAuth } from "../../context/AuthContext"
 import { cn } from "../../lib/utils"
 import { motion, AnimatePresence } from "framer-motion"
@@ -10,132 +15,159 @@ import {
 } from "lucide-react"
 
 const NAV_LINKS = [
-  { path: "/home",    label: "Beranda", icon: Home },
-  { path: "/catalog", label: "Katalog",  icon: BookOpen },
-  { path: "/profile", label: "Profil",   icon: User },
+  { path: "/home",    label: "Dashboard", icon: Home },
+  { path: "/catalog", label: "Katalog",   icon: BookOpen },
+  { path: "/profile", label: "Profil",    icon: User },
 ]
 
 function UserNavbar() {
   const [open, setOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [scrolled, setScrolled] = useState(false)
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
 
-  const handleLogout = () => { logout(); navigate("/"); setOpen(false); setUserMenuOpen(false) }
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 12)
+    onScroll()
+    window.addEventListener("scroll", onScroll, { passive: true })
+    return () => window.removeEventListener("scroll", onScroll)
+  }, [])
+
+  // close user menu on outside click
+  useEffect(() => {
+    if (!userMenuOpen) return
+    const handler = (e) => {
+      if (!e.target.closest?.("[data-user-menu]")) setUserMenuOpen(false)
+    }
+    document.addEventListener("click", handler)
+    return () => document.removeEventListener("click", handler)
+  }, [userMenuOpen])
+
+  const handleLogout = () => {
+    logout()
+    navigate("/")
+    setOpen(false)
+    setUserMenuOpen(false)
+  }
 
   const initial = (user?.nama || "U")[0].toUpperCase()
 
   const isActive = (path) => {
-    if (path === "/catalog") return location.pathname.startsWith("/catalog") || location.pathname.startsWith("/items")
+    if (path === "/catalog")
+      return location.pathname.startsWith("/catalog") || location.pathname.startsWith("/items")
     return location.pathname === path
   }
 
   return (
     <motion.nav
-      initial={{ y: -64, opacity: 0 }}
+      initial={{ y: -56, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
-      transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-      className="fixed top-0 left-0 right-0 z-50 bg-card/95 backdrop-blur-xl border-b border-border shadow-sm"
+      transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+      className={cn(
+        "fixed top-0 left-0 right-0 z-50 border-b transition-colors duration-300",
+        scrolled || open
+          ? "bg-background/85 backdrop-blur-xl border-border/60"
+          : "bg-background border-transparent"
+      )}
     >
-      {/* Thin accent bar at top */}
-      <div className="h-0.5 bg-gradient-to-r from-primary via-primary/60 to-transparent" />
-
-      <div className="max-w-7xl mx-auto px-4 h-15 flex items-center justify-between gap-4" style={{ height: "60px" }}>
-
-        {/* Logo */}
-        <Link to="/home" className="flex items-center gap-2 flex-shrink-0 group">
-          <motion.div whileHover={{ rotate: -8, scale: 1.1 }} transition={{ type: "spring", stiffness: 300 }}>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+        {/* ── Logo ── */}
+        <Link to="/home" className="flex items-center gap-2.5 flex-shrink-0 group">
+          <motion.div
+            whileHover={{ scale: 1.06 }}
+            transition={{ type: "spring", stiffness: 320, damping: 18 }}
+          >
             <img
               src="/sewainLogo.webp"
               alt="Sewain"
-              className="w-8 h-8 rounded-xl object-cover"
+              className="w-9 h-9 rounded-xl object-cover"
               onError={(e) => {
                 e.target.style.display = "none"
-                const fb = document.createElement("div")
-                fb.className = "w-8 h-8 rounded-xl bg-primary flex items-center justify-center"
-                e.target.parentNode.appendChild(fb)
+                e.target.nextSibling.style.display = "flex"
               }}
             />
+            <div className="hidden w-9 h-9 rounded-xl bg-primary items-center justify-center">
+              <Package className="w-5 h-5 text-primary-foreground" />
+            </div>
           </motion.div>
-          <span className="font-bold text-lg text-foreground group-hover:text-primary transition-colors">Sewain</span>
+          <span className="font-bold text-lg tracking-tight">Sewain</span>
         </Link>
 
-        {/* Desktop nav links */}
-        <div className="hidden md:flex items-center gap-1 flex-1 justify-center">
-          {NAV_LINKS.map(({ path, label, icon: Icon }) => {
-            const active = isActive(path)
-            return (
-              <Link
-                key={path}
-                to={path}
-                className={cn(
-                  "relative flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200",
-                  active
-                    ? "text-primary bg-primary/10"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
-                )}
-              >
-                <Icon className="w-4 h-4" />
-                {label}
-                {active && (
-                  <motion.div
-                    layoutId="active-underline"
-                    className="absolute bottom-1 left-4 right-4 h-0.5 bg-primary rounded-full"
-                    transition={{ type: "spring", stiffness: 380, damping: 30 }}
-                  />
-                )}
-              </Link>
-            )
-          })}
+        {/* ── Desktop nav pills ── */}
+        <div className="hidden md:flex items-center justify-center flex-1">
+          <div className="flex items-center gap-1 rounded-full p-1 bg-muted/40 border border-border/60">
+            {NAV_LINKS.map(({ path, label, icon: Icon }) => {
+              const active = isActive(path)
+              return (
+                <Link
+                  key={path}
+                  to={path}
+                  className={cn(
+                    "relative inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium transition-colors",
+                    active
+                      ? "text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {active && (
+                    <motion.div
+                      layoutId="user-active-pill"
+                      className="absolute inset-0 rounded-full bg-primary shadow-sm"
+                      transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                    />
+                  )}
+                  <Icon className="relative w-3.5 h-3.5" />
+                  <span className="relative">{label}</span>
+                </Link>
+              )
+            })}
+          </div>
         </div>
 
-        {/* Desktop right */}
+        {/* ── Right cluster ── */}
         <div className="hidden md:flex items-center gap-2 flex-shrink-0">
           <ThemeToggle />
-          {/* Sewa cepat */}
-          <motion.button
-            whileHover={{ scale: 1.03 }}
-            whileTap={{ scale: 0.97 }}
-            onClick={() => navigate("/rentals/new")}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-primary text-white text-xs font-semibold hover:bg-primary/90 transition shadow-sm shadow-primary/20"
-          >
-            <ShoppingCart className="w-3.5 h-3.5" /> Sewa Sekarang
-          </motion.button>
 
-          {/* User chip with dropdown */}
-          <div className="relative">
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
+          <button
+            onClick={() => navigate("/rentals/new")}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition shadow-sm"
+          >
+            <ShoppingCart className="w-3.5 h-3.5" /> Sewa baru
+          </button>
+
+          {/* User chip */}
+          <div className="relative" data-user-menu>
+            <button
               onClick={() => setUserMenuOpen(!userMenuOpen)}
-              className="flex items-center gap-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl px-3 py-2 transition-colors"
+              className="inline-flex items-center gap-2 bg-muted/40 hover:bg-muted border border-border/60 rounded-full px-2.5 py-1.5 transition-colors"
             >
-              <div className="w-6 h-6 rounded-lg bg-primary text-white text-xs font-bold flex items-center justify-center flex-shrink-0">
+              <div className="w-7 h-7 rounded-full bg-primary text-primary-foreground text-xs font-bold flex items-center justify-center flex-shrink-0">
                 {initial}
               </div>
-              <span className="text-sm text-slate-700 font-medium max-w-[110px] truncate">
+              <span className="text-sm font-medium max-w-[110px] truncate">
                 {user?.nama?.split(" ")[0]}
               </span>
               <motion.span
                 animate={{ rotate: userMenuOpen ? 180 : 0 }}
                 transition={{ duration: 0.2 }}
               >
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
               </motion.span>
-            </motion.button>
+            </button>
 
             <AnimatePresence>
               {userMenuOpen && (
                 <motion.div
-                  initial={{ opacity: 0, scale: 0.95, y: -4 }}
+                  initial={{ opacity: 0, scale: 0.96, y: -4 }}
                   animate={{ opacity: 1, scale: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.95, y: -4 }}
+                  exit={{ opacity: 0, scale: 0.96, y: -4 }}
                   transition={{ duration: 0.15, ease: "easeOut" }}
-                  className="absolute right-0 mt-2 w-52 bg-card border border-border rounded-2xl shadow-xl overflow-hidden"
+                  className="absolute right-0 mt-2 w-56 bg-card border border-border rounded-2xl shadow-soft overflow-hidden"
                 >
                   <div className="px-4 py-3 border-b border-border">
-                    <p className="text-sm font-semibold text-foreground truncate">{user?.nama}</p>
+                    <p className="text-sm font-semibold tracking-tight truncate">{user?.nama}</p>
                     <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
                   </div>
                   <div className="p-1.5">
@@ -144,14 +176,14 @@ function UserNavbar() {
                       onClick={() => setUserMenuOpen(false)}
                       className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
                     >
-                      <User className="w-4 h-4" /> Profil Saya
+                      <User className="w-4 h-4" /> Profil saya
                     </Link>
                     <Link
                       to="/rentals/my"
                       onClick={() => setUserMenuOpen(false)}
                       className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
                     >
-                      <Package className="w-4 h-4" /> Riwayat Sewa
+                      <Package className="w-4 h-4" /> Riwayat sewa
                     </Link>
                     <button
                       onClick={handleLogout}
@@ -166,46 +198,46 @@ function UserNavbar() {
           </div>
         </div>
 
-        {/* Mobile: theme toggle + hamburger */}
-        <div className="md:hidden flex items-center gap-1">
+        {/* ── Mobile ── */}
+        <div className="md:hidden flex items-center gap-1.5">
           <ThemeToggle />
           <button
-            className="p-1.5 rounded-lg text-foreground hover:bg-muted/60 transition-colors"
+            className="p-2 rounded-full text-foreground hover:bg-muted/60 transition-colors"
             onClick={() => setOpen(!open)}
+            aria-label="Menu"
           >
-          <AnimatePresence mode="wait" initial={false}>
-            <motion.span
-              key={open ? "close" : "open"}
-              initial={{ rotate: -90, opacity: 0 }}
-              animate={{ rotate: 0, opacity: 1 }}
-              exit={{ rotate: 90, opacity: 0 }}
-              transition={{ duration: 0.15 }}
-            >
-              {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-            </motion.span>
-          </AnimatePresence>
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.span
+                key={open ? "x" : "m"}
+                initial={{ rotate: -90, opacity: 0 }}
+                animate={{ rotate: 0, opacity: 1 }}
+                exit={{ rotate: 90, opacity: 0 }}
+                transition={{ duration: 0.15 }}
+              >
+                {open ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+              </motion.span>
+            </AnimatePresence>
           </button>
         </div>
       </div>
 
-      {/* Mobile menu */}
+      {/* ── Mobile menu ── */}
       <AnimatePresence>
         {open && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.28, ease: "easeInOut" }}
-            className="md:hidden overflow-hidden bg-card border-t border-border"
+            transition={{ duration: 0.25, ease: "easeInOut" }}
+            className="md:hidden overflow-hidden bg-background border-t border-border"
           >
             <div className="px-4 py-3 space-y-1">
-              {/* User info */}
-              <div className="flex items-center gap-3 px-3 py-3 mb-2 bg-muted/50 rounded-xl">
-                <div className="w-9 h-9 rounded-xl bg-primary text-white font-bold flex items-center justify-center flex-shrink-0">
+              <div className="flex items-center gap-3 px-3 py-3 mb-2 bg-muted/40 rounded-2xl">
+                <div className="w-9 h-9 rounded-full bg-primary text-primary-foreground font-bold flex items-center justify-center flex-shrink-0">
                   {initial}
                 </div>
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-foreground truncate">{user?.nama}</p>
+                  <p className="text-sm font-semibold tracking-tight truncate">{user?.nama}</p>
                   <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
                 </div>
               </div>
@@ -218,8 +250,8 @@ function UserNavbar() {
                   className={cn(
                     "flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors",
                     isActive(path)
-                      ? "bg-primary/10 text-primary"
-                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-800"
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
                   )}
                 >
                   <Icon className="w-4 h-4" /> {label}
@@ -228,13 +260,13 @@ function UserNavbar() {
 
               <button
                 onClick={() => { navigate("/rentals/new"); setOpen(false) }}
-                className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold text-white bg-primary hover:bg-primary/90 transition mt-1"
+                className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold text-primary-foreground bg-primary hover:bg-primary/90 transition mt-1"
               >
-                <ShoppingCart className="w-4 h-4" /> Sewa Sekarang
+                <ShoppingCart className="w-4 h-4" /> Sewa baru
               </button>
               <button
                 onClick={handleLogout}
-                className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium text-destructive hover:bg-red-50 transition"
+                className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium text-destructive hover:bg-destructive/10 transition"
               >
                 <LogOut className="w-4 h-4" /> Keluar
               </button>
@@ -248,11 +280,11 @@ function UserNavbar() {
 
 export default function UserLayout({ children }) {
   return (
-    <div className="min-h-screen bg-page">
+    <div className="min-h-screen bg-page text-foreground">
       <UserNavbar />
-      <main className="pt-[60px] max-w-7xl mx-auto px-4 py-6 md:py-8">
+      <main className="pt-28 max-w-7xl mx-auto px-4 sm:px-6 pb-10">
         <motion.div
-          initial={{ opacity: 0, y: 16 }}
+          initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
         >
