@@ -1,56 +1,77 @@
 """
-migrate_pickup_fields.py — Script migrasi database untuk fitur lokasi pickup
+migrate_pickup_fields.py — Tambah kolom pickup/lokasi ke tabel admins & rentals.
 
-Jalankan sekali untuk menambah kolom baru ke database yang sudah ada:
-  python migrate_pickup_fields.py
+Jalankan sekali dari folder backend:
+    python migrate_pickup_fields.py
 
-SQLite aman untuk ALTER TABLE ADD COLUMN (tidak butuh downtime).
+Skrip mendeteksi otomatis apakah DATABASE_URL menunjuk ke SQLite atau
+PostgreSQL, dan memakai sintaks ALTER TABLE yang sesuai. Semua ALTER
+idempoten: kolom yang sudah ada akan di-skip.
 """
 
-import sqlite3
 import os
+from dotenv import load_dotenv
+from sqlalchemy import create_engine, text, inspect
 
-DB_PATH = os.getenv("DB_PATH", "sewain.db")
+load_dotenv()
 
-MIGRATIONS = [
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    raise SystemExit("DATABASE_URL tidak ditemukan di .env!")
+
+is_sqlite = DATABASE_URL.startswith("sqlite")
+FLOAT_TYPE = "REAL" if is_sqlite else "DOUBLE PRECISION"
+TIMESTAMP_TYPE = "TIMESTAMP" if is_sqlite else "TIMESTAMP WITH TIME ZONE"
+
+# (table, column_name, column_type)
+COLUMNS = [
     # Kolom baru di tabel admins
-    "ALTER TABLE admins ADD COLUMN latitude REAL",
-    "ALTER TABLE admins ADD COLUMN longitude REAL",
-
+    ("admins", "latitude", FLOAT_TYPE),
+    ("admins", "longitude", FLOAT_TYPE),
     # Kolom baru di tabel rentals (snapshot pickup)
-    "ALTER TABLE rentals ADD COLUMN pickup_alamat TEXT",
-    "ALTER TABLE rentals ADD COLUMN pickup_latitude REAL",
-    "ALTER TABLE rentals ADD COLUMN pickup_longitude REAL",
-    "ALTER TABLE rentals ADD COLUMN pickup_nama_usaha VARCHAR(100)",
-    "ALTER TABLE rentals ADD COLUMN pickup_telepon VARCHAR(20)",
-    "ALTER TABLE rentals ADD COLUMN diambil_at TIMESTAMP",
+    ("rentals", "pickup_alamat", "TEXT"),
+    ("rentals", "pickup_latitude", FLOAT_TYPE),
+    ("rentals", "pickup_longitude", FLOAT_TYPE),
+    ("rentals", "pickup_nama_usaha", "VARCHAR(100)"),
+    ("rentals", "pickup_telepon", "VARCHAR(20)"),
+    ("rentals", "diambil_at", TIMESTAMP_TYPE),
 ]
 
+
 def run_migration():
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    
-    success = 0
-    skipped = 0
-    
-    for sql in MIGRATIONS:
+    engine = create_engine(DATABASE_URL)
+    print(f"[*] Target DB: {'SQLite' if is_sqlite else 'PostgreSQL'}")
+    print(f"[*] URL: {DATABASE_URL.split('@')[-1] if '@' in DATABASE_URL else DATABASE_URL}\n")
+
+    inspector = inspect(engine)
+
+    # Ambil kolom existing per tabel
+    existing = {}
+    for table in ("admins", "rentals"):
         try:
-            cursor.execute(sql)
-            print(f"  [OK] {sql}")
-            success += 1
-        except sqlite3.OperationalError as e:
-            if "duplicate column name" in str(e).lower():
-                print(f"  [SKIP] Sudah ada: {sql.split('ADD COLUMN')[1].strip().split()[0]}")
+            existing[table] = {c["name"] for c in inspector.get_columns(table)}
+        except Exception as e:
+            print(f"[X] Gagal membaca kolom tabel '{table}': {e}")
+            return
+
+    added = skipped = 0
+
+    with engine.begin() as conn:
+        for table, col_name, col_type in COLUMNS:
+            if col_name in existing[table]:
+                print(f"  [SKIP] {table}.{col_name} sudah ada")
                 skipped += 1
-            else:
-                print(f"  [ERR] Error: {e} -> {sql}")
-                conn.close()
-                raise
-    
-    conn.commit()
-    conn.close()
-    print(f"\nMigrasi selesai: {success} kolom ditambah, {skipped} sudah ada.")
+                continue
+            sql = f"ALTER TABLE {table} ADD COLUMN {col_name} {col_type}"
+            try:
+                conn.execute(text(sql))
+                print(f"  [OK]   {sql}")
+                added += 1
+            except Exception as e:
+                print(f"  [ERR]  {sql} → {e}")
+
+    print(f"\nSelesai: {added} kolom ditambahkan, {skipped} sudah ada.")
+
 
 if __name__ == "__main__":
-    print(f"[*] Menjalankan migrasi ke: {DB_PATH}\n")
     run_migration()
