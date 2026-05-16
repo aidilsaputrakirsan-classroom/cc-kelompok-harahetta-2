@@ -52,9 +52,10 @@ export function AuthProvider({ children }) {
   }, [])
 
   const handleRegister = useCallback(async (userData) => {
-    await apiRegister(userData)
-    return await handleLogin(userData.email, userData.password)
-  }, [handleLogin])
+    const result = await apiRegister(userData)
+    // Jangan auto-login — user harus verifikasi email dulu
+    return result
+  }, [])
 
   const handleLogout = useCallback(() => {
     clearToken()

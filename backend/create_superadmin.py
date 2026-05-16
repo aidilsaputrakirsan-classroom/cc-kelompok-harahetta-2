@@ -13,6 +13,7 @@ load_dotenv()
 from database import engine, SessionLocal
 from models import Base, User, UserRole
 from passlib.context import CryptContext
+from datetime import datetime
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -47,6 +48,7 @@ def create_superadmin():
             role=UserRole.super_admin,
             is_active=True,
             is_verified=True,
+            email_verified_at=datetime.now(),
         )
         db.add(superadmin)
         db.commit()

@@ -64,6 +64,42 @@ export async function login(email, password) {
   return data
 }
 
+export async function verifyEmail(token) {
+  const res = await fetch(`${API_URL}/auth/verify-email`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token }),
+  })
+  return handleResponse(res)
+}
+
+export async function resendVerification(email) {
+  const res = await fetch(`${API_URL}/auth/resend-verification`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  })
+  return handleResponse(res)
+}
+
+export async function forgotPassword(email) {
+  const res = await fetch(`${API_URL}/auth/forgot-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  })
+  return handleResponse(res)
+}
+
+export async function resetPassword(token, new_password) {
+  const res = await fetch(`${API_URL}/auth/reset-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token, new_password }),
+  })
+  return handleResponse(res)
+}
+
 export async function getMe() {
   const res = await fetch(`${API_URL}/auth/me`, { headers: authOnlyHeaders() })
   return handleResponse(res)
@@ -233,6 +269,14 @@ export async function fetchRentalPickupInfo(rentalId) {
 export async function confirmPickup(rentalId) {
   const res = await fetch(`${API_URL}/rentals/${rentalId}/confirm-pickup`, {
     method: "PUT", headers: authHeaders(),
+  })
+  return handleResponse(res)
+}
+
+// User request pengembalian barang ke admin
+export async function requestReturn(rentalId) {
+  const res = await fetch(`${API_URL}/rentals/${rentalId}/request-return`, {
+    method: "POST", headers: authHeaders(),
   })
   return handleResponse(res)
 }

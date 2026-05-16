@@ -83,6 +83,8 @@ class User(Base):
     role = Column(SAEnum(UserRole), nullable=False, default=UserRole.user)
     is_active = Column(Boolean, default=True)
     is_verified = Column(Boolean, default=False)  # True jika verifikasi identitas disetujui
+    email_verified_at = Column(DateTime(timezone=True), nullable=True)  # NULL = belum verifikasi email
+    password_changed_at = Column(DateTime(timezone=True), nullable=True)  # Untuk invalidasi token reset
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships
@@ -110,8 +112,6 @@ class AdminProfile(Base):
     nama_usaha = Column(String(100), nullable=False)
     alamat_usaha = Column(Text, nullable=True)
     nomor_telepon = Column(String(20), nullable=True)
-    nomor_rekening = Column(String(100), nullable=True)   # No. rek / nama bank
-    foto_qris = Column(Text, nullable=True)               # base64 gambar QRIS
     latitude = Column(Float, nullable=True)               # Koordinat lokasi usaha
     longitude = Column(Float, nullable=True)              # Koordinat lokasi usaha
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -244,6 +244,7 @@ class Rental(Base):
     pickup_nama_usaha = Column(String(100), nullable=True)
     pickup_telepon = Column(String(20), nullable=True)
     diambil_at = Column(DateTime(timezone=True), nullable=True)  # Timestamp konfirmasi pengambilan
+    return_requested_at = Column(DateTime(timezone=True), nullable=True)  # User request pengembalian
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
 

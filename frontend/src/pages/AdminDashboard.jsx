@@ -40,8 +40,53 @@ const PAYMENT_STATUS_LABEL = {
   cancelled: { label: "Dibatalkan", cls: "bg-muted text-muted-foreground" },
 }
 
+/* ─── Admin Countdown (sisa waktu sewa) ───────────────────── */
+function AdminCountdown({ endDate }) {
+  const [t, setT] = useState({ d: 0, h: 0, m: 0, s: 0 })
+  const [expired, setExpired] = useState(false)
+
+  useEffect(() => {
+    if (!endDate) return
+    const calc = () => {
+      const diff = new Date(endDate).getTime() - Date.now()
+      if (diff <= 0) { setExpired(true); return }
+      setExpired(false)
+      setT({
+        d: Math.floor(diff / 86400000),
+        h: Math.floor((diff / 3600000) % 24),
+        m: Math.floor((diff / 60000) % 60),
+        s: Math.floor((diff / 1000) % 60),
+      })
+    }
+    calc()
+    const tick = setInterval(calc, 1000)
+    return () => clearInterval(tick)
+  }, [endDate])
+
+  if (expired) {
+    return (
+      <div className="mt-3 flex items-center gap-1.5 text-xs font-bold text-destructive bg-destructive/10 px-3 py-1.5 rounded-lg">
+        <AlertTriangle className="w-3.5 h-3.5" /> Waktu sewa habis
+      </div>
+    )
+  }
+
+  return (
+    <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+      <Clock className="w-3.5 h-3.5" />
+      <span>Sisa:</span>
+      <div className="flex items-center gap-1 font-mono font-bold text-foreground">
+        {t.d > 0 && <span className="bg-secondary px-1.5 py-0.5 rounded">{t.d}h</span>}
+        <span className="bg-secondary px-1.5 py-0.5 rounded">{String(t.h).padStart(2, "0")}j</span>
+        <span className="bg-secondary px-1.5 py-0.5 rounded">{String(t.m).padStart(2, "0")}m</span>
+        <span className="bg-secondary px-1.5 py-0.5 rounded">{String(t.s).padStart(2, "0")}d</span>
+      </div>
+    </div>
+  )
+}
+
 /* ─── AdminRentalCard ─────────────────────────────────────── */
-function AdminRentalCard({ rental, payment, onUpdateStatus, onViewBukti, onConfirmPayment, onRejectPayment }) {
+function AdminRentalCard({ rental, payment, onUpdateStatus, onViewBukti, onConfirmPayment, onRejectPayment, busy }) {
   const item = rental.item
   const paymentMeta = payment ? PAYMENT_STATUS_LABEL[payment.status] : null
   return (
@@ -91,6 +136,11 @@ function AdminRentalCard({ rental, payment, onUpdateStatus, onViewBukti, onConfi
               )}
             </div>
           )}
+
+          {/* Countdown sisa waktu sewa (hanya untuk sedang_disewa) */}
+          {rental.status === "sedang_disewa" && (
+            <AdminCountdown endDate={rental.tanggal_selesai} />
+          )}
         </div>
         <div className="flex flex-col gap-2 flex-shrink-0">
           {rental.status === "pending" && (
@@ -119,7 +169,36 @@ function AdminRentalCard({ rental, payment, onUpdateStatus, onViewBukti, onConfi
             </>
           )}
           {rental.status === "sedang_disewa" && (
-            <Button size="sm" variant="secondary" className="rounded-full" onClick={() => onUpdateStatus(rental.id, "selesai")}>Selesai</Button>
+            <>
+              {rental.return_requested_at ? (
+                <>
+                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1 rounded-full bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-200 whitespace-nowrap">
+                    <Clock className="w-3 h-3" /> User minta kembalikan
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="success"
+                    className="rounded-full"
+                    onClick={() => onUpdateStatus(rental.id, "selesai")}
+                    loading={busy}
+                    disabled={busy}
+                  >
+                    <CheckCircle className="w-3.5 h-3.5 mr-1" /> Konfirmasi terima
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="rounded-full"
+                  onClick={() => onUpdateStatus(rental.id, "selesai")}
+                  loading={busy}
+                  disabled={busy}
+                >
+                  Tandai selesai
+                </Button>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -146,11 +225,10 @@ export default function AdminDashboard({ addToast }) {
   const [fotoUploading, setFotoUploading] = useState(false)
   const [profileForm, setProfileForm] = useState({
     nama_usaha: "", alamat_usaha: "", nomor_telepon: "",
-    nomor_rekening: "", foto_qris: "",
     latitude: null, longitude: null,
   })
-  const [qrisUploading, setQrisUploading] = useState(false)
   const [savingProfile, setSavingProfile] = useState(false)
+  const [rentalUpdatingId, setRentalUpdatingId] = useState(null)
   const [previewBukti, setPreviewBukti] = useState(null)
   const [paymentMap, setPaymentMap] = useState({})
 
@@ -205,8 +283,8 @@ export default function AdminDashboard({ addToast }) {
         setProfile(p)
         setProfileForm({
           nama_usaha: p.nama_usaha || "", alamat_usaha: p.alamat_usaha || "",
-          nomor_telepon: p.nomor_telepon || "", nomor_rekening: p.nomor_rekening || "",
-          foto_qris: p.foto_qris || "", latitude: p.latitude || null, longitude: p.longitude || null,
+          nomor_telepon: p.nomor_telepon || "",
+          latitude: p.latitude || null, longitude: p.longitude || null,
         })
       }).catch(() => {}),
       fetchCategories().then(setCategories).catch(() => {}),
@@ -251,8 +329,10 @@ export default function AdminDashboard({ addToast }) {
     finally { setSaving(false) }
   }
   const handleUpdateRentalStatus = async (rentalId, status) => {
+    setRentalUpdatingId(rentalId)
     try { await updateRentalStatus(rentalId, { status }); addToast?.(`Status → "${status}"`, "success"); await Promise.all([loadRentals(), loadItems()]) }
     catch (err) { addToast?.(err.message, "error") }
+    finally { setRentalUpdatingId(null) }
   }
   const handleConfirmPayment = async (paymentId) => {
     if (!confirm("Konfirmasi pembayaran ini?")) return
@@ -281,12 +361,12 @@ export default function AdminDashboard({ addToast }) {
     if (!profileForm.latitude || !profileForm.longitude) { addToast?.("Titik lokasi di peta wajib diisi", "error"); return }
     setSavingProfile(true)
     try {
-      const payload = { nama_usaha: profileForm.nama_usaha, alamat_usaha: profileForm.alamat_usaha, nomor_telepon: profileForm.nomor_telepon, nomor_rekening: profileForm.nomor_rekening || null, foto_qris: profileForm.foto_qris || null, latitude: profileForm.latitude, longitude: profileForm.longitude }
+      const payload = { nama_usaha: profileForm.nama_usaha, alamat_usaha: profileForm.alamat_usaha, nomor_telepon: profileForm.nomor_telepon, latitude: profileForm.latitude, longitude: profileForm.longitude }
       if (profile) await updateAdminProfile(payload)
       else await createAdminProfile(payload)
       const updated = await fetchAdminProfile()
       setProfile(updated)
-      setProfileForm({ nama_usaha: updated.nama_usaha || "", alamat_usaha: updated.alamat_usaha || "", nomor_telepon: updated.nomor_telepon || "", nomor_rekening: updated.nomor_rekening || "", foto_qris: updated.foto_qris || "", latitude: updated.latitude || null, longitude: updated.longitude || null })
+      setProfileForm({ nama_usaha: updated.nama_usaha || "", alamat_usaha: updated.alamat_usaha || "", nomor_telepon: updated.nomor_telepon || "", latitude: updated.latitude || null, longitude: updated.longitude || null })
       addToast?.("Profil usaha disimpan", "success")
     } catch (err) { addToast?.(err.message, "error") }
     finally { setSavingProfile(false) }
@@ -307,22 +387,6 @@ export default function AdminDashboard({ addToast }) {
       }; img.src = ev.target.result
     }; reader.readAsDataURL(file); e.target.value = ""
   }
-  const handleQrisChange = (e) => {
-    const file = e.target.files?.[0]; if (!file) return
-    setQrisUploading(true)
-    const reader = new FileReader()
-    reader.onload = (ev) => {
-      const img = new Image()
-      img.onload = () => {
-        const MAX = 600; let { width, height } = img
-        if (width > MAX || height > MAX) { if (width > height) { height = Math.round(height * MAX / width); width = MAX } else { width = Math.round(width * MAX / height); height = MAX } }
-        const canvas = document.createElement("canvas"); canvas.width = width; canvas.height = height
-        canvas.getContext("2d").drawImage(img, 0, 0, width, height)
-        setProfileForm(p => ({ ...p, foto_qris: canvas.toDataURL("image/png", 0.9) })); setQrisUploading(false)
-      }; img.src = ev.target.result
-    }; reader.readAsDataURL(file); e.target.value = ""
-  }
-
   const imgFallback = (name) => `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0a6e4a&color=fff&size=400&bold=true`
 
   if (loading) {
@@ -428,7 +492,7 @@ export default function AdminDashboard({ addToast }) {
           ) : (
             <div className="space-y-3">
               {rentals.map(r => (
-                <AdminRentalCard key={r.id} rental={r} payment={paymentMap[r.id]} onUpdateStatus={handleUpdateRentalStatus} onViewBukti={setPreviewBukti} onConfirmPayment={handleConfirmPayment} onRejectPayment={handleRejectPayment} />
+                <AdminRentalCard key={r.id} rental={r} payment={paymentMap[r.id]} onUpdateStatus={handleUpdateRentalStatus} onViewBukti={setPreviewBukti} onConfirmPayment={handleConfirmPayment} onRejectPayment={handleRejectPayment} busy={rentalUpdatingId === r.id} />
               ))}
             </div>
           )}
@@ -551,30 +615,6 @@ export default function AdminDashboard({ addToast }) {
 
               <Separator />
 
-              <div>
-                <p className="text-sm font-semibold mb-1">Info pembayaran</p>
-                <p className="text-xs text-muted-foreground mb-4">Ditampilkan ke penyewa saat mengajukan sewa</p>
-              </div>
-              <div className="space-y-2">
-                <Label>Nomor rekening / bank</Label>
-                <Input placeholder="BCA 1234567890 a/n Nama" value={profileForm.nomor_rekening} onChange={(e) => setProfileForm(p => ({ ...p, nomor_rekening: e.target.value }))} />
-              </div>
-              <div className="space-y-2">
-                <Label>Gambar QRIS (opsional)</Label>
-                {profileForm.foto_qris ? (
-                  <div className="relative inline-block">
-                    <img src={profileForm.foto_qris} alt="QRIS" className="w-48 h-48 object-contain rounded-2xl border border-border bg-background p-2" />
-                    <button type="button" onClick={() => setProfileForm(p => ({ ...p, foto_qris: "" }))} className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1 shadow hover:opacity-80"><X className="w-3.5 h-3.5" /></button>
-                  </div>
-                ) : (
-                  <label className={`flex flex-col items-center justify-center w-48 h-48 border-2 border-dashed border-border rounded-2xl cursor-pointer hover:border-primary hover:text-primary transition-colors ${qrisUploading ? "opacity-50 pointer-events-none" : ""}`}>
-                    <div className="flex flex-col items-center gap-1 text-muted-foreground">
-                      {qrisUploading ? <span className="text-sm">Memproses...</span> : (<><ImageIcon className="w-7 h-7 mb-1" /><span className="text-sm font-medium">Upload QRIS</span><span className="text-xs">JPG / PNG</span></>)}
-                    </div>
-                    <input type="file" className="hidden" accept="image/jpeg,image/png,image/webp" onChange={handleQrisChange} disabled={qrisUploading} />
-                  </label>
-                )}
-              </div>
               <Button type="submit" loading={savingProfile} className="rounded-full"><Save className="w-4 h-4 mr-1.5" /> Simpan profil</Button>
             </form>
           </div>

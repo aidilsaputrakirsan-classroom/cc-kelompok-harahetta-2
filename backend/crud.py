@@ -77,11 +77,23 @@ def create_user(db: Session, user_data: UserCreate) -> User | None:
     """
     Buat user baru dengan password yang di-hash.
     Registrasi publik hanya untuk role 'user'.
-    Return None jika email sudah terdaftar.
+    
+    Behavior:
+    - Email belum terdaftar → buat user baru
+    - Email terdaftar TAPI belum verifikasi email → update data (password, nama) & izinkan daftar ulang
+    - Email terdaftar DAN sudah verifikasi → return None (blok duplikat)
     """
     existing = db.query(User).filter(User.email == user_data.email).first()
     if existing:
-        return None
+        # Kalau sudah verifikasi → blok daftar ulang
+        if existing.email_verified_at:
+            return None
+        # Belum verifikasi → izinkan daftar ulang dengan update data
+        existing.nama = user_data.nama
+        existing.hashed_password = hash_password(user_data.password)
+        db.commit()
+        db.refresh(existing)
+        return existing
 
     db_user = User(
         email=user_data.email,
@@ -183,6 +195,7 @@ def create_admin_user(
         nama=nama,
         hashed_password=hash_password(password),
         role=UserRole.admin,
+        email_verified_at=datetime.now(),  # Admin dibuat super admin → auto verified
     )
     db.add(db_user)
     db.commit()
@@ -217,8 +230,6 @@ def create_admin_profile(db: Session, user_id: int, data: AdminProfileCreate) ->
         nama_usaha=data.nama_usaha,
         alamat_usaha=data.alamat_usaha,
         nomor_telepon=data.nomor_telepon,
-        nomor_rekening=data.nomor_rekening,
-        foto_qris=data.foto_qris,
         latitude=getattr(data, 'latitude', None),
         longitude=getattr(data, 'longitude', None),
     )
