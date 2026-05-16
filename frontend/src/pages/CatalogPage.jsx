@@ -13,7 +13,7 @@ import Navbar from "../components/Layout/Navbar"
 import Footer from "../components/Layout/Footer"
 import {
   Search, Package, ShoppingCart, ArrowLeft, ArrowRight, X,
-  Sparkles, CheckCircle, Clock, Eye, SlidersHorizontal, Filter,
+  Sparkles, CheckCircle, Clock, Eye, SlidersHorizontal, Filter, Store,
 } from "lucide-react"
 
 /* ─── motion ──────────────────────────────────────────────── */
@@ -29,9 +29,9 @@ const catalogNavLinks = [
 
 /* ─── status ──────────────────────────────────────────────── */
 const STATUS_CONFIG = {
-  available:   { label: "Tersedia",        cls: "bg-primary/10 text-primary" },
-  rented:      { label: "Disewa",          cls: "bg-amber-100 text-amber-800" },
-  unavailable: { label: "Tidak tersedia",  cls: "bg-muted text-muted-foreground" },
+  available:   { label: "Tersedia",        cls: "bg-emerald-100 text-emerald-800 shadow-sm" },
+  rented:      { label: "Disewa",          cls: "bg-amber-100 text-amber-800 shadow-sm" },
+  unavailable: { label: "Tidak tersedia",  cls: "bg-muted text-muted-foreground shadow-sm" },
 }
 
 /* ─── ItemCard ────────────────────────────────────────────── */
@@ -88,6 +88,12 @@ function ItemCard({ item, onRent, index }) {
         >
           {item.nama}
         </h3>
+        {item.admin_nama_usaha && (
+          <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+            <Store className="w-3 h-3" />
+            {item.admin_nama_usaha}
+          </p>
+        )}
         {item.deskripsi && (
           <p className="text-sm text-muted-foreground line-clamp-2 mt-1.5 flex-1 leading-relaxed">
             {item.deskripsi}
