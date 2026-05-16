@@ -224,8 +224,8 @@ export default function ChatbotWidget() {
                 {/* Bubble */}
                 <div style={{
                   maxWidth: "78%",
-                  background: msg.role === "user" ? "#1b7e6a" : "white",
-                  color: msg.role === "user" ? "white" : "#1e293b",
+                  background: msg.isError ? "#fef2f2" : (msg.role === "user" ? "#1b7e6a" : "white"),
+                  color: msg.isError ? "#dc2626" : (msg.role === "user" ? "white" : "#1e293b"),
                   padding: "8px 12px",
                   borderRadius: msg.role === "user"
                     ? "14px 4px 14px 14px"
@@ -234,8 +234,6 @@ export default function ChatbotWidget() {
                   lineHeight: "1.55",
                   boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
                   border: msg.role === "model" ? "1px solid #f1f5f9" : "none",
-                  background: msg.isError ? "#fef2f2" : (msg.role === "user" ? "#1b7e6a" : "white"),
-                  color: msg.isError ? "#dc2626" : (msg.role === "user" ? "white" : "#1e293b"),
                 }}
                   dangerouslySetInnerHTML={{ __html: formatMessage(msg.content) }}
                 />

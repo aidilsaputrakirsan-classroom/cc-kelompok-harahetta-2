@@ -209,6 +209,11 @@ class Item(Base):
     category = relationship("Category", back_populates="items")
     rentals = relationship("Rental", back_populates="item")
 
+    @property
+    def admin_nama_usaha(self):
+        """Nama usaha penyedia barang (untuk ditampilkan di katalog)."""
+        return self.admin.nama_usaha if self.admin else None
+
     def __repr__(self):
         return f"<Item(id={self.id}, nama='{self.nama}', harga_per_hari={self.harga_per_hari})>"
 

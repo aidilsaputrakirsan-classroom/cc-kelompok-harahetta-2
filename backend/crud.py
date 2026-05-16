@@ -508,7 +508,7 @@ def get_items(
     - admin_id: filter by penyedia (untuk admin melihat barang miliknya)
     - status: filter by status (available, rented, unavailable)
     """
-    query = db.query(Item).options(joinedload(Item.category))
+    query = db.query(Item).options(joinedload(Item.category), joinedload(Item.admin))
 
     if search:
         term = f"%{search}%"
@@ -543,7 +543,7 @@ def get_item(db: Session, item_id: int) -> Item | None:
     """Ambil satu barang berdasarkan ID."""
     return (
         db.query(Item)
-        .options(joinedload(Item.category))
+        .options(joinedload(Item.category), joinedload(Item.admin))
         .filter(Item.id == item_id)
         .first()
     )

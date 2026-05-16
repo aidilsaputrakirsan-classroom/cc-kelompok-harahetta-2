@@ -314,6 +314,7 @@ class ItemResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     category: Optional[CategoryResponse]
+    admin_nama_usaha: Optional[str] = None
 
     class Config:
         from_attributes = True
