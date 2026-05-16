@@ -6,7 +6,7 @@ import { Input } from "../components/ui/input"
 import { Label } from "../components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card"
 import { Separator } from "../components/ui/separator"
-import { Store, CreditCard, QrCode, ArrowRight, ArrowLeft, CheckCircle, MapPin } from "lucide-react"
+import { Store, ArrowRight, ArrowLeft, CheckCircle, MapPin } from "lucide-react"
 import MapPicker from "../components/MapPicker"
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000"
@@ -17,14 +17,11 @@ export default function AdminOnboardingPage({ addToast }) {
   const [currentStep, setCurrentStep] = useState(1)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [uploading, setUploading] = useState(false)
   const [profile, setProfile] = useState(null)
   const [form, setForm] = useState({
     nama_usaha: "",
     alamat_usaha: "",
     nomor_telepon: "",
-    nomor_rekening: "",
-    foto_qris: "",
     latitude: null,
     longitude: null,
   })
@@ -43,14 +40,9 @@ export default function AdminOnboardingPage({ addToast }) {
           nama_usaha: p.nama_usaha || "",
           alamat_usaha: p.alamat_usaha || "",
           nomor_telepon: p.nomor_telepon || "",
-          nomor_rekening: p.nomor_rekening || "",
-          foto_qris: p.foto_qris || "",
           latitude: p.latitude || null,
           longitude: p.longitude || null,
         })
-        if (p.nomor_rekening || p.foto_qris) {
-          setCurrentStep(2)
-        }
       })
       .catch(() => {
         setProfile(null)
@@ -60,42 +52,6 @@ export default function AdminOnboardingPage({ addToast }) {
 
   const handleChange = (e) =>
     setForm((p) => ({ ...p, [e.target.name]: e.target.value }))
-
-  const compressAndSetQRIS = (file) => {
-    if (file.size > 5 * 1024 * 1024) {
-      addToast?.("Ukuran file maksimal 5MB", "error")
-      return
-    }
-    setUploading(true)
-    const reader = new FileReader()
-    reader.onload = (ev) => {
-      const img = new Image()
-      img.onload = () => {
-        const MAX = 800
-        let { width, height } = img
-        if (width > MAX || height > MAX) {
-          if (width > height) {
-            height = Math.round((height * MAX) / width)
-            width = MAX
-          } else {
-            width = Math.round((width * MAX) / height)
-            height = MAX
-          }
-        }
-        const canvas = document.createElement("canvas")
-        canvas.width = width
-        canvas.height = height
-        canvas.getContext("2d").drawImage(img, 0, 0, width, height)
-        setForm((p) => ({
-          ...p,
-          foto_qris: canvas.toDataURL("image/jpeg", 0.8),
-        }))
-        setUploading(false)
-      }
-      img.src = ev.target.result
-    }
-    reader.readAsDataURL(file)
-  }
 
   const handleNextStep = async () => {
     if (currentStep === 1) {
@@ -136,38 +92,6 @@ export default function AdminOnboardingPage({ addToast }) {
         setSaving(false)
       }
     } else if (currentStep === 2) {
-      if (!form.nomor_rekening && !form.foto_qris) {
-        addToast?.(
-          "Harap isi minimal nomor rekening atau upload QRIS",
-          "error"
-        )
-        return
-      }
-      setSaving(true)
-      try {
-        const payload = {
-          nomor_rekening: form.nomor_rekening,
-          foto_qris: form.foto_qris || undefined,
-        }
-        const res = await fetch(`${API_URL}/admin/profile`, {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(payload),
-        })
-        if (!res.ok) throw new Error("Gagal menyimpan info pembayaran")
-        const updated = await res.json()
-        setProfile(updated)
-        addToast?.("Info pembayaran berhasil disimpan", "success")
-        setCurrentStep(3)
-      } catch (err) {
-        addToast?.(err.message, "error")
-      } finally {
-        setSaving(false)
-      }
-    } else if (currentStep === 3) {
       navigate("/admin/dashboard")
     }
   }
@@ -207,7 +131,7 @@ export default function AdminOnboardingPage({ addToast }) {
         {/* Progress Indicator */}
         <div className="mb-8">
           <div className="flex items-center justify-center space-x-4">
-            {[1, 2, 3].map((step) => (
+            {[1, 2].map((step) => (
               <div key={step} className="flex items-center">
                 <div
                   className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold transition-all ${
@@ -222,7 +146,7 @@ export default function AdminOnboardingPage({ addToast }) {
                     step
                   )}
                 </div>
-                {step < 3 && (
+                {step < 2 && (
                   <div
                     className={`w-24 h-1 mx-2 rounded-full transition-all ${
                       currentStep > step ? "bg-primary" : "bg-muted"
@@ -245,13 +169,6 @@ export default function AdminOnboardingPage({ addToast }) {
                 currentStep === 2 ? "font-semibold text-primary" : ""
               }
             >
-              Pembayaran
-            </span>
-            <span
-              className={
-                currentStep === 3 ? "font-semibold text-primary" : ""
-              }
-            >
               Selesai
             </span>
           </div>
@@ -267,11 +184,6 @@ export default function AdminOnboardingPage({ addToast }) {
                 </>
               )}
               {currentStep === 2 && (
-                <>
-                  <CreditCard className="w-6 h-6" /> Info Pembayaran
-                </>
-              )}
-              {currentStep === 3 && (
                 <>
                   <CheckCircle className="w-6 h-6" /> Setup Selesai
                 </>
@@ -351,96 +263,8 @@ export default function AdminOnboardingPage({ addToast }) {
               </div>
             )}
 
-            {/* Step 2 */}
+            {/* Step 2 - Selesai */}
             {currentStep === 2 && (
-              <div className="space-y-6">
-                <p className="text-muted-foreground">
-                  Setup metode pembayaran agar penyewa dapat melakukan transfer.
-                </p>
-                <Separator />
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="nomor_rekening">Nomor Rekening Bank</Label>
-                    <Input
-                      id="nomor_rekening"
-                      name="nomor_rekening"
-                      value={form.nomor_rekening}
-                      onChange={handleChange}
-                      placeholder="BCA 1234567890 a/n Toko Sewa Jaya"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Format: [Bank] [Nomor] a/n [Nama Pemilik]
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <div className="flex-1 h-px bg-border"></div>
-                    <span>ATAU</span>
-                    <div className="flex-1 h-px bg-border"></div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Foto QRIS (Opsional)</Label>
-                    <div className="mt-2">
-                      {form.foto_qris ? (
-                        <div className="relative">
-                          <img
-                            src={form.foto_qris}
-                            alt="QRIS"
-                            className="w-full max-w-sm rounded-2xl border border-border mx-auto"
-                          />
-                          <Button
-                            type="button"
-                            variant="destructive"
-                            size="sm"
-                            className="absolute top-2 right-2 rounded-full"
-                            onClick={() =>
-                              setForm((p) => ({ ...p, foto_qris: "" }))
-                            }
-                          >
-                            Hapus
-                          </Button>
-                        </div>
-                      ) : (
-                        <div className="border-2 border-dashed border-border rounded-2xl p-6 text-center">
-                          <QrCode className="w-12 h-12 mx-auto text-muted-foreground mb-2" />
-                          <p className="text-sm text-muted-foreground mb-2">
-                            Upload foto QRIS Anda
-                          </p>
-                          <Input
-                            type="file"
-                            accept="image/*"
-                            onChange={(e) =>
-                              e.target.files?.[0] &&
-                              compressAndSetQRIS(e.target.files[0])
-                            }
-                            disabled={uploading}
-                          />
-                          {uploading && (
-                            <p className="text-sm text-primary mt-2">
-                              Memproses...
-                            </p>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      QRIS memudahkan penyewa scan dan bayar dari e-wallet
-                    </p>
-                  </div>
-
-                  <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-sm text-amber-800">
-                    <p className="font-semibold mb-1">Penting!</p>
-                    <p>
-                      Isi minimal satu metode pembayaran (rekening atau QRIS).
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Step 3 */}
-            {currentStep === 3 && (
               <div className="space-y-6 text-center py-8">
                 <div className="mx-auto w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center">
                   <CheckCircle className="w-10 h-10 text-primary" />
@@ -450,7 +274,9 @@ export default function AdminOnboardingPage({ addToast }) {
                 </h3>
                 <p className="text-muted-foreground max-w-xl mx-auto">
                   Profil usaha Anda sudah siap. Sekarang Anda bisa mulai
-                  menambahkan barang dan mengelola pesanan.
+                  menambahkan barang dan mengelola pesanan. Pembayaran dari
+                  penyewa akan otomatis masuk ke wallet Anda lewat payment
+                  gateway.
                 </p>
                 <div className="bg-primary/5 border border-primary/20 rounded-2xl p-4 text-left max-w-xl mx-auto">
                   <h4 className="font-semibold text-foreground mb-2">
@@ -460,7 +286,7 @@ export default function AdminOnboardingPage({ addToast }) {
                     <li>Tambahkan barang pertama ke katalog</li>
                     <li>Atur harga sewa per hari dan stok</li>
                     <li>Kelola pesanan yang masuk dari penyewa</li>
-                    <li>Verifikasi pembayaran dari penyewa</li>
+                    <li>Tarik saldo wallet ke rekening Anda</li>
                   </ul>
                 </div>
               </div>
@@ -469,7 +295,7 @@ export default function AdminOnboardingPage({ addToast }) {
             {/* Navigation */}
             <div className="flex justify-between mt-8 pt-6 border-t border-border">
               <div className="flex gap-2">
-                {currentStep > 1 && currentStep < 3 && (
+                {currentStep > 1 && currentStep < 2 && (
                   <Button
                     type="button"
                     variant="outline"
@@ -481,7 +307,7 @@ export default function AdminOnboardingPage({ addToast }) {
                     Kembali
                   </Button>
                 )}
-                {currentStep < 3 && (
+                {currentStep < 2 && (
                   <Button
                     type="button"
                     variant="ghost"
@@ -495,14 +321,14 @@ export default function AdminOnboardingPage({ addToast }) {
                 type="button"
                 className="rounded-full"
                 onClick={handleNextStep}
-                disabled={saving || uploading}
+                disabled={saving}
               >
                 {saving
                   ? "Menyimpan..."
-                  : currentStep === 3
+                  : currentStep === 2
                   ? "Ke Dashboard"
                   : "Lanjut"}
-                {!saving && currentStep < 3 && (
+                {!saving && currentStep < 2 && (
                   <ArrowRight className="w-4 h-4 ml-1.5" />
                 )}
               </Button>

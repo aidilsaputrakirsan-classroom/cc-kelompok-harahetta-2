@@ -14,17 +14,35 @@ def test_register_success(client):
     assert data["role"] == "user"
 
 
-def test_register_duplicate_email(client):
-    """Test registrasi dengan email yang sudah ada → 400."""
+def test_register_duplicate_email(client, db_session):
+    """Test registrasi email yang sudah verified → 400. Email belum verified → 201 (replace)."""
+    from datetime import datetime, timezone
+    from models import User
+
+    # 1. Register pertama kali → 201
     client.post("/auth/register", json={
         "email": "dup@example.com",
         "password": "DupPass123!",
         "nama": "Dup User",
     })
+
+    # 2. Daftar ulang dengan email yang BELUM diverifikasi → 201 (replace data)
     response = client.post("/auth/register", json={
         "email": "dup@example.com",
-        "password": "DupPass123!",
+        "password": "NewPass123!",
         "nama": "Dup User 2",
+    })
+    assert response.status_code == 201
+
+    # 3. Tandai email sebagai verified, lalu coba daftar ulang → 400
+    user = db_session.query(User).filter(User.email == "dup@example.com").first()
+    user.email_verified_at = datetime.now(timezone.utc)
+    db_session.commit()
+
+    response = client.post("/auth/register", json={
+        "email": "dup@example.com",
+        "password": "AnotherPass123!",
+        "nama": "Dup User 3",
     })
     assert response.status_code == 400
 
@@ -39,13 +57,21 @@ def test_register_weak_password(client):
     assert response.status_code == 422
 
 
-def test_login_success(client):
-    """Test login berhasil."""
+def test_login_success(client, db_session):
+    """Test login berhasil (setelah email diverifikasi)."""
+    from datetime import datetime, timezone
+    from models import User
+
     client.post("/auth/register", json={
         "email": "login@example.com",
         "password": "Login123!",
         "nama": "Login User",
     })
+    # Verifikasi email di DB (simulasi klik link verifikasi)
+    user = db_session.query(User).filter(User.email == "login@example.com").first()
+    user.email_verified_at = datetime.now(timezone.utc)
+    db_session.commit()
+
     response = client.post("/auth/login", data={
         "username": "login@example.com",
         "password": "Login123!",

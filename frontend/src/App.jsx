@@ -25,6 +25,9 @@ import ItemDetailPage from "./pages/ItemDetailPage"
 import AdminOnboardingPage from "./pages/AdminOnboardingPage"
 import AdminPaymentsPage from "./pages/AdminPaymentsPage"
 import AboutPage from "./pages/AboutPage"
+import VerifyEmailPage from "./pages/VerifyEmailPage"
+import ForgotPasswordPage from "./pages/ForgotPasswordPage"
+import ResetPasswordPage from "./pages/ResetPasswordPage"
 
 function RedirectToStatic404() {
   if (typeof window !== "undefined") {
@@ -163,6 +166,9 @@ function AppContent() {
           <Route path="login" element={
             isAuthenticated ? <Navigate to={homeRoute} replace /> : <LoginPage addToast={addToast} />
           } />
+          <Route path="verify-email" element={<VerifyEmailPage />} />
+          <Route path="forgot-password" element={<ForgotPasswordPage addToast={addToast} />} />
+          <Route path="reset-password" element={<ResetPasswordPage addToast={addToast} />} />
         </Route>
         <Route path="/404" element={<RedirectToStatic404 />} />
 

@@ -5,7 +5,7 @@ Semua endpoint REST API sesuai implementation_plan_sewain (Modul 1-4)
 
 import os
 from dotenv import load_dotenv
-from fastapi import FastAPI, Depends, HTTPException, Query, status
+from fastapi import FastAPI, Depends, HTTPException, Query, status, BackgroundTasks
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -18,6 +18,7 @@ from models import Base, User, AdminProfile
 from schemas import (
     # Auth
     UserCreate, UserResponse, TokenResponse, UserUpdateByAdmin,
+    EmailVerifyRequest, ResendVerificationRequest, ForgotPasswordRequest, ResetPasswordRequest,
     # AdminProfile
     AdminProfileCreate, AdminProfileUpdate, AdminProfileResponse, AdminCreateRequest, AdminPaymentInfoResponse,
     # UserProfile
@@ -41,6 +42,7 @@ from auth import (
     require_user, require_verified_user,
 )
 import crud
+import email_service
 
 # ==================== INIT ====================
 
@@ -151,7 +153,7 @@ def team_info():
     tags=["🔐 Auth"],
     summary="Daftar akun baru (hanya untuk Penyewa)",
 )
-def register(user_data: UserCreate, db: Session = Depends(get_db)):
+def register(user_data: UserCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     """
     Registrasi akun baru di Sewain sebagai **Penyewa** (role: user).
 
@@ -160,14 +162,24 @@ def register(user_data: UserCreate, db: Session = Depends(get_db)):
     - **Admin** (penyedia barang) dibuat oleh Super Admin via `POST /superadmin/admins`
     - **Super Admin** dibuat manual oleh developer/database seeder
 
-    Setelah registrasi, user perlu melengkapi profil dan upload KTP untuk diverifikasi.
+    Setelah registrasi, user harus verifikasi email sebelum bisa login.
     """
     user = crud.create_user(db=db, user_data=user_data)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email sudah terdaftar. Gunakan email lain atau login.",
+            detail="Email sudah terdaftar dan terverifikasi. Silakan login atau gunakan fitur lupa password.",
         )
+
+    # Kirim email verifikasi di background
+    token = email_service.create_verification_token(user.id)
+    background_tasks.add_task(
+        email_service.send_verification_email,
+        user.email,
+        user.nama,
+        token,
+    )
+
     return user
 
 
@@ -203,6 +215,12 @@ def login(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Akun Anda dinonaktifkan. Hubungi administrator.",
         )
+    # Cek email sudah diverifikasi (admin & super_admin bypass)
+    if user.role == "user" and not user.email_verified_at:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Email belum diverifikasi. Silakan cek inbox email Anda untuk link verifikasi.",
+        )
 
     token = create_access_token(data={"sub": str(user.id)})
     return {"access_token": token, "token_type": "bearer", "user": user}
@@ -217,6 +235,147 @@ def login(
 def get_me(current_user: User = Depends(get_current_user)):
     """Ambil data profil user yang sedang login berdasarkan JWT token."""
     return current_user
+
+
+# ============================================================
+# EMAIL VERIFICATION & PASSWORD RESET ENDPOINTS
+# ============================================================
+
+@app.post(
+    "/auth/verify-email",
+    tags=["🔐 Auth"],
+    summary="Verifikasi email dengan token dari link",
+)
+def verify_email(data: EmailVerifyRequest, db: Session = Depends(get_db)):
+    """
+    Verifikasi email user menggunakan token yang dikirim via email.
+    Token valid selama 24 jam setelah registrasi.
+    """
+    payload = email_service.decode_email_token(data.token, "verify_email")
+    if not payload:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Token verifikasi tidak valid atau sudah expired. Silakan minta kirim ulang.",
+        )
+
+    user_id = int(payload["sub"])
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User tidak ditemukan.")
+
+    if user.email_verified_at:
+        return {"message": "Email sudah diverifikasi sebelumnya. Silakan login."}
+
+    from datetime import datetime, timezone
+    user.email_verified_at = datetime.now(timezone.utc)
+    db.commit()
+
+    return {"message": "Email berhasil diverifikasi! Silakan login."}
+
+
+@app.post(
+    "/auth/resend-verification",
+    tags=["🔐 Auth"],
+    summary="Kirim ulang email verifikasi",
+)
+def resend_verification(
+    data: ResendVerificationRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
+    """
+    Kirim ulang email verifikasi ke alamat email yang terdaftar.
+    Untuk keamanan, selalu return sukses meskipun email tidak ditemukan.
+    """
+    user = db.query(User).filter(User.email == data.email).first()
+
+    if user and not user.email_verified_at:
+        token = email_service.create_verification_token(user.id)
+        background_tasks.add_task(
+            email_service.send_verification_email,
+            user.email,
+            user.nama,
+            token,
+        )
+
+    # Selalu return sukses (security: jangan bocorkan info email terdaftar atau tidak)
+    return {"message": "Jika email terdaftar, link verifikasi telah dikirim. Cek inbox Anda."}
+
+
+@app.post(
+    "/auth/forgot-password",
+    tags=["🔐 Auth"],
+    summary="Request reset password via email",
+)
+def forgot_password(
+    data: ForgotPasswordRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
+    """
+    Kirim link reset password ke email user.
+    Untuk keamanan, selalu return sukses meskipun email tidak ditemukan.
+    """
+    user = db.query(User).filter(User.email == data.email).first()
+
+    if user and user.is_active:
+        token = email_service.create_reset_password_token(user.id)
+        background_tasks.add_task(
+            email_service.send_reset_password_email,
+            user.email,
+            user.nama,
+            token,
+        )
+
+    return {"message": "Jika email terdaftar, link reset password telah dikirim. Cek inbox Anda."}
+
+
+@app.post(
+    "/auth/reset-password",
+    tags=["🔐 Auth"],
+    summary="Reset password dengan token dari email",
+)
+def reset_password(data: ResetPasswordRequest, db: Session = Depends(get_db)):
+    """
+    Reset password menggunakan token yang dikirim via email.
+    Token valid selama 1 jam dan hanya bisa dipakai sekali.
+    """
+    payload = email_service.decode_email_token(data.token, "reset_password")
+    if not payload:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Token reset password tidak valid atau sudah expired. Silakan request ulang.",
+        )
+
+    user_id = int(payload["sub"])
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User tidak ditemukan.")
+
+    if not user.is_active:
+        raise HTTPException(status_code=403, detail="Akun tidak aktif.")
+
+    # Cek token belum dipakai: iat harus >= password_changed_at
+    from datetime import datetime, timezone
+    token_iat = datetime.fromtimestamp(payload["iat"], tz=timezone.utc)
+    if user.password_changed_at and token_iat < user.password_changed_at:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Token sudah tidak berlaku. Password sudah pernah diubah setelah token ini dibuat.",
+        )
+
+    # Update password
+    from auth import hash_password
+    user.hashed_password = hash_password(data.new_password)
+    user.password_changed_at = datetime.now(timezone.utc)
+
+    # Jika user belum verifikasi email, otomatis verifikasi (karena sudah buktikan akses email)
+    if not user.email_verified_at:
+        user.email_verified_at = datetime.now(timezone.utc)
+
+    db.commit()
+
+    return {"message": "Password berhasil direset! Silakan login dengan password baru."}
 
 
 # ============================================================
@@ -485,8 +644,6 @@ def get_admin_payment_info(
     return AdminPaymentInfoResponse(
         admin_id=profile.id,
         nama_usaha=profile.nama_usaha,
-        nomor_rekening=profile.nomor_rekening,
-        foto_qris=profile.foto_qris,
         nomor_telepon=profile.nomor_telepon,
     )
 
@@ -1173,6 +1330,55 @@ def confirm_pickup(
         "message": "Pengambilan barang berhasil dikonfirmasi",
         "rental_id": rental_id,
         "diambil_at": db_rental.diambil_at,
+    }
+
+
+@app.post(
+    "/rentals/{rental_id}/request-return",
+    tags=["📋 Rentals — Penyewaan"],
+    summary="[User] Request pengembalian barang",
+)
+def request_return(
+    rental_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """
+    User memberitahu admin bahwa barang sudah dikembalikan.
+
+    Hanya menandai timestamp `return_requested_at`. Admin yang akan finalisasi
+    status menjadi `selesai` setelah memverifikasi barang fisik diterima.
+    """
+    from models import RentalStatus as RS, Rental as RentalModel
+    from datetime import datetime as dt
+
+    rental = db.query(RentalModel).filter(RentalModel.id == rental_id).first()
+    if not rental:
+        raise HTTPException(status_code=404, detail=f"Rental ID {rental_id} tidak ditemukan")
+
+    if rental.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Rental ini bukan milik Anda")
+
+    if rental.status != RS.sedang_disewa:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Hanya rental dengan status 'sedang_disewa' yang bisa di-request pengembalian. Status saat ini: '{rental.status.value}'",
+        )
+
+    if rental.return_requested_at:
+        raise HTTPException(
+            status_code=400,
+            detail="Pengembalian sudah pernah di-request. Tunggu konfirmasi admin.",
+        )
+
+    rental.return_requested_at = dt.now()
+    db.commit()
+    db.refresh(rental)
+
+    return {
+        "message": "Permintaan pengembalian berhasil dikirim. Tunggu konfirmasi admin.",
+        "rental_id": rental_id,
+        "return_requested_at": rental.return_requested_at,
     }
 
 

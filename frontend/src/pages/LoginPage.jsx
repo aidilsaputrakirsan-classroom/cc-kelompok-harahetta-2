@@ -1,17 +1,21 @@
 import { useState } from "react"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, Link } from "react-router-dom"
 import { useAuth } from "../context/AuthContext"
+import { resendVerification } from "../services/api"
 import { Button } from "../components/ui/Button"
 import { Input } from "../components/ui/input"
 import { Label } from "../components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs"
-import { Info } from "lucide-react"
+import { Info, Mail, CheckCircle2 } from "lucide-react"
 
 export default function LoginPage({ addToast }) {
   const [loading, setLoading] = useState(false)
   const [loginForm, setLoginForm] = useState({ email: "", password: "" })
   const [registerForm, setRegisterForm] = useState({ email: "", password: "", nama: "", role: "user" })
+  const [registerSuccess, setRegisterSuccess] = useState(false)
+  const [registeredEmail, setRegisteredEmail] = useState("")
+  const [resending, setResending] = useState(false)
   const { login, register } = useAuth()
   const navigate = useNavigate()
 
@@ -27,7 +31,14 @@ export default function LoginPage({ addToast }) {
       addToast?.("Selamat datang kembali!", "success")
       navigate("/dashboard")
     } catch (err) {
-      addToast?.(err.message === "UNAUTHORIZED" ? "Email atau password salah" : err.message, "error")
+      const msg = err.message
+      if (msg === "UNAUTHORIZED") {
+        addToast?.("Email atau password salah", "error")
+      } else if (msg.includes("belum diverifikasi")) {
+        addToast?.("Email belum diverifikasi. Cek inbox email Anda.", "error")
+      } else {
+        addToast?.(msg, "error")
+      }
     } finally {
       setLoading(false)
     }
@@ -38,8 +49,9 @@ export default function LoginPage({ addToast }) {
     setLoading(true)
     try {
       await register(registerForm)
-      addToast?.("Registrasi berhasil! Selamat datang", "success")
-      navigate("/dashboard")
+      setRegisteredEmail(registerForm.email)
+      setRegisterSuccess(true)
+      addToast?.("Registrasi berhasil! Cek inbox & folder Spam untuk verifikasi email.", "success")
     } catch (err) {
       addToast?.(err.message, "error")
     } finally {
@@ -47,20 +59,71 @@ export default function LoginPage({ addToast }) {
     }
   }
 
+  const handleResendVerification = async () => {
+    setResending(true)
+    try {
+      await resendVerification(registeredEmail)
+      addToast?.("Email verifikasi dikirim ulang. Cek inbox & folder Spam.", "success")
+    } catch (err) {
+      addToast?.(err.message || "Gagal mengirim ulang", "error")
+    } finally {
+      setResending(false)
+    }
+  }
+
   const fillDemo = (email) => {
     setLoginForm({ email, password: "Password123" })
+  }
+
+  // Tampilan setelah register berhasil
+  if (registerSuccess) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <div className="w-full max-w-md">
+          <Card>
+            <CardContent className="pt-8 pb-8 text-center space-y-4">
+              <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto">
+                <Mail className="w-8 h-8 text-primary" />
+              </div>
+              <CardTitle className="text-xl">Cek Email Anda</CardTitle>
+              <CardDescription className="text-base leading-relaxed">
+                Kami telah mengirim link verifikasi ke<br />
+                <strong className="text-foreground">{registeredEmail}</strong>
+              </CardDescription>
+              <p className="text-sm text-muted-foreground">
+                Klik link di email untuk mengaktifkan akun Anda. Link berlaku selama 24 jam.
+              </p>
+              <div className="text-xs bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 rounded-lg p-3 text-amber-900 dark:text-amber-200">
+                💡 <strong>Tidak ada email masuk?</strong> Cek folder <strong>Spam</strong> atau <strong>Promotions</strong> di inbox Anda.
+              </div>
+
+              <div className="pt-4 space-y-3">
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={handleResendVerification}
+                  loading={resending}
+                >
+                  Kirim Ulang Email Verifikasi
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="w-full"
+                  onClick={() => { setRegisterSuccess(false); setRegisterForm({ email: "", password: "", nama: "", role: "user" }) }}
+                >
+                  Kembali ke Login
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    )
   }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-md">
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <img src="/sewainLogo.webp" alt="Sewain" className="w-12 h-12 rounded-xl object-cover mx-auto mb-3" />
-          <h1 className="text-2xl font-bold text-foreground">Sewain</h1>
-          <p className="text-sm text-muted-foreground">Platform sewa barang terpercaya</p>
-        </div>
-
         <Card>
           <Tabs defaultValue="login">
             <CardHeader className="pb-3">
@@ -89,7 +152,15 @@ export default function LoginPage({ addToast }) {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="login-password">Password</Label>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="login-password">Password</Label>
+                      <Link
+                        to="/forgot-password"
+                        className="text-xs text-primary hover:underline font-medium"
+                      >
+                        Lupa password?
+                      </Link>
+                    </div>
                     <Input
                       id="login-password"
                       type="password"

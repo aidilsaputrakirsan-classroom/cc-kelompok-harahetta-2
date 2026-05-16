@@ -87,6 +87,7 @@ class UserResponse(BaseModel):
     role: UserRoleEnum
     is_active: bool
     is_verified: bool
+    email_verified_at: Optional[datetime] = None
     created_at: datetime
 
     class Config:
@@ -107,6 +108,38 @@ class TokenResponse(BaseModel):
     user: UserResponse
 
 
+class EmailVerifyRequest(BaseModel):
+    """Schema untuk verifikasi email via token."""
+    token: str
+
+
+class ResendVerificationRequest(BaseModel):
+    """Schema untuk resend email verifikasi."""
+    email: EmailStr
+
+
+class ForgotPasswordRequest(BaseModel):
+    """Schema untuk request reset password."""
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    """Schema untuk reset password dengan token."""
+    token: str
+    new_password: str = Field(..., min_length=8)
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_password_strength(cls, value: str):
+        """Password: min 8 karakter, harus ada huruf besar, kecil, dan angka."""
+        pattern = r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$"
+        if not re.match(pattern, value):
+            raise ValueError(
+                "Password harus minimal 8 karakter dan mengandung huruf besar, huruf kecil, dan angka."
+            )
+        return value
+
+
 # ============================================================
 # ADMIN PROFILE SCHEMAS
 # ============================================================
@@ -116,8 +149,6 @@ class AdminProfileCreate(BaseModel):
     nama_usaha: str = Field(..., min_length=2, max_length=100, examples=["Toko Sewa Jaya"])
     alamat_usaha: Optional[str] = Field(None, examples=["Jl. Soekarno-Hatta No.1, Balikpapan"])
     nomor_telepon: Optional[str] = Field(None, max_length=20, examples=["08123456789"])
-    nomor_rekening: Optional[str] = Field(None, max_length=100, examples=["BCA 1234567890 a/n Toko Sewa Jaya"])
-    foto_qris: Optional[str] = Field(None, examples=["data:image/png;base64,..."])
     latitude: Optional[float] = Field(None, ge=-90.0, le=90.0, examples=[-1.2654])   # ← Koordinat lokasi
     longitude: Optional[float] = Field(None, ge=-180.0, le=180.0, examples=[116.8312])  # ← Koordinat lokasi
 
@@ -127,8 +158,6 @@ class AdminProfileUpdate(BaseModel):
     nama_usaha: Optional[str] = Field(None, max_length=100)
     alamat_usaha: Optional[str] = None
     nomor_telepon: Optional[str] = Field(None, max_length=20)
-    nomor_rekening: Optional[str] = Field(None, max_length=100)
-    foto_qris: Optional[str] = None
     latitude: Optional[float] = Field(None, ge=-90.0, le=90.0)    # ← Koordinat lokasi
     longitude: Optional[float] = Field(None, ge=-180.0, le=180.0)  # ← Koordinat lokasi
 
@@ -140,8 +169,6 @@ class AdminProfileResponse(BaseModel):
     nama_usaha: str
     alamat_usaha: Optional[str]
     nomor_telepon: Optional[str]
-    nomor_rekening: Optional[str]
-    foto_qris: Optional[str]
     latitude: Optional[float]    # ← Koordinat lokasi
     longitude: Optional[float]   # ← Koordinat lokasi
     created_at: datetime
@@ -155,8 +182,6 @@ class AdminPaymentInfoResponse(BaseModel):
     """Schema response info pembayaran admin (publik, untuk user yang mau sewa)."""
     admin_id: int
     nama_usaha: str
-    nomor_rekening: Optional[str]
-    foto_qris: Optional[str]
     nomor_telepon: Optional[str]
 
     class Config:
@@ -369,6 +394,7 @@ class RentalResponse(BaseModel):
     pickup_nama_usaha: Optional[str] = None
     pickup_telepon: Optional[str] = None
     diambil_at: Optional[datetime] = None
+    return_requested_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
     item: Optional[ItemResponse]

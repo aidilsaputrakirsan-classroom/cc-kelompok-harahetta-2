@@ -9,6 +9,7 @@ import { useAuth } from "../context/AuthContext"
 import {
   fetchMyRentals, fetchItems, fetchMyPayments, createPaymentForRental,
   uploadPaymentProof, fetchAdminPaymentInfo, fetchRentalPickupInfo,
+  requestReturn,
 } from "../services/api"
 import { formatPrice } from "../lib/utils"
 import { Button } from "../components/ui/Button"
@@ -43,7 +44,7 @@ const RENTAL_TABS = [
 const RENTAL_PAGE_SIZE = 6
 
 /* ─── countdown widget ────────────────────────────────────── */
-function MiniCountdown({ endDate, onReturnClick }) {
+function MiniCountdown({ endDate, returnRequested, onReturnClick, returnLoading }) {
   const [t, setT] = useState({ d: 0, h: 0, m: 0, s: 0 })
   const [expired, setExpired] = useState(false)
 
@@ -84,12 +85,19 @@ function MiniCountdown({ endDate, onReturnClick }) {
           </div>
         )}
       </div>
-      {expired && (
+      {expired && returnRequested && (
+        <div className="mt-2.5 w-full py-2 rounded-xl text-xs font-semibold bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-200 flex items-center justify-center gap-1.5 border border-amber-200 dark:border-amber-900">
+          <Clock className="w-3.5 h-3.5" /> Menunggu konfirmasi admin
+        </div>
+      )}
+      {expired && !returnRequested && (
         <button
           onClick={onReturnClick}
-          className="mt-2.5 w-full py-2 rounded-xl text-xs font-semibold bg-destructive text-destructive-foreground flex items-center justify-center gap-1.5 hover:bg-destructive/90 transition"
+          disabled={returnLoading}
+          className="mt-2.5 w-full py-2 rounded-xl text-xs font-semibold bg-destructive text-destructive-foreground flex items-center justify-center gap-1.5 hover:bg-destructive/90 disabled:opacity-50 transition"
         >
-          <CheckCircle className="w-3.5 h-3.5" /> Konfirmasi pengembalian barang
+          {returnLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
+          {returnLoading ? "Mengirim..." : "Kirim permintaan pengembalian"}
         </button>
       )}
     </div>
@@ -148,6 +156,7 @@ export default function UserDashboard({ addToast }) {
   const [buktiModal, setBuktiModal]     = useState(null)
   const [pickupModal, setPickupModal]   = useState(null)
   const [, setPickupLoading]            = useState(false)
+  const [returnLoadingId, setReturnLoadingId] = useState(null)
   const [adminPayInfo, setAdminPayInfo] = useState(null)
   const [buktiFile, setBuktiFile]       = useState(null)
   const [buktiCatatan, setBuktiCatatan] = useState("")
@@ -245,6 +254,19 @@ export default function UserDashboard({ addToast }) {
   }, [statusTab, rentalPage, addToast])
 
   useEffect(() => { loadAllRentals() }, [loadAllRentals])
+
+  const handleRequestReturn = async (rentalId) => {
+    setReturnLoadingId(rentalId)
+    try {
+      await requestReturn(rentalId)
+      addToast?.("Permintaan pengembalian dikirim ke admin", "success")
+      await loadAllRentals()
+    } catch (err) {
+      addToast?.(err.message || "Gagal kirim permintaan pengembalian", "error")
+    } finally {
+      setReturnLoadingId(null)
+    }
+  }
 
   /* ── derived ── */
   const totalSpend = rentals.reduce((s, r) => s + (r.total_harga || 0), 0)
@@ -619,7 +641,9 @@ export default function UserDashboard({ addToast }) {
                           </button>
                           <MiniCountdown
                             endDate={r.tanggal_selesai}
-                            onReturnClick={() => addToast?.("Notifikasi pengembalian dikirim ke admin", "success")}
+                            returnRequested={!!r.return_requested_at}
+                            onReturnClick={() => handleRequestReturn(r.id)}
+                            returnLoading={returnLoadingId === r.id}
                           />
                         </div>
                       )}
@@ -785,41 +809,7 @@ export default function UserDashboard({ addToast }) {
                   )}
                 </div>
 
-                {/* Admin pay info */}
-                {adminPayInfo && (adminPayInfo.nomor_rekening || adminPayInfo.foto_qris) && (
-                  <div className="bg-hero-deep text-white rounded-2xl p-4 space-y-3 relative overflow-hidden">
-                    <div className="absolute inset-0 bg-mesh opacity-30 pointer-events-none" />
-                    <p className="relative text-xs font-semibold text-white/70 inline-flex items-center gap-1">
-                      <CreditCard className="w-3.5 h-3.5" /> Transfer ke
-                    </p>
-                    {adminPayInfo.nomor_rekening && (
-                      <div className="relative bg-white/10 border border-white/10 rounded-xl p-3">
-                        <div className="text-[10px] text-white/60 inline-flex items-center gap-1 mb-1">
-                          <Building2 className="w-3 h-3" /> Nomor rekening
-                        </div>
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-sm font-bold">{adminPayInfo.nomor_rekening}</span>
-                          <button
-                            onClick={copyRekening}
-                            className="inline-flex items-center gap-1 text-[10px] bg-white/15 px-2 py-1 rounded-lg hover:bg-white/25 transition flex-shrink-0"
-                          >
-                            {copiedRek ? <><CheckCircle className="w-3 h-3" /> Tersalin</> : <><Copy className="w-3 h-3" /> Salin</>}
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                    {adminPayInfo.foto_qris && (
-                      <div className="relative space-y-1.5">
-                        <div className="text-[10px] text-white/60 inline-flex items-center gap-1">
-                          <QrCode className="w-3 h-3" /> QRIS
-                        </div>
-                        <div className="bg-white rounded-xl p-2 flex justify-center">
-                          <img src={adminPayInfo.foto_qris} alt="QRIS" className="w-32 h-32 object-contain" />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
+                {/* Admin pay info: dihilangkan, sekarang pakai payment gateway (Midtrans) */}
 
                 {/* Existing bukti */}
                 {buktiModal.payment?.bukti_pembayaran && !buktiFile && (
