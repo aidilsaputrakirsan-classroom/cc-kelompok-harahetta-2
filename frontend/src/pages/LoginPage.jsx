@@ -124,6 +124,16 @@ export default function LoginPage({ addToast }) {
         <Card>
           <Tabs defaultValue="login">
             <CardHeader className="pb-3">
+              {/* Logo Sewain */}
+              <div className="flex flex-col items-center gap-2 mb-4">
+                <img
+                  src="/Logo sewain.png"
+                  alt="Sewain"
+                  className="h-12 w-auto object-contain"
+                />
+                <span className="font-bold text-xl tracking-tight text-primary">Sewain</span>
+              </div>
+
               <TabsList className="w-full">
                 <TabsTrigger value="login" className="flex-1">Masuk</TabsTrigger>
                 <TabsTrigger value="register" className="flex-1">Daftar</TabsTrigger>

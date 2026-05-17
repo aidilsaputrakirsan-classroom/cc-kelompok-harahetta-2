@@ -106,16 +106,18 @@ export default function Sidebar() {
       <div className="p-4 pb-3">
         <Link to={isAdmin || isSuperAdmin ? "/dashboard" : "/home"} className="flex items-center gap-2.5 group">
           <img
-            src="/sewainLogo.webp"
+            src="/Logo sewain.png"
             alt="Sewain"
-            className="w-9 h-9 rounded-xl object-cover flex-shrink-0"
+            className="h-9 w-auto object-contain flex-shrink-0"
             onError={(e) => {
               e.target.style.display = "none"
               e.target.nextSibling.style.display = "flex"
             }}
           />
-          <div className="hidden w-9 h-9 rounded-xl bg-sidebar-primary items-center justify-center flex-shrink-0">
-            <Package className="w-5 h-5 text-sidebar-primary-foreground" />
+          <div className="hidden h-9 items-center gap-2 flex-shrink-0">
+            <div className="w-9 h-9 rounded-full bg-sidebar-primary flex items-center justify-center">
+              <Package className="w-5 h-5 text-sidebar-primary-foreground" />
+            </div>
           </div>
           {!collapsed && (
             <span className="font-bold text-base tracking-tight text-sidebar-foreground">

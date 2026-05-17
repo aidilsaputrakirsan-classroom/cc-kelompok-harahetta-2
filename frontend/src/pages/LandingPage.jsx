@@ -51,6 +51,7 @@ function MediaSlot({
   rounded = "rounded-3xl",
   children,
   poster,
+  objectPosition = "center",
 }) {
   return (
     <div
@@ -66,12 +67,14 @@ function MediaSlot({
           muted
           loop
           playsInline
+          style={{ objectPosition }}
           className="absolute inset-0 w-full h-full object-cover"
         />
       ) : src ? (
         <img
           src={src}
           alt={alt}
+          style={{ objectPosition }}
           className="absolute inset-0 w-full h-full object-cover"
           loading="lazy"
         />
@@ -218,11 +221,20 @@ export default function LandingPage() {
 
               <motion.h1
                 {...fadeUp(0.05)}
-                className="mt-6 text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight leading-[1.02]"
+                className="relative mt-6 text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight leading-[1.1]"
               >
-                Sewa apa saja,{" "}
-                <span className="font-display text-primary">tanpa</span>{" "}
-                harus beli.
+                {/* Background image behind text — tilted for aesthetic */}
+                <img
+                  src="/images/hero/cardkecil.jpg"
+                  alt=""
+                  aria-hidden="true"
+                  className="absolute top-1/2 left-[60%] -translate-x-1/2 -translate-y-1/2 w-56 md:w-72 lg:w-80 h-auto rounded-3xl opacity-25 rotate-[6deg] pointer-events-none select-none"
+                />
+                <span className="relative z-10">
+                  Sewa apa saja,{" "}
+                  <span className="font-display text-primary">tanpa</span>
+                  {" "}harus beli.
+                </span>
               </motion.h1>
 
               <motion.p
@@ -230,7 +242,7 @@ export default function LandingPage() {
                 className="mt-6 text-lg text-muted-foreground max-w-xl leading-relaxed"
               >
                 Sewain menghubungkan kamu dengan ribuan penyedia barang terverifikasi.
-                Mulai dari kamera, alat camping, hingga peralatan event — semua dalam
+                Mulai dari kamera, alat camping, hingga peralatan event. Semua dalam
                 satu platform yang aman, cepat, dan transparan.
               </motion.p>
 
@@ -281,49 +293,21 @@ export default function LandingPage() {
               >
                 {/* Big card */}
                 <MediaSlot
-                  src="/images/hero/orangherobesar.png"
+                  video="/images/hero/HEROCARDVIDEO.mp4"
+                  poster="/images/hero/orangherobesar.png"
                   alt="Sewain — Sewa barang apa saja"
                   label="Hero · video / gambar utama"
                   ratio="aspect-[4/5]"
                   className="shadow-glow"
+                  objectPosition="center 42%"
                 >
-                  {/* floating badge */}
-                  <div className="absolute top-4 left-4 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-background/95 backdrop-blur-md text-xs font-semibold border border-border shadow-soft">
-                    <span className="relative flex h-2 w-2">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
-                    </span>
-                    Live
+                  {/* Gradient overlay bawah */}
+                  <div className="absolute inset-x-0 bottom-0 h-[30%] bg-gradient-to-t from-black/60 to-transparent rounded-b-3xl pointer-events-none" />
+                  <div className="absolute bottom-5 left-5 right-5 flex items-center gap-3 z-10">
+                    <img src="/Logo sewain.png" alt="Sewain" className="h-10 w-auto brightness-0 invert opacity-90" />
+                    <span className="text-white/90 text-sm font-medium">Sewa apa saja, kapan saja.</span>
                   </div>
                 </MediaSlot>
-
-                {/* Floating mini card kanan bawah */}
-                <motion.div
-                  initial={{ opacity: 0, x: 20, y: 20 }}
-                  animate={{ opacity: 1, x: 0, y: 0 }}
-                  transition={{ delay: 0.6, duration: 0.6, ease }}
-                  className="absolute -right-2 -bottom-6 sm:-right-6 w-44 sm:w-52 rotate-[3deg]"
-                >
-                  <div className="bg-card border border-border rounded-2xl shadow-soft p-3">
-                    <MediaSlot
-                      src="/images/hero/herokecilkamera.png"
-                      alt="Kamera Sony A7"
-                      label="Mini media"
-                      ratio="aspect-square"
-                      rounded="rounded-xl"
-                      className="border-0"
-                    />
-                    <div className="mt-2 flex items-center justify-between">
-                      <div>
-                        <p className="text-xs font-semibold">Kamera Sony A7</p>
-                        <p className="text-[10px] text-muted-foreground">Rp 250rb / hari</p>
-                      </div>
-                      <span className="inline-flex items-center text-[10px] font-semibold text-primary">
-                        Sewa <ArrowUpRight className="w-3 h-3 ml-0.5" />
-                      </span>
-                    </div>
-                  </div>
-                </motion.div>
 
                 {/* Mini stat kiri atas */}
                 <motion.div
