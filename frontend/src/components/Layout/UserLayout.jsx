@@ -193,19 +193,22 @@ function UserNavbar() {
             transition={{ type: "spring", stiffness: 320, damping: 18 }}
           >
             <img
-              src="/sewainLogo.webp"
+              src="/Logo sewain.png"
               alt="Sewain"
-              className="w-9 h-9 rounded-xl object-cover"
+              className="h-9 w-auto object-contain"
               onError={(e) => {
                 e.target.style.display = "none"
                 e.target.nextSibling.style.display = "flex"
               }}
             />
-            <div className="hidden w-9 h-9 rounded-xl bg-primary items-center justify-center">
-              <Package className="w-5 h-5 text-primary-foreground" />
+            <div className="hidden h-9 items-center gap-2">
+              <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center">
+                <Package className="w-5 h-5 text-primary-foreground" />
+              </div>
+              <span className="font-bold text-lg tracking-tight">Sewain</span>
             </div>
           </motion.div>
-          <span className="font-bold text-lg tracking-tight">Sewain</span>
+          <span className="font-bold text-lg tracking-tight text-primary">Sewain</span>
         </Link>
 
         {/* ── Desktop nav pills (horizontal-only slide) ── */}

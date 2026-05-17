@@ -182,24 +182,27 @@ export default function Navbar({
         {/* ── Logo ── */}
         <Link to="/" className="flex items-center gap-2.5 flex-shrink-0 group">
           <motion.div
-            whileHover={{ scale: 1.06 }}
+            whileHover={{ scale: 1.04 }}
             transition={{ type: "spring", stiffness: 320, damping: 18 }}
             className="relative"
           >
             <img
-              src="/sewainLogo.webp"
+              src="/Logo sewain.png"
               alt="Sewain"
-              className="w-9 h-9 rounded-xl object-cover"
+              className="h-9 w-auto object-contain"
               onError={(e) => {
                 e.target.style.display = "none"
                 e.target.nextSibling.style.display = "flex"
               }}
             />
-            <div className="hidden w-9 h-9 rounded-xl bg-primary items-center justify-center">
-              <Package className="w-5 h-5 text-primary-foreground" />
+            <div className="hidden h-9 items-center gap-2">
+              <div className="w-9 h-9 rounded-full bg-primary flex items-center justify-center">
+                <Package className="w-5 h-5 text-primary-foreground" />
+              </div>
+              <span className="font-bold text-lg tracking-tight">Sewain</span>
             </div>
           </motion.div>
-          <span className="font-bold text-lg tracking-tight">Sewain</span>
+          <span className="font-bold text-lg tracking-tight text-primary">Sewain</span>
         </Link>
 
         {/* ── Center: breadcrumb / nav ── */}
