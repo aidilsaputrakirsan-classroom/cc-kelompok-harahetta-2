@@ -22,6 +22,7 @@ import {
 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import PickupMap from "../components/PickupMap"
+import { getRentalDeadline, formatDeadline } from "../lib/rental"
 
 /* ─── status meta ─────────────────────────────────────────── */
 const STATUS_META = {
@@ -44,14 +45,19 @@ const RENTAL_TABS = [
 const RENTAL_PAGE_SIZE = 6
 
 /* ─── countdown widget ────────────────────────────────────── */
-function MiniCountdown({ endDate, returnRequested, onReturnClick, returnLoading }) {
+function MiniCountdown({ rental, returnRequested, onReturnClick, returnLoading }) {
   const [t, setT] = useState({ d: 0, h: 0, m: 0, s: 0 })
   const [expired, setExpired] = useState(false)
 
+  const deadline = getRentalDeadline(rental)
+  const deadlineMs = deadline ? deadline.getTime() : null
+  const deadlineLabel = deadline ? formatDeadline(deadline) : ""
+  const sourceFromPickup = !!rental?.due_at
+
   useEffect(() => {
-    if (!endDate) return
+    if (!deadlineMs) return
     const calc = () => {
-      const diff = new Date(endDate).getTime() - Date.now()
+      const diff = deadlineMs - Date.now()
       if (diff <= 0) { setExpired(true); return }
       setExpired(false)
       setT({
@@ -64,7 +70,7 @@ function MiniCountdown({ endDate, returnRequested, onReturnClick, returnLoading 
     calc()
     const tick = setInterval(calc, 1000)
     return () => clearInterval(tick)
-  }, [endDate])
+  }, [deadlineMs])
 
   return (
     <div className="mt-3 pt-3 border-t border-dashed border-border bg-secondary/40 rounded-xl p-3">
@@ -85,6 +91,13 @@ function MiniCountdown({ endDate, returnRequested, onReturnClick, returnLoading 
           </div>
         )}
       </div>
+      {deadlineLabel && (
+        <p className="mt-1 text-[10px] text-muted-foreground">
+          {sourceFromPickup ? "Berakhir " : "Tanggal selesai "}
+          <span className="font-semibold text-foreground">{deadlineLabel}</span>
+          {sourceFromPickup ? "  ·  24 jam sejak pengambilan" : ""}
+        </p>
+      )}
       {expired && returnRequested && (
         <div className="mt-2.5 w-full py-2 rounded-xl text-xs font-semibold bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-200 flex items-center justify-center gap-1.5 border border-amber-200 dark:border-amber-900">
           <Clock className="w-3.5 h-3.5" /> Menunggu konfirmasi admin
@@ -640,7 +653,7 @@ export default function UserDashboard({ addToast }) {
                             Alamat pengembalian barang
                           </button>
                           <MiniCountdown
-                            endDate={r.tanggal_selesai}
+                            rental={r}
                             returnRequested={!!r.return_requested_at}
                             onReturnClick={() => handleRequestReturn(r.id)}
                             returnLoading={returnLoadingId === r.id}

@@ -5,20 +5,24 @@ Semua endpoint REST API sesuai implementation_plan_sewain (Modul 1-4)
 
 import os
 from dotenv import load_dotenv
+from typing import List
 from fastapi import FastAPI, Depends, HTTPException, Query, status, BackgroundTasks
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from sqlalchemy.orm import joinedload
 from sqlalchemy import text
 
 from database import engine, get_db
 import chatbot
+import chat
 from models import Base, User, AdminProfile
 from schemas import (
     # Auth
     UserCreate, UserResponse, TokenResponse, UserUpdateByAdmin,
     EmailVerifyRequest, ResendVerificationRequest, ForgotPasswordRequest, ResetPasswordRequest,
+    UserMeUpdate,
     # AdminProfile
     AdminProfileCreate, AdminProfileUpdate, AdminProfileResponse, AdminCreateRequest, AdminPaymentInfoResponse,
     # UserProfile
@@ -51,6 +55,55 @@ load_dotenv(override=True)  # override=True agar .env selalu menimpa shell env v
 # Buat semua tabel di database
 Base.metadata.create_all(bind=engine)
 
+
+def _ensure_user_photo_column() -> None:
+    """Idempotent migration: tambah kolom users.foto_profil jika belum ada.
+
+    Aman dipanggil setiap startup. Mendukung PostgreSQL & SQLite.
+    """
+    try:
+        from sqlalchemy import inspect as sa_inspect
+        insp = sa_inspect(engine)
+        if not insp.has_table("users"):
+            return
+        cols = {c["name"] for c in insp.get_columns("users")}
+        if "foto_profil" in cols:
+            return
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE users ADD COLUMN foto_profil TEXT"))
+        print("[startup] Kolom users.foto_profil berhasil ditambahkan.")
+    except Exception as exc:  # noqa: BLE001
+        print(f"[startup] Gagal menambah kolom foto_profil: {exc}")
+
+
+def _ensure_rental_due_at_column() -> None:
+    """Idempotent migration: tambah kolom rentals.due_at jika belum ada."""
+    try:
+        from sqlalchemy import inspect as sa_inspect
+        insp = sa_inspect(engine)
+        if not insp.has_table("rentals"):
+            return
+        cols = {c["name"] for c in insp.get_columns("rentals")}
+        if "due_at" in cols:
+            return
+        # PostgreSQL & SQLite sama-sama mengenali TIMESTAMP. Untuk Postgres dengan
+        # timezone-aware (sesuai model), ALTER ini tetap diterima sebagai timestamp.
+        ddl = "ALTER TABLE rentals ADD COLUMN due_at TIMESTAMP WITH TIME ZONE"
+        try:
+            with engine.begin() as conn:
+                conn.execute(text(ddl))
+        except Exception:
+            # SQLite tidak mengenal "WITH TIME ZONE" — fallback ke TIMESTAMP biasa.
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE rentals ADD COLUMN due_at TIMESTAMP"))
+        print("[startup] Kolom rentals.due_at berhasil ditambahkan.")
+    except Exception as exc:  # noqa: BLE001
+        print(f"[startup] Gagal menambah kolom due_at: {exc}")
+
+
+_ensure_user_photo_column()
+_ensure_rental_due_at_column()
+
 # ==================== APP INSTANCE ====================
 
 app = FastAPI(
@@ -66,6 +119,8 @@ app = FastAPI(
         {"name": "📋 Rentals", "description": "Transaksi Penyewaan"},
         {"name": "� Payments — Pembayaran", "description": "Pembayaran Penyewaan"},
         {"name": "�📂 Categories", "description": "Kategori Barang"},
+        {"name": "🤖 Chatbot AI", "description": "Chatbot AI Sewain"},
+        {"name": "💬 Chat", "description": "Chat User ↔ Admin"},
         {"name": "ℹ️ Info", "description": "Platform Information"},
     ]
 )
@@ -86,6 +141,9 @@ app.add_middleware(
 
 # Daftarkan Router Chatbot
 app.include_router(chatbot.router)
+
+# Daftarkan Router Chat (User ↔ Admin)
+app.include_router(chat.router)
 
 
 
@@ -140,6 +198,20 @@ def team_info():
             {"nama": "Riqqah Khalda Karina", "nim": "10231082", "peran": "Lead QA & Docs"},
         ],
     }
+
+
+@app.get("/stats/public", tags=["ℹ️ Info"], summary="Statistik publik platform")
+def public_stats(db: Session = Depends(get_db)):
+    """
+    Statistik publik: jumlah pengguna aktif (role=user, is_active=True).
+    Tidak perlu login.
+    """
+    from models import UserRole
+    active_users = db.query(User).filter(
+        User.role == UserRole.user,
+        User.is_active == True,
+    ).count()
+    return {"active_users": active_users}
 
 
 # ============================================================
@@ -234,6 +306,50 @@ def login(
 )
 def get_me(current_user: User = Depends(get_current_user)):
     """Ambil data profil user yang sedang login berdasarkan JWT token."""
+    return current_user
+
+
+@app.put(
+    "/auth/me",
+    response_model=UserResponse,
+    tags=["🔐 Auth"],
+    summary="Update data akun saya (nama / foto profil)",
+)
+def update_me(
+    data: UserMeUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Endpoint umum untuk semua role mengubah data ringan miliknya sendiri:
+    - `nama`: nama tampilan
+    - `foto_profil`: data URL / URL gambar (boleh string kosong untuk hapus)
+
+    Untuk batas ukuran: validasi dilakukan di sisi klien (kompresi sebelum upload).
+    """
+    payload = data.model_dump(exclude_unset=True)
+
+    if "nama" in payload:
+        nama = (payload["nama"] or "").strip()
+        if len(nama) < 2:
+            raise HTTPException(status_code=422, detail="Nama minimal 2 karakter")
+        current_user.nama = nama
+
+    if "foto_profil" in payload:
+        foto = payload["foto_profil"]
+        if foto is None or foto == "":
+            current_user.foto_profil = None
+        else:
+            # Batas ukuran payload (sekitar 4 MB base64 → ~3 MB raw)
+            if isinstance(foto, str) and len(foto) > 5_500_000:
+                raise HTTPException(
+                    status_code=413,
+                    detail="Foto terlalu besar. Mohon kompres ke ukuran lebih kecil.",
+                )
+            current_user.foto_profil = foto
+
+    db.commit()
+    db.refresh(current_user)
     return current_user
 
 
@@ -638,13 +754,20 @@ def get_admin_payment_info(
     Mengambil info pembayaran penyedia barang (publik).
     Digunakan user untuk melihat nomor rekening & QRIS saat akan membayar.
     """
-    profile = db.query(AdminProfile).filter(AdminProfile.id == admin_id).first()
+    profile = (
+        db.query(AdminProfile)
+        .options(joinedload(AdminProfile.user))
+        .filter(AdminProfile.id == admin_id)
+        .first()
+    )
     if not profile:
         raise HTTPException(status_code=404, detail=f"Admin ID {admin_id} tidak ditemukan")
     return AdminPaymentInfoResponse(
         admin_id=profile.id,
         nama_usaha=profile.nama_usaha,
         nomor_telepon=profile.nomor_telepon,
+        alamat_usaha=profile.alamat_usaha,
+        foto_profil=(profile.user.foto_profil if profile.user else None),
     )
 
 
@@ -817,6 +940,7 @@ def list_items(
     category_id: int = Query(None, description="Filter by ID kategori"),
     category: str = Query(None, description="Filter by nama kategori, contoh: electronics"),
     item_status: str = Query(None, alias="status", description="Filter: available | rented | unavailable"),
+    city: str = Query(None, description="Filter by kota dari alamat usaha admin, contoh: Balikpapan"),
     db: Session = Depends(get_db),
 ):
     """
@@ -829,6 +953,7 @@ def list_items(
     - `category_id`: Filter berdasarkan ID kategori
     - `category`: Filter berdasarkan nama kategori (contoh: `electronics`, `outdoor`)
     - `status`: Filter berdasarkan ketersediaan (available, rented, unavailable)
+    - `city`: Filter berdasarkan kota lokasi usaha admin (contoh: `Balikpapan`)
     - `skip` & `limit`: Pagination
     """
     return crud.get_items(
@@ -839,7 +964,24 @@ def list_items(
         category_id=category_id,
         category=category,
         status=item_status,
+        city=city,
     )
+
+
+@app.get(
+    "/items/cities",
+    response_model=List[str],
+    tags=["📦 Items — Barang Sewa"],
+    summary="Daftar kota tempat ada barang sewa (PUBLIK)",
+)
+def list_item_cities(db: Session = Depends(get_db)):
+    """
+    Daftar unik kota dari admin penyedia yang punya minimal 1 barang aktif.
+    Kota diekstrak dari `alamat_usaha` admin (segment sebelum provinsi).
+
+    **Akses:** Publik (tidak perlu login)
+    """
+    return crud.get_item_cities(db=db)
 
 
 @app.get(
@@ -1307,7 +1449,7 @@ def confirm_pickup(
     Status rental harus `sedang_disewa` sebelum bisa konfirmasi.
     """
     from models import RentalStatus as RS
-    from datetime import datetime as dt
+    from datetime import datetime as dt, timedelta, timezone as tz
 
     rental = crud.get_rental(db=db, rental_id=rental_id)
     if not rental:
@@ -1322,7 +1464,13 @@ def confirm_pickup(
     # Ambil rental langsung dari DB untuk update
     from models import Rental as RentalModel
     db_rental = db.query(RentalModel).filter(RentalModel.id == rental_id).first()
-    db_rental.diambil_at = dt.now()
+
+    now = dt.now(tz.utc)
+    durasi_hari = max(1, (db_rental.tanggal_selesai - db_rental.tanggal_mulai).days)
+
+    db_rental.diambil_at = now
+    db_rental.due_at = now + timedelta(days=durasi_hari)
+
     db.commit()
     db.refresh(db_rental)
 
@@ -1330,6 +1478,8 @@ def confirm_pickup(
         "message": "Pengambilan barang berhasil dikonfirmasi",
         "rental_id": rental_id,
         "diambil_at": db_rental.diambil_at,
+        "due_at": db_rental.due_at,
+        "durasi_hari": durasi_hari,
     }
 
 

@@ -6,7 +6,7 @@ Semua tabel sesuai skema implementation_plan_sewain
 import enum
 from sqlalchemy import (
     Column, Integer, String, Float, DateTime, Text,
-    Boolean, Enum as SAEnum, Date, ForeignKey
+    Boolean, Enum as SAEnum, Date, ForeignKey, UniqueConstraint, Index
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -85,6 +85,7 @@ class User(Base):
     is_verified = Column(Boolean, default=False)  # True jika verifikasi identitas disetujui
     email_verified_at = Column(DateTime(timezone=True), nullable=True)  # NULL = belum verifikasi email
     password_changed_at = Column(DateTime(timezone=True), nullable=True)  # Untuk invalidasi token reset
+    foto_profil = Column(Text, nullable=True)  # Foto profil (data URL / URL); berlaku untuk semua role
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships
@@ -214,6 +215,19 @@ class Item(Base):
         """Nama usaha penyedia barang (untuk ditampilkan di katalog)."""
         return self.admin.nama_usaha if self.admin else None
 
+    @property
+    def admin_alamat_usaha(self):
+        """Alamat usaha penyedia barang (untuk ditampilkan di katalog)."""
+        return self.admin.alamat_usaha if self.admin else None
+
+    @property
+    def admin_kota(self):
+        """Kota penyedia barang (di-extract dari alamat_usaha)."""
+        from crud import extract_city
+        if self.admin and self.admin.alamat_usaha:
+            return extract_city(self.admin.alamat_usaha)
+        return None
+
     def __repr__(self):
         return f"<Item(id={self.id}, nama='{self.nama}', harga_per_hari={self.harga_per_hari})>"
 
@@ -244,6 +258,7 @@ class Rental(Base):
     pickup_nama_usaha = Column(String(100), nullable=True)
     pickup_telepon = Column(String(20), nullable=True)
     diambil_at = Column(DateTime(timezone=True), nullable=True)  # Timestamp konfirmasi pengambilan
+    due_at = Column(DateTime(timezone=True), nullable=True)  # Deadline 24h × durasi sejak pickup
     return_requested_at = Column(DateTime(timezone=True), nullable=True)  # User request pengembalian
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
@@ -358,3 +373,73 @@ class Withdrawal(Base):
 
     def __repr__(self):
         return f"<Withdrawal(id={self.id}, admin_id={self.admin_id}, jumlah={self.jumlah}, status='{self.status}')>"
+
+
+# ============================================================
+# TABEL chat_rooms — Kanal Percakapan User ↔ Admin per Item
+# ============================================================
+
+class ChatRoom(Base):
+    """
+    Kanal percakapan antara seorang penyewa (user) dengan
+    seorang penyedia (admin) terkait satu barang spesifik.
+
+    Pasangan unik: (user_id, admin_id, item_id).
+    """
+
+    __tablename__ = "chat_rooms"
+    __table_args__ = (
+        UniqueConstraint("user_id", "admin_id", "item_id", name="uq_chatroom_user_admin_item"),
+        Index("ix_chatroom_user", "user_id"),
+        Index("ix_chatroom_admin", "admin_id"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    admin_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    item_id = Column(Integer, ForeignKey("items.id", ondelete="SET NULL"), nullable=True)
+    last_message_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # Relationships
+    user = relationship("User", foreign_keys=[user_id])
+    admin = relationship("User", foreign_keys=[admin_id])
+    item = relationship("Item", foreign_keys=[item_id])
+    messages = relationship(
+        "ChatMessage",
+        back_populates="room",
+        cascade="all, delete-orphan",
+        order_by="ChatMessage.created_at",
+    )
+
+    def __repr__(self):
+        return f"<ChatRoom(id={self.id}, user_id={self.user_id}, admin_id={self.admin_id}, item_id={self.item_id})>"
+
+
+# ============================================================
+# TABEL chat_messages — Pesan dalam Kanal Chat
+# ============================================================
+
+class ChatMessage(Base):
+    """
+    Satu pesan teks dalam ChatRoom. Sender bisa user atau admin.
+    """
+
+    __tablename__ = "chat_messages"
+    __table_args__ = (
+        Index("ix_chatmessage_room_created", "room_id", "created_at"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    room_id = Column(Integer, ForeignKey("chat_rooms.id", ondelete="CASCADE"), nullable=False)
+    sender_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    body = Column(Text, nullable=False)
+    is_read = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    # Relationships
+    room = relationship("ChatRoom", back_populates="messages")
+    sender = relationship("User", foreign_keys=[sender_id])
+
+    def __repr__(self):
+        return f"<ChatMessage(id={self.id}, room_id={self.room_id}, sender_id={self.sender_id})>"

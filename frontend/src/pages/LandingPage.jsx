@@ -3,11 +3,13 @@
  * Modern minimalist · base hijau pekat + putih.
  * Card-card siap diisi gambar / video dengan attribute data-media-slot.
  */
-import { Link } from "react-router-dom"
+import { useState, useEffect } from "react"
+import { Link, useNavigate } from "react-router-dom"
 import { Button } from "../components/ui/Button"
 import { motion } from "framer-motion"
 import Navbar from "../components/Layout/Navbar"
 import Footer from "../components/Layout/Footer"
+import { fetchPublicStats } from "../services/api"
 import {
   ArrowRight, ArrowUpRight, Search, ShieldCheck, Sparkles, Star,
   Wallet, MapPin, MessageSquare, Camera, Tent, Zap, Box, ChevronDown,
@@ -173,6 +175,26 @@ const navLinks = [
 ]
 
 export default function LandingPage() {
+  const [activeUsers, setActiveUsers] = useState(0)
+  const [heroSearch, setHeroSearch] = useState("")
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    fetchPublicStats()
+      .then(data => setActiveUsers(data?.active_users || 0))
+      .catch(() => {})
+  }, [])
+
+  const handleHeroSearch = (e) => {
+    e.preventDefault()
+    const q = heroSearch.trim()
+    if (q) {
+      navigate(`/catalog?search=${encodeURIComponent(q)}`)
+    } else {
+      navigate("/catalog")
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background text-foreground overflow-x-hidden font-sans">
 
@@ -190,7 +212,7 @@ export default function LandingPage() {
               <motion.div {...fadeUp(0)}>
                 <span className="chip">
                   <Sparkles className="w-3.5 h-3.5 text-primary" />
-                  Marketplace sewa barang #1 di kampus
+                  Marketplace sewa barang #1 di Dunia
                 </span>
               </motion.div>
 
@@ -215,20 +237,20 @@ export default function LandingPage() {
               {/* Search bar */}
               <motion.form
                 {...fadeUp(0.15)}
-                onSubmit={(e) => e.preventDefault()}
+                onSubmit={handleHeroSearch}
                 className="mt-8 flex items-center bg-card border border-border rounded-full p-1.5 pl-5 shadow-soft max-w-xl focus-within:ring-2 focus-within:ring-primary/30 transition"
               >
                 <Search className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                 <input
                   type="text"
-                  placeholder="Coba ketik 'kamera Sony' atau 'tenda 4 orang'..."
+                  value={heroSearch}
+                  onChange={(e) => setHeroSearch(e.target.value)}
+                  placeholder="Coba ketik 'Kamera Sony'..."
                   className="bg-transparent border-none outline-none flex-1 px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground"
                 />
-                <Link to="/catalog">
-                  <Button className="rounded-full px-5 h-10">
-                    Cari
-                  </Button>
-                </Link>
+                <Button type="submit" className="rounded-full px-5 h-10">
+                  Cari
+                </Button>
               </motion.form>
 
               {/* Trust line */}
@@ -236,25 +258,15 @@ export default function LandingPage() {
                 {...fadeUp(0.2)}
                 className="mt-8 flex flex-wrap items-center gap-6 text-sm text-muted-foreground"
               >
-                <div className="flex items-center gap-2">
-                  <div className="flex -space-x-2">
-                    {[1, 2, 3, 4].map((i) => (
-                      <div
-                        key={i}
-                        className="w-7 h-7 rounded-full border-2 border-background bg-gradient-to-br from-primary-200 to-primary-400 ring-1 ring-primary/20"
-                      />
-                    ))}
+                <div className="flex items-center gap-3 bg-primary/5 border border-primary/15 rounded-full px-4 py-2">
+                  <div className="relative flex items-center justify-center">
+                    <span className="absolute w-2.5 h-2.5 rounded-full bg-primary animate-ping opacity-40" />
+                    <span className="relative w-2.5 h-2.5 rounded-full bg-primary" />
                   </div>
-                  <span>50.000+ pengguna aktif</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <div className="flex">
-                    {[...Array(5)].map((_, i) => (
-                      <Star key={i} className="w-3.5 h-3.5 fill-primary text-primary" />
-                    ))}
-                  </div>
-                  <span className="font-medium text-foreground">4.9</span>
-                  <span>(2.1k ulasan)</span>
+                  <span className="font-semibold text-foreground">
+                    {activeUsers > 0 ? activeUsers.toLocaleString("id-ID") : "—"}
+                  </span>
+                  <span>pengguna aktif</span>
                 </div>
               </motion.div>
             </div>

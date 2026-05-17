@@ -30,6 +30,7 @@ import {
   Wallet, ArrowDownToLine, Clock, Ban,
 } from "lucide-react"
 import MapPicker from "../components/MapPicker"
+import { getRentalDeadline, formatDeadline } from "../lib/rental"
 
 const defaultItem = { nama: "", deskripsi: "", harga_per_hari: "", stok: 1, foto_url: "", category_id: "" }
 
@@ -41,14 +42,19 @@ const PAYMENT_STATUS_LABEL = {
 }
 
 /* ─── Admin Countdown (sisa waktu sewa) ───────────────────── */
-function AdminCountdown({ endDate }) {
+function AdminCountdown({ rental }) {
   const [t, setT] = useState({ d: 0, h: 0, m: 0, s: 0 })
   const [expired, setExpired] = useState(false)
 
+  const deadline = getRentalDeadline(rental)
+  const deadlineMs = deadline ? deadline.getTime() : null
+  const deadlineLabel = deadline ? formatDeadline(deadline) : ""
+  const fromPickup = !!rental?.due_at
+
   useEffect(() => {
-    if (!endDate) return
+    if (!deadlineMs) return
     const calc = () => {
-      const diff = new Date(endDate).getTime() - Date.now()
+      const diff = deadlineMs - Date.now()
       if (diff <= 0) { setExpired(true); return }
       setExpired(false)
       setT({
@@ -61,26 +67,42 @@ function AdminCountdown({ endDate }) {
     calc()
     const tick = setInterval(calc, 1000)
     return () => clearInterval(tick)
-  }, [endDate])
+  }, [deadlineMs])
 
   if (expired) {
     return (
-      <div className="mt-3 flex items-center gap-1.5 text-xs font-bold text-destructive bg-destructive/10 px-3 py-1.5 rounded-lg">
-        <AlertTriangle className="w-3.5 h-3.5" /> Waktu sewa habis
+      <div className="mt-3 flex flex-col gap-1">
+        <div className="inline-flex items-center gap-1.5 text-xs font-bold text-destructive bg-destructive/10 px-3 py-1.5 rounded-lg w-fit">
+          <AlertTriangle className="w-3.5 h-3.5" /> Waktu sewa habis
+        </div>
+        {deadlineLabel && (
+          <span className="text-[10px] text-muted-foreground">
+            Berakhir {deadlineLabel}
+          </span>
+        )}
       </div>
     )
   }
 
   return (
-    <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
-      <Clock className="w-3.5 h-3.5" />
-      <span>Sisa:</span>
-      <div className="flex items-center gap-1 font-mono font-bold text-foreground">
-        {t.d > 0 && <span className="bg-secondary px-1.5 py-0.5 rounded">{t.d}h</span>}
-        <span className="bg-secondary px-1.5 py-0.5 rounded">{String(t.h).padStart(2, "0")}j</span>
-        <span className="bg-secondary px-1.5 py-0.5 rounded">{String(t.m).padStart(2, "0")}m</span>
-        <span className="bg-secondary px-1.5 py-0.5 rounded">{String(t.s).padStart(2, "0")}d</span>
+    <div className="mt-3 flex flex-col gap-1">
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <Clock className="w-3.5 h-3.5" />
+        <span>Sisa:</span>
+        <div className="flex items-center gap-1 font-mono font-bold text-foreground">
+          {t.d > 0 && <span className="bg-secondary px-1.5 py-0.5 rounded">{t.d}h</span>}
+          <span className="bg-secondary px-1.5 py-0.5 rounded">{String(t.h).padStart(2, "0")}j</span>
+          <span className="bg-secondary px-1.5 py-0.5 rounded">{String(t.m).padStart(2, "0")}m</span>
+          <span className="bg-secondary px-1.5 py-0.5 rounded">{String(t.s).padStart(2, "0")}d</span>
+        </div>
       </div>
+      {deadlineLabel && (
+        <span className="text-[10px] text-muted-foreground">
+          {fromPickup ? "Berakhir " : "Tanggal selesai "}
+          <span className="font-semibold text-foreground">{deadlineLabel}</span>
+          {fromPickup ? " · 24 jam sejak pengambilan" : ""}
+        </span>
+      )}
     </div>
   )
 }
@@ -139,7 +161,7 @@ function AdminRentalCard({ rental, payment, onUpdateStatus, onViewBukti, onConfi
 
           {/* Countdown sisa waktu sewa (hanya untuk sedang_disewa) */}
           {rental.status === "sedang_disewa" && (
-            <AdminCountdown endDate={rental.tanggal_selesai} />
+            <AdminCountdown rental={rental} />
           )}
         </div>
         <div className="flex flex-col gap-2 flex-shrink-0">

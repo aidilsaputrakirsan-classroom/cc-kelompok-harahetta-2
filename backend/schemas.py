@@ -88,10 +88,20 @@ class UserResponse(BaseModel):
     is_active: bool
     is_verified: bool
     email_verified_at: Optional[datetime] = None
+    foto_profil: Optional[str] = None
     created_at: datetime
 
     class Config:
         from_attributes = True
+
+
+class UserMeUpdate(BaseModel):
+    """Schema untuk user (semua role) update profil ringan miliknya sendiri."""
+    nama: Optional[str] = Field(None, min_length=2, max_length=100)
+    foto_profil: Optional[str] = Field(
+        None,
+        description="Data URL (data:image/...;base64,...) atau URL gambar publik",
+    )
 
 
 class UserUpdateByAdmin(BaseModel):
@@ -183,6 +193,8 @@ class AdminPaymentInfoResponse(BaseModel):
     admin_id: int
     nama_usaha: str
     nomor_telepon: Optional[str]
+    alamat_usaha: Optional[str] = None
+    foto_profil: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -340,6 +352,8 @@ class ItemResponse(BaseModel):
     updated_at: datetime
     category: Optional[CategoryResponse]
     admin_nama_usaha: Optional[str] = None
+    admin_alamat_usaha: Optional[str] = None
+    admin_kota: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -394,6 +408,7 @@ class RentalResponse(BaseModel):
     pickup_nama_usaha: Optional[str] = None
     pickup_telepon: Optional[str] = None
     diambil_at: Optional[datetime] = None
+    due_at: Optional[datetime] = None
     return_requested_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
@@ -568,3 +583,65 @@ class WithdrawalActionByAdmin(BaseModel):
     status: WithdrawalStatusEnum = Field(..., examples=["processing"])
     catatan: Optional[str] = Field(None, examples=["Sedang diproses ke rekening tujuan"])
     rejected_reason: Optional[str] = Field(None, examples=["Nomor rekening tidak valid"])
+
+
+# ============================================================
+# CHAT SCHEMAS
+# ============================================================
+
+class ChatRoomCreate(BaseModel):
+    """Schema untuk membuka room chat dari sisi user (penyewa).
+    Server akan mencari atau membuat room (user, admin pemilik item, item).
+    """
+    item_id: int = Field(..., examples=[1])
+
+
+class ChatMessageCreate(BaseModel):
+    """Schema untuk mengirim pesan baru ke sebuah room."""
+    body: str = Field(..., min_length=1, max_length=2000, examples=["Halo, barang masih tersedia?"])
+
+
+class ChatMessageResponse(BaseModel):
+    """Schema response satu pesan chat."""
+    id: int
+    room_id: int
+    sender_id: int
+    body: str
+    is_read: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ChatRoomResponse(BaseModel):
+    """Schema response room chat (lengkap dengan info partner)."""
+    id: int
+    user_id: int
+    admin_id: int
+    item_id: Optional[int] = None
+    last_message_at: Optional[datetime] = None
+    created_at: datetime
+    # Info ringkas — diisi manual di endpoint
+    partner_id: int
+    partner_nama: str
+    partner_role: str
+    partner_avatar: Optional[str] = None
+    item_nama: Optional[str] = None
+    item_foto_url: Optional[str] = None
+    last_message_preview: Optional[str] = None
+    unread_count: int = 0
+    partner_online: bool = False
+
+    class Config:
+        from_attributes = True
+
+
+class ChatRoomListResponse(BaseModel):
+    total: int
+    rooms: List[ChatRoomResponse]
+
+
+class ChatMessageListResponse(BaseModel):
+    total: int
+    messages: List[ChatMessageResponse]
