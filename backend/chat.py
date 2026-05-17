@@ -17,6 +17,19 @@ import logging
 from datetime import datetime, timezone
 from typing import Dict, Iterable, List, Optional, Set
 
+# ── Heartbeat presence store (REST-based, no WS dependency) ──
+import time as _time
+
+_heartbeat_store: Dict[int, float] = {}  # user_id → timestamp last heartbeat
+_HEARTBEAT_TTL = 60  # detik — user dianggap online jika heartbeat < 60s lalu
+
+
+def _is_online_by_heartbeat(user_id: int) -> bool:
+    ts = _heartbeat_store.get(user_id)
+    if ts is None:
+        return False
+    return (_time.time() - ts) < _HEARTBEAT_TTL
+
 from fastapi import (
     APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect,
     status,
@@ -275,6 +288,19 @@ def my_unread_count(
     return {"unread": int(total)}
 
 
+@router.post(
+    "/heartbeat",
+    summary="Ping heartbeat — panggil tiap 30 detik agar status online aktif",
+)
+def heartbeat_ping(
+    current_user: User = Depends(_get_current_user_dep()),
+):
+    """Frontend memanggil ini tiap 30 detik selama user login.
+    Server menyimpan timestamp terakhir untuk menentukan status online."""
+    _heartbeat_store[current_user.id] = _time.time()
+    return {"ok": True}
+
+
 @router.get(
     "/presence",
     summary="Status online dari partner-partner chat saya",
@@ -283,6 +309,9 @@ def my_partners_presence(
     db: Session = Depends(get_db),
     current_user: User = Depends(_get_current_user_dep()),
 ):
+    # Juga update heartbeat caller (karena mereka jelas online saat panggil ini)
+    _heartbeat_store[current_user.id] = _time.time()
+
     rows = (
         db.query(ChatRoom.user_id, ChatRoom.admin_id)
         .filter(or_(ChatRoom.user_id == current_user.id, ChatRoom.admin_id == current_user.id))
@@ -294,8 +323,13 @@ def my_partners_presence(
             partner_ids.add(u)
         if a != current_user.id:
             partner_ids.add(a)
-    statuses = manager.online_users(partner_ids)
-    return {"online": [uid for uid, ok in statuses.items() if ok]}
+
+    # Gabungkan: online via WS ATAU via heartbeat REST
+    online_list = [
+        uid for uid in partner_ids
+        if manager.is_online(uid) or _is_online_by_heartbeat(uid)
+    ]
+    return {"online": online_list}
 
 
 # ============================================================

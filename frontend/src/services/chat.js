@@ -204,6 +204,14 @@ export async function fetchChatPresence() {
   return handleResponse(res)
 }
 
+export async function chatHeartbeat() {
+  const res = await fetch(`${API_URL}/chat/heartbeat`, {
+    method: "POST",
+    headers: authOnlyHeaders(),
+  })
+  return handleResponse(res)
+}
+
 
 function buildPresenceWsUrl() {
   const explicit = import.meta.env.VITE_WS_URL
