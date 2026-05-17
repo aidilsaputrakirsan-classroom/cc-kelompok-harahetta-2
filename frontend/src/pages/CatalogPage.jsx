@@ -3,9 +3,9 @@
  * Modern minimalist · search-first dengan filter sticky di kiri (desktop).
  */
 import { useState, useEffect, useCallback } from "react"
-import { Link, useNavigate } from "react-router-dom"
+import { Link, useNavigate, useSearchParams } from "react-router-dom"
 import { useAuth } from "../context/AuthContext"
-import { fetchItems, fetchCategories } from "../services/api"
+import { fetchItems, fetchCategories, fetchItemCities } from "../services/api"
 import { formatPrice } from "../lib/utils"
 import { Button } from "../components/ui/Button"
 import { motion, AnimatePresence } from "framer-motion"
@@ -13,7 +13,7 @@ import Navbar from "../components/Layout/Navbar"
 import Footer from "../components/Layout/Footer"
 import {
   Search, Package, ShoppingCart, ArrowLeft, ArrowRight, X,
-  Sparkles, CheckCircle, Clock, Eye, SlidersHorizontal, Filter, Store,
+  Sparkles, CheckCircle, Clock, Eye, SlidersHorizontal, Filter, Store, MapPin,
 } from "lucide-react"
 
 /* ─── motion ──────────────────────────────────────────────── */
@@ -94,6 +94,12 @@ function ItemCard({ item, onRent, index }) {
             {item.admin_nama_usaha}
           </p>
         )}
+        {item.admin_kota && (
+          <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
+            <MapPin className="w-3 h-3" />
+            {item.admin_kota}
+          </p>
+        )}
         {item.deskripsi && (
           <p className="text-sm text-muted-foreground line-clamp-2 mt-1.5 flex-1 leading-relaxed">
             {item.deskripsi}
@@ -165,16 +171,21 @@ function EmptyState({ onReset }) {
 /* ─── Page ────────────────────────────────────────────────── */
 export default function CatalogPage({ addToast }) {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { isAuthenticated } = useAuth()
+
+  const initialSearch = searchParams.get("search") || ""
 
   const [items, setItems]               = useState([])
   const [total, setTotal]               = useState(0)
   const [categories, setCategories]     = useState([])
+  const [cities, setCities]             = useState([])
   const [loading, setLoading]           = useState(true)
-  const [search, setSearch]             = useState("")
-  const [searchInput, setSearchInput]   = useState("")
+  const [search, setSearch]             = useState(initialSearch)
+  const [searchInput, setSearchInput]   = useState(initialSearch)
   const [categoryId, setCategoryId]     = useState("")
   const [statusFilter, setStatusFilter] = useState("")
+  const [cityFilter, setCityFilter]     = useState("")
   const [page, setPage]                 = useState(0)
   const [filterOpen, setFilterOpen]     = useState(false)
   const LIMIT = 12
@@ -182,6 +193,9 @@ export default function CatalogPage({ addToast }) {
   useEffect(() => {
     fetchCategories()
       .then(c => setCategories(Array.isArray(c) ? c : []))
+      .catch(() => {})
+    fetchItemCities()
+      .then(c => setCities(Array.isArray(c) ? c : []))
       .catch(() => {})
   }, [])
 
@@ -192,6 +206,7 @@ export default function CatalogPage({ addToast }) {
       if (search)       params.search = search
       if (categoryId)   params.category_id = categoryId
       if (statusFilter) params.status = statusFilter
+      if (cityFilter)   params.city = cityFilter
       const data = await fetchItems(params)
       setItems(Array.isArray(data) ? data : (data?.items || []))
       setTotal(data?.total || 0)
@@ -200,7 +215,7 @@ export default function CatalogPage({ addToast }) {
     } finally {
       setLoading(false)
     }
-  }, [search, categoryId, statusFilter, page, addToast])
+  }, [search, categoryId, statusFilter, cityFilter, page, addToast])
 
   useEffect(() => { load() }, [load])
 
@@ -215,6 +230,7 @@ export default function CatalogPage({ addToast }) {
     setSearchInput("")
     setCategoryId("")
     setStatusFilter("")
+    setCityFilter("")
     setPage(0)
   }
 
@@ -223,7 +239,7 @@ export default function CatalogPage({ addToast }) {
     navigate(`/rentals/new?item=${item.id}`)
   }
 
-  const hasFilter = !!(search || categoryId || statusFilter)
+  const hasFilter = !!(search || categoryId || statusFilter || cityFilter)
   const totalPages = Math.max(1, Math.ceil(total / LIMIT))
 
   /* ─── reusable filter section (desktop sidebar / mobile sheet) ── */
@@ -253,6 +269,39 @@ export default function CatalogPage({ addToast }) {
           ))}
         </div>
       </div>
+
+      {cities.length > 0 && (
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3 flex items-center gap-1.5">
+            <MapPin className="w-3 h-3" /> Kota
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => { setCityFilter(""); setPage(0); setFilterOpen(false) }}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors border ${
+                !cityFilter
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-background text-muted-foreground border-border hover:border-primary hover:text-primary"
+              }`}
+            >
+              Semua
+            </button>
+            {cities.map(c => (
+              <button
+                key={c}
+                onClick={() => { setCityFilter(c); setPage(0); setFilterOpen(false) }}
+                className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold transition-colors border ${
+                  cityFilter === c
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-background text-muted-foreground border-border hover:border-primary hover:text-primary"
+                }`}
+              >
+                <MapPin className="w-3 h-3" /> {c}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div>
         <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">
@@ -300,7 +349,7 @@ export default function CatalogPage({ addToast }) {
     <div className="min-h-screen bg-background text-foreground flex flex-col">
 
       {/* ══ HERO SEARCH ════════════════════════════════════ */}
-      <section className="relative pt-24 pb-12 md:pt-28 md:pb-16 bg-section-alt overflow-hidden">
+      <section className={`relative pb-12 md:pb-16 bg-section-alt overflow-hidden ${isAuthenticated ? "pt-4 md:pt-6" : "pt-24 md:pt-28"}`}>
         <div className="absolute inset-0 bg-dot-grid opacity-30 [mask-image:radial-gradient(ellipse_at_center,black_20%,transparent_75%)] pointer-events-none" />
 
         <div className="relative max-w-4xl mx-auto px-4 sm:px-6 text-center">

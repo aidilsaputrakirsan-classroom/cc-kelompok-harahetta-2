@@ -7,6 +7,7 @@ import { useState, useEffect } from "react"
 import { useParams, useNavigate, Link } from "react-router-dom"
 import { useAuth } from "../context/AuthContext"
 import { fetchItem, fetchAdminPaymentInfo } from "../services/api"
+import { openChatRoomForItem } from "../services/chat"
 import { formatPrice } from "../lib/utils"
 import { Button } from "../components/ui/Button"
 import { Skeleton } from "../components/ui/skeleton"
@@ -14,7 +15,7 @@ import { motion } from "framer-motion"
 import {
   ArrowLeft, Package, ShoppingCart, Tag, CheckCircle,
   XCircle, AlertTriangle, Store, Phone,
-  Calendar, MapPin, Shield, Timer, Clock, Star,
+  Calendar, MapPin, Shield, Timer, Clock, Star, MessageCircle, Loader2,
 } from "lucide-react"
 
 /* ─── status ──────────────────────────────────────────────── */
@@ -29,13 +30,14 @@ function calcDays(s, e) { return Math.max(0, Math.ceil((new Date(e) - new Date(s
 export default function ItemDetailPage({ addToast }) {
   const { itemId } = useParams()
   const navigate = useNavigate()
-  const { isAuthenticated, isVerified } = useAuth()
+  const { isAuthenticated, isVerified, isAdmin, isSuperAdmin } = useAuth()
 
   const [item, setItem]           = useState(null)
   const [adminInfo, setAdminInfo] = useState(null)
   const [loading, setLoading]     = useState(true)
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate]     = useState("")
+  const [openingChat, setOpeningChat] = useState(false)
 
   const today = new Date().toISOString().split("T")[0]
   const days = startDate && endDate ? calcDays(startDate, endDate) : 0
@@ -58,6 +60,28 @@ export default function ItemDetailPage({ addToast }) {
   const handleRent = () => {
     if (!isAuthenticated) { addToast?.("Silakan login terlebih dahulu", "info"); navigate("/login"); return }
     navigate(`/rentals/new?item=${itemId}`)
+  }
+
+  const handleAskAdmin = async () => {
+    if (!isAuthenticated) {
+      addToast?.("Login dulu untuk bisa chat dengan penyedia", "info")
+      navigate("/login")
+      return
+    }
+    if (isAdmin || isSuperAdmin) {
+      addToast?.("Hanya akun penyewa yang bisa memulai chat dari halaman item", "warning")
+      return
+    }
+    setOpeningChat(true)
+    try {
+      const room = await openChatRoomForItem(Number(itemId))
+      navigate(`/chat/${room.id}`)
+    } catch (err) {
+      if (err.message === "UNAUTHORIZED") { navigate("/login"); return }
+      addToast?.(err.message || "Gagal membuka chat", "error")
+    } finally {
+      setOpeningChat(false)
+    }
   }
 
   const fallback = (n) => `https://ui-avatars.com/api/?name=${encodeURIComponent(n || "I")}&background=0a6e4a&color=fff&size=800&bold=true`
@@ -146,19 +170,51 @@ export default function ItemDetailPage({ addToast }) {
 
           {/* Provider mini */}
           {adminInfo && (
-            <div className="flex items-center gap-3 bg-secondary/60 rounded-2xl px-4 py-3">
-              <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center text-primary flex-shrink-0">
-                <Store className="w-4 h-4" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-sm font-semibold tracking-tight truncate">{adminInfo.nama_usaha}</p>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  {adminInfo.nomor_telepon && <span className="inline-flex items-center gap-1"><Phone className="w-3 h-3" /> {adminInfo.nomor_telepon}</span>}
+            <div className="bg-secondary/60 rounded-2xl px-4 py-3 sm:max-w-xs w-full">
+              <div className="flex items-center gap-3">
+                {adminInfo.foto_profil ? (
+                  <img
+                    src={adminInfo.foto_profil}
+                    alt={adminInfo.nama_usaha}
+                    className="w-9 h-9 rounded-xl object-cover flex-shrink-0 ring-1 ring-primary/20"
+                    onError={(e) => { e.currentTarget.style.display = "none"; e.currentTarget.nextSibling.style.display = "flex" }}
+                  />
+                ) : null}
+                <div
+                  className="w-9 h-9 rounded-xl bg-primary/10 items-center justify-center text-primary flex-shrink-0"
+                  style={{ display: adminInfo.foto_profil ? "none" : "flex" }}
+                >
+                  <Store className="w-4 h-4" />
                 </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold tracking-tight truncate">{adminInfo.nama_usaha}</p>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    {adminInfo.nomor_telepon && (
+                      <span className="inline-flex items-center gap-1 truncate">
+                        <Phone className="w-3 h-3 flex-shrink-0" /> {adminInfo.nomor_telepon}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full flex-shrink-0">
+                  <CheckCircle className="w-3 h-3" /> Verified
+                </span>
               </div>
-              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full flex-shrink-0">
-                <CheckCircle className="w-3 h-3" /> Verified
-              </span>
+
+              {/* Tanya admin — di bawah info toko */}
+              {!isAdmin && !isSuperAdmin && (
+                <button
+                  onClick={handleAskAdmin}
+                  disabled={openingChat}
+                  className="mt-3 w-full h-9 rounded-xl border border-primary/30 text-primary bg-background hover:bg-primary/10 transition font-semibold text-xs inline-flex items-center justify-center gap-1.5 disabled:opacity-60"
+                >
+                  {openingChat
+                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    : <MessageCircle className="w-3.5 h-3.5" />
+                  }
+                  Tanya admin
+                </button>
+              )}
             </div>
           )}
         </div>

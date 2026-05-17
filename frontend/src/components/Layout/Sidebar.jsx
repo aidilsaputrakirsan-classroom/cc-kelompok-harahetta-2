@@ -2,32 +2,37 @@
  * Sidebar — Admin & SuperAdmin layout
  * Forest dark · accent hijau emerald.
  */
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useLocation, useNavigate, Link } from "react-router-dom"
 import { useAuth } from "../../context/AuthContext"
 import { cn } from "../../lib/utils"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   Package, LayoutDashboard, User, Store, Crown,
-  LogOut, ChevronLeft, Menu, X, Home, BookOpen,
+  LogOut, ChevronLeft, Menu, X, Home, BookOpen, MessageCircle,
 } from "lucide-react"
 import ThemeToggle from "../ui/ThemeToggle"
+import Avatar from "../ui/Avatar"
+import { fetchChatUnreadCount } from "../../services/chat"
 
 const NAV_USER = [
   { path: "/home",    label: "Beranda", icon: Home },
   { path: "/catalog", label: "Katalog", icon: BookOpen },
+  { path: "/chat",    label: "Pesan",   icon: MessageCircle },
   { path: "/profile", label: "Profil",  icon: User },
 ]
 
 const NAV_ADMIN = [
   { path: "/dashboard",       label: "Katalog",     icon: LayoutDashboard },
   { path: "/admin/dashboard", label: "Admin panel", icon: Store },
+  { path: "/chat",            label: "Pesan",       icon: MessageCircle },
   { path: "/profile",         label: "Profil",      icon: User },
 ]
 
 const NAV_SUPER = [
   { path: "/dashboard",  label: "Katalog",     icon: LayoutDashboard },
   { path: "/superadmin", label: "Super admin", icon: Crown },
+  { path: "/chat",       label: "Pesan",       icon: MessageCircle },
   { path: "/profile",    label: "Profil",      icon: User },
 ]
 
@@ -37,6 +42,21 @@ export default function Sidebar() {
   const navigate = useNavigate()
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [unread, setUnread] = useState(0)
+
+  // Poll unread count tiap 20 detik selagi user login
+  useEffect(() => {
+    let alive = true
+    const load = async () => {
+      try {
+        const data = await fetchChatUnreadCount()
+        if (alive) setUnread(Number(data?.unread || 0))
+      } catch { /* ignore */ }
+    }
+    load()
+    const t = setInterval(load, 20000)
+    return () => { alive = false; clearInterval(t) }
+  }, [location.pathname])
 
   const nav = isSuperAdmin ? NAV_SUPER : isAdmin ? NAV_ADMIN : NAV_USER
   const initial = (user?.nama || "U")[0].toUpperCase()
@@ -48,20 +68,32 @@ export default function Sidebar() {
     <nav className="flex-1 p-3 space-y-1">
       {nav.map((item) => {
         const active = location.pathname === item.path ||
-          (item.path === "/dashboard" && location.pathname.startsWith("/dashboard"))
+          (item.path === "/dashboard" && location.pathname.startsWith("/dashboard")) ||
+          (item.path === "/chat" && location.pathname.startsWith("/chat"))
+        const showBadge = item.path === "/chat" && unread > 0
         return (
           <button
             key={item.path}
             onClick={() => handleNav(item.path)}
             className={cn(
-              "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors",
+              "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors relative",
               active
                 ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
                 : "text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent"
             )}
           >
-            <item.icon className="w-4 h-4 flex-shrink-0" />
+            <span className="relative inline-flex">
+              <item.icon className="w-4 h-4 flex-shrink-0" />
+              {showBadge && collapsed && (
+                <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-rose-500" />
+              )}
+            </span>
             {!collapsed && <span>{item.label}</span>}
+            {showBadge && !collapsed && (
+              <span className="ml-auto bg-rose-500 text-white text-[10px] font-bold rounded-full px-1.5 min-w-[18px] h-[18px] inline-flex items-center justify-center">
+                {unread > 99 ? "99+" : unread}
+              </span>
+            )}
           </button>
         )
       })}
@@ -97,9 +129,12 @@ export default function Sidebar() {
       {!collapsed && (
         <div className="mx-3 mb-3 p-3 rounded-2xl bg-sidebar-accent border border-sidebar-border">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-full bg-sidebar-primary text-sidebar-primary-foreground text-xs font-bold flex items-center justify-center flex-shrink-0">
-              {initial}
-            </div>
+            <Avatar
+              src={user?.foto_profil}
+              name={user?.nama}
+              size={36}
+              className="ring-2 ring-sidebar-primary/30"
+            />
             <div className="min-w-0">
               <p className="text-xs font-semibold text-sidebar-accent-foreground truncate">{user?.nama}</p>
               <p className="text-[10px] text-sidebar-foreground/60 truncate">

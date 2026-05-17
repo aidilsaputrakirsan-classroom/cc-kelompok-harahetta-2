@@ -510,6 +510,7 @@ def get_items(
     category: Optional[str] = None,
     admin_id: Optional[int] = None,
     status: Optional[str] = None,
+    city: Optional[str] = None,
 ) -> dict:
     """
     Ambil daftar barang sewa dengan pagination, search, dan filter.
@@ -518,6 +519,7 @@ def get_items(
     - category: filter by nama kategori (contoh: 'electronics')
     - admin_id: filter by penyedia (untuk admin melihat barang miliknya)
     - status: filter by status (available, rented, unavailable)
+    - city: filter by kota dari alamat_usaha admin (contoh: 'Balikpapan')
     """
     query = db.query(Item).options(joinedload(Item.category), joinedload(Item.admin))
 
@@ -544,10 +546,109 @@ def get_items(
         except ValueError:
             pass
 
+    # Filter by kota (parse client-side dari alamat_usaha)
+    if city:
+        city_norm = city.strip().lower()
+        # Pre-filter: alamat_usaha mengandung nama kota (loose match di SQL)
+        query = query.join(AdminProfile, Item.admin_id == AdminProfile.id).filter(
+            AdminProfile.alamat_usaha.ilike(f"%{city}%")
+        )
+        # Strict filter di Python: cocokkan kota yang ter-extract benar-benar = city
+        all_items = query.order_by(Item.created_at.desc()).all()
+        filtered = [
+            it for it in all_items
+            if it.admin and extract_city(it.admin.alamat_usaha) and
+            extract_city(it.admin.alamat_usaha).lower() == city_norm
+        ]
+        total = len(filtered)
+        items = filtered[skip:skip + limit]
+        return {"total": total, "items": items}
+
     total = query.count()
     items = query.order_by(Item.created_at.desc()).offset(skip).limit(limit).all()
 
     return {"total": total, "items": items}
+
+
+# ────────────────────────────────────────────────────────────
+# CITY EXTRACTION & LIST
+# ────────────────────────────────────────────────────────────
+
+# Province names (last segment di alamat hasil reverse geocode Nominatim)
+_INDO_PROVINCES = {
+    "aceh", "bali", "banten", "bengkulu", "daerah istimewa yogyakarta",
+    "di yogyakarta", "yogyakarta", "dki jakarta", "jakarta", "gorontalo",
+    "jambi", "jawa barat", "jawa tengah", "jawa timur", "kalimantan barat",
+    "kalimantan selatan", "kalimantan tengah", "kalimantan timur",
+    "kalimantan utara", "kepulauan bangka belitung", "kepulauan riau",
+    "lampung", "maluku", "maluku utara", "nusa tenggara barat",
+    "nusa tenggara timur", "papua", "papua barat", "papua barat daya",
+    "papua pegunungan", "papua selatan", "papua tengah", "riau",
+    "sulawesi barat", "sulawesi selatan", "sulawesi tengah",
+    "sulawesi tenggara", "sulawesi utara", "sumatera barat",
+    "sumatera selatan", "sumatera utara", "indonesia",
+}
+
+
+def extract_city(alamat: Optional[str]) -> Optional[str]:
+    """
+    Ekstrak nama kota dari alamat usaha.
+    Format alamat dari Nominatim biasanya:
+        road, [house_no], suburb, district, city, state
+    Strategi:
+      1. Split by koma, trim, drop kosong
+      2. Strip prefix 'Kota '/'Kabupaten '/'Kab. '
+      3. Drop segment yang termasuk nama provinsi atau 'Indonesia'
+      4. Ambil segment terakhir setelah filter (kota biasanya before-last)
+    """
+    if not alamat:
+        return None
+    parts = [p.strip() for p in alamat.split(",") if p.strip()]
+    if not parts:
+        return None
+
+    cleaned = []
+    for p in parts:
+        low = p.lower()
+        # Skip kode pos murni
+        if low.replace(" ", "").isdigit():
+            continue
+        # Skip provinsi & 'Indonesia'
+        if low in _INDO_PROVINCES:
+            continue
+        # Strip prefix umum kota/kabupaten
+        for prefix in ("kota ", "kabupaten ", "kab. ", "kab "):
+            if low.startswith(prefix):
+                p = p[len(prefix):].strip()
+                low = p.lower()
+                break
+        cleaned.append(p)
+
+    if not cleaned:
+        return None
+    # Setelah membuang provinsi, kota = segment terakhir yang tersisa
+    return cleaned[-1]
+
+
+def get_item_cities(db: Session) -> List[str]:
+    """
+    List unik kota dari admin yang punya minimal 1 item aktif (status != unavailable).
+    Diurutkan alfabet.
+    """
+    rows = (
+        db.query(AdminProfile.alamat_usaha)
+        .join(Item, Item.admin_id == AdminProfile.id)
+        .filter(AdminProfile.alamat_usaha.isnot(None))
+        .filter(Item.status != ItemStatus.unavailable)
+        .distinct()
+        .all()
+    )
+    cities = set()
+    for (alamat,) in rows:
+        city = extract_city(alamat)
+        if city:
+            cities.add(city)
+    return sorted(cities, key=lambda x: x.lower())
 
 
 def get_item(db: Session, item_id: int) -> Item | None:

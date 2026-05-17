@@ -8,6 +8,7 @@ import UserLayout from "./components/Layout/UserLayout"
 import Navbar from "./components/Layout/Navbar"
 import { Loader2 } from "lucide-react"
 import ChatbotWidget from "./components/ChatbotWidget"
+import PresenceManager from "./components/PresenceManager"
 
 import LandingPage from "./pages/LandingPage"
 import LoginPage from "./pages/LoginPage"
@@ -28,6 +29,7 @@ import AboutPage from "./pages/AboutPage"
 import VerifyEmailPage from "./pages/VerifyEmailPage"
 import ForgotPasswordPage from "./pages/ForgotPasswordPage"
 import ResetPasswordPage from "./pages/ResetPasswordPage"
+import ChatPage from "./pages/ChatPage"
 
 function RedirectToStatic404() {
   if (typeof window !== "undefined") {
@@ -108,6 +110,8 @@ function AdminLayout({ addToast }) {
             <Route path="/admin/rentals" element={<RequireAdmin><AdminDashboard addToast={addToast} /></RequireAdmin>} />
             <Route path="/admin/payments" element={<RequireAdmin><AdminPaymentsPage addToast={addToast} /></RequireAdmin>} />
             <Route path="/admin/profile" element={<RequireAdmin><AdminDashboard addToast={addToast} /></RequireAdmin>} />
+            <Route path="/chat" element={<RequireAuth><ChatPage addToast={addToast} /></RequireAuth>} />
+            <Route path="/chat/:roomId" element={<RequireAuth><ChatPage addToast={addToast} /></RequireAuth>} />
             <Route path="/superadmin" element={<RequireSuperAdmin><SuperAdminPanel addToast={addToast} /></RequireSuperAdmin>} />
             <Route path="/superadmin/*" element={<RequireSuperAdmin><SuperAdminPanel addToast={addToast} /></RequireSuperAdmin>} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
@@ -131,6 +135,8 @@ function UserAppLayout({ addToast }) {
         <Route path="/rentals/my" element={<RequireAuth><MyRentalsPage addToast={addToast} /></RequireAuth>} />
         <Route path="/payment/:rentalId" element={<RequireAuth><PaymentPage addToast={addToast} /></RequireAuth>} />
         <Route path="/profile" element={<RequireAuth><ProfilePage addToast={addToast} /></RequireAuth>} />
+        <Route path="/chat" element={<RequireAuth><ChatPage addToast={addToast} /></RequireAuth>} />
+        <Route path="/chat/:roomId" element={<RequireAuth><ChatPage addToast={addToast} /></RequireAuth>} />
         <Route path="*" element={<Navigate to="/home" replace />} />
       </Routes>
     </UserLayout>
@@ -184,6 +190,9 @@ function AppContent() {
 
       {/* Floating Chatbot Widget — tampil di semua halaman */}
       {isAuthenticated && <ChatbotWidget />}
+
+      {/* Presence WebSocket — kabari server bahwa user online di mana pun */}
+      {isAuthenticated && <PresenceManager />}
     </>
   )
 }

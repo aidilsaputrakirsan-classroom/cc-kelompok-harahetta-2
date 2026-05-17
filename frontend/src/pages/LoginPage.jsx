@@ -7,7 +7,7 @@ import { Input } from "../components/ui/input"
 import { Label } from "../components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs"
-import { Info, Mail, CheckCircle2 } from "lucide-react"
+import { Mail, CheckCircle2 } from "lucide-react"
 
 export default function LoginPage({ addToast }) {
   const [loading, setLoading] = useState(false)
@@ -71,9 +71,6 @@ export default function LoginPage({ addToast }) {
     }
   }
 
-  const fillDemo = (email) => {
-    setLoginForm({ email, password: "Password123" })
-  }
 
   // Tampilan setelah register berhasil
   if (registerSuccess) {
@@ -173,21 +170,6 @@ export default function LoginPage({ addToast }) {
                   <Button type="submit" className="w-full" loading={loading}>Masuk</Button>
                 </form>
 
-                <div className="mt-4 p-3 rounded-lg bg-muted border text-xs space-y-1">
-                  <div className="flex items-center gap-1.5 font-semibold text-foreground mb-2">
-                    <Info className="w-3.5 h-3.5" /> Demo Akun:
-                  </div>
-                  <button onClick={() => fillDemo("user@sewain.id")} className="block w-full text-left hover:text-primary transition-colors">
-                    User: <span className="font-medium">user@sewain.id</span>
-                  </button>
-                  <button onClick={() => fillDemo("admin@sewain.id")} className="block w-full text-left hover:text-primary transition-colors">
-                    Admin: <span className="font-medium">admin@sewain.id</span>
-                  </button>
-                  <button onClick={() => fillDemo("super@sewain.id")} className="block w-full text-left hover:text-primary transition-colors">
-                    Super Admin: <span className="font-medium">super@sewain.id</span>
-                  </button>
-                  <p className="text-muted-foreground">Password: apapun</p>
-                </div>
               </TabsContent>
 
               {/* Register Tab */}

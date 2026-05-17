@@ -105,12 +105,24 @@ export async function getMe() {
   return handleResponse(res)
 }
 
+export async function updateMe(data) {
+  const res = await fetch(`${API_URL}/auth/me`, {
+    method: "PUT", headers: authHeaders(), body: JSON.stringify(data),
+  })
+  return handleResponse(res)
+}
+
 export async function checkHealth() {
   try {
     const res = await fetch(`${API_URL}/health`)
     const data = await res.json()
     return data.status === "healthy"
   } catch { return false }
+}
+
+export async function fetchPublicStats() {
+  const res = await fetch(`${API_URL}/stats/public`)
+  return handleResponse(res)
 }
 
 // ==================== CATEGORIES API ====================
@@ -146,9 +158,15 @@ export async function fetchItems(params = {}) {
   if (params.search) q.append("search", params.search)
   if (params.category_id) q.append("category_id", params.category_id)
   if (params.status) q.append("status", params.status)
+  if (params.city) q.append("city", params.city)
   q.append("skip", params.skip ?? 0)
   q.append("limit", params.limit ?? 20)
   const res = await fetch(`${API_URL}/items?${q}`, { headers: authOnlyHeaders() })
+  return handleResponse(res)
+}
+
+export async function fetchItemCities() {
+  const res = await fetch(`${API_URL}/items/cities`, { headers: authOnlyHeaders() })
   return handleResponse(res)
 }
 
