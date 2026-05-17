@@ -17,7 +17,7 @@ import {
 } from "../services/chat"
 import { motion, AnimatePresence } from "framer-motion"
 import {
-  ArrowLeft, Loader2, MessageCircle, Send, Wifi, WifiOff, Package, User as UserIcon, Store,
+  ArrowLeft, Loader2, MessageCircle, Send, Package, User as UserIcon, Store,
 } from "lucide-react"
 
 function formatTime(iso) {
@@ -68,23 +68,6 @@ function PartnerAvatar({ name, role, size = 40, online = null, src = null }) {
         />
       )}
     </div>
-  )
-}
-
-function StatusPill({ status }) {
-  const map = {
-    open: { label: "Terhubung", icon: Wifi, cls: "bg-emerald-100 text-emerald-700" },
-    connecting: { label: "Menghubungkan...", icon: Loader2, cls: "bg-amber-100 text-amber-800" },
-    reconnecting: { label: "Mencoba kembali...", icon: Loader2, cls: "bg-amber-100 text-amber-800" },
-    closed: { label: "Terputus", icon: WifiOff, cls: "bg-rose-100 text-rose-700" },
-  }
-  const meta = map[status] || map.connecting
-  const Icon = meta.icon
-  return (
-    <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2 py-0.5 rounded-full ${meta.cls}`}>
-      <Icon className={`w-3 h-3 ${meta.icon === Loader2 ? "animate-spin" : ""}`} />
-      {meta.label}
-    </span>
   )
 }
 
@@ -168,7 +151,6 @@ export default function ChatPage({ addToast }) {
   const [loadingMessages, setLoadingMessages] = useState(false)
   const [sending, setSending] = useState(false)
   const [input, setInput] = useState("")
-  const [wsStatus, setWsStatus] = useState("connecting")
 
   const socketRef = useRef(null)
   const messagesEndRef = useRef(null)
@@ -200,7 +182,6 @@ export default function ChatPage({ addToast }) {
     socketRef.current = null
     setMessages([])
     setActiveRoom(null)
-    setWsStatus("connecting")
 
     if (!activeRoomId) return
 
@@ -231,7 +212,6 @@ export default function ChatPage({ addToast }) {
 
       // Buka WebSocket
       const sock = createChatSocket(activeRoomId, {
-        onStatus: setWsStatus,
         onMessage: (evt) => {
           if (evt?.type === "presence" && evt.data) {
             const { user_id: uid, online } = evt.data
@@ -280,6 +260,26 @@ export default function ChatPage({ addToast }) {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages.length, activeRoomId])
+
+  // Polling pesan baru tiap 5 detik (fallback saat WS tidak tersedia di production)
+  useEffect(() => {
+    if (!activeRoomId) return
+    const poll = async () => {
+      try {
+        const list = await fetchChatMessages(activeRoomId, { limit: 200 })
+        const msgs = list?.messages || []
+        setMessages((prev) => {
+          // Merge: tambah pesan baru yang belum ada di state
+          const existingIds = new Set(prev.map((m) => m.id))
+          const newOnes = msgs.filter((m) => !existingIds.has(m.id))
+          if (newOnes.length === 0) return prev
+          return [...prev, ...newOnes]
+        })
+      } catch { /* ignore */ }
+    }
+    const t = setInterval(poll, 5000)
+    return () => clearInterval(t)
+  }, [activeRoomId])
 
   // Polling fallback ringan: refresh room list tiap 30 detik
   useEffect(() => {
@@ -444,7 +444,6 @@ export default function ChatPage({ addToast }) {
                     )}
                   </div>
                 </div>
-                <StatusPill status={wsStatus} />
               </div>
 
               {/* Messages */}
@@ -489,11 +488,6 @@ export default function ChatPage({ addToast }) {
                     {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                   </button>
                 </div>
-                {wsStatus !== "open" && (
-                  <p className="text-[11px] text-muted-foreground mt-2">
-                    Koneksi realtime sedang bermasalah. Pesan tetap akan terkirim lewat koneksi cadangan.
-                  </p>
-                )}
               </div>
             </>
           )}

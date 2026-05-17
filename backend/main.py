@@ -203,13 +203,14 @@ def team_info():
 @app.get("/stats/public", tags=["ℹ️ Info"], summary="Statistik publik platform")
 def public_stats(db: Session = Depends(get_db)):
     """
-    Statistik publik: jumlah pengguna aktif (role=user, is_active=True).
+    Statistik publik: jumlah pengguna aktif (role=user, is_active=True, email terverifikasi).
     Tidak perlu login.
     """
     from models import UserRole
     active_users = db.query(User).filter(
         User.role == UserRole.user,
         User.is_active == True,
+        User.email_verified_at.isnot(None),
     ).count()
     return {"active_users": active_users}
 
