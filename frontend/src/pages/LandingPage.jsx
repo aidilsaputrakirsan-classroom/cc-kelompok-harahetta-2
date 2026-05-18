@@ -423,7 +423,7 @@ export default function LandingPage() {
           <div className="relative flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12 md:mb-16">
             {/* Background image behind the header text */}
             <img
-              src="/images/hero/Section2.png"
+              src="/images/hero/section2.png"
               alt=""
               aria-hidden="true"
               className="absolute top-1/2 right-[15%] -translate-y-1/2 max-w-xl md:max-w-2xl opacity-25 pointer-events-none"
