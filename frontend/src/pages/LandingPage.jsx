@@ -144,10 +144,10 @@ const categories = [
 ]
 
 const steps = [
-  { n: "01", title: "Verifikasi akun",      desc: "Daftar dan unggah KTP + selfie. Beres dalam beberapa menit.", icon: ShieldCheck },
-  { n: "02", title: "Pilih barang",         desc: "Telusuri katalog, banding harga, pilih dari mitra terdekat.", icon: Search },
-  { n: "03", title: "Bayar & ambil",        desc: "Bayar lewat metode pilihanmu, ambil sesuai titik di peta.",   icon: Wallet },
-  { n: "04", title: "Nikmati & kembalikan", desc: "Pakai sepuasnya, kembalikan tepat waktu — done.",             icon: CheckCircle2 },
+  { n: "01", title: "Verifikasi akun",      desc: "Daftar dan unggah KTP + selfie. Beres dalam beberapa menit.", icon: ShieldCheck, bg: "/images/hero/section3.png" },
+  { n: "02", title: "Pilih barang",         desc: "Telusuri katalog, banding harga, pilih dari mitra terdekat.", icon: Search, bg: "/images/hero/section4.png" },
+  { n: "03", title: "Bayar & ambil",        desc: "Bayar lewat metode pilihanmu, ambil sesuai titik di peta.",   icon: Wallet, bg: "/images/hero/section5.png" },
+  { n: "04", title: "Nikmati & kembalikan", desc: "Pakai sepuasnya, kembalikan tepat waktu — done.",             icon: CheckCircle2, bg: "/images/hero/section6.png" },
 ]
 
 const testimonials = [
@@ -350,8 +350,19 @@ export default function LandingPage() {
       {/* ══════════════════════════════════════════════════════
           FEATURE GRID
       ══════════════════════════════════════════════════════ */}
-      <section id="features" className="py-24 md:py-32 bg-section-alt">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+      <section id="features" className="relative py-24 md:py-32 bg-section-alt overflow-hidden">
+        {/* Background image centered behind content */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <img
+            src="/images/hero/section1.png"
+            alt=""
+            aria-hidden="true"
+            className="max-w-2xl md:max-w-3xl opacity-20"
+            loading="lazy"
+          />
+        </div>
+
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6">
           <div className="grid md:grid-cols-12 gap-8 md:gap-12 mb-16">
             <div className="md:col-span-5">
               <motion.span {...fadeUp(0)} className="chip">
@@ -388,7 +399,7 @@ export default function LandingPage() {
               <motion.div
                 key={i}
                 variants={child}
-                className="group relative overflow-hidden rounded-3xl border border-border bg-card p-7 lift"
+                className="group relative overflow-hidden rounded-3xl border-2 border-primary/20 bg-card/40 shadow-md p-7 lift"
               >
                 <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center text-primary mb-5">
                   <f.icon className="w-5 h-5" />
@@ -409,8 +420,16 @@ export default function LandingPage() {
       ══════════════════════════════════════════════════════ */}
       <section id="categories" className="py-24 md:py-32">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12 md:mb-16">
-            <div className="max-w-2xl">
+          <div className="relative flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12 md:mb-16">
+            {/* Background image behind the header text */}
+            <img
+              src="/images/hero/Section2.png"
+              alt=""
+              aria-hidden="true"
+              className="absolute top-1/2 right-[15%] -translate-y-1/2 max-w-xl md:max-w-2xl opacity-25 pointer-events-none"
+              loading="lazy"
+            />
+            <div className="relative max-w-2xl">
               <motion.span {...fadeUp(0)} className="chip">
                 Kategori
               </motion.span>
@@ -419,7 +438,7 @@ export default function LandingPage() {
                 <span className="font-display text-primary">apa</span> hari ini?
               </motion.h2>
             </div>
-            <motion.div {...fadeUp(0.1)}>
+            <motion.div {...fadeUp(0.1)} className="relative">
               <Link to="/catalog" className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary group link-underline">
                 Lihat semua kategori
                 <ArrowUpRight className="w-4 h-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
@@ -503,17 +522,28 @@ export default function LandingPage() {
               <motion.div
                 key={i}
                 variants={child}
-                className="relative rounded-3xl border border-white/10 bg-white/5 backdrop-blur-md p-7 hover:bg-white/[0.08] transition-colors"
+                className="relative overflow-visible rounded-3xl border border-white/10 bg-white/5 backdrop-blur-md p-7 hover:bg-white/[0.08] transition-colors"
               >
+                {/* Background image (clipped to card shape) */}
+                <div className="absolute inset-0 rounded-3xl overflow-hidden pointer-events-none">
+                  <img
+                    src={s.bg}
+                    alt=""
+                    aria-hidden="true"
+                    className="absolute top-0 right-[-10%] w-[80%] h-full object-contain opacity-20"
+                    loading="lazy"
+                  />
+                </div>
+
                 {/* Arrow connector between cards (desktop only) */}
                 {i < steps.length - 1 && (
-                  <div className="hidden lg:flex absolute -right-3 top-1/2 -translate-y-1/2 z-10 w-6 h-6 rounded-full bg-primary-300 text-primary-900 items-center justify-center">
+                  <div className="hidden lg:flex absolute -right-3 top-1/2 -translate-y-1/2 z-20 w-6 h-6 rounded-full bg-primary-300 text-primary-900 items-center justify-center">
                     <ArrowRight className="w-3.5 h-3.5" />
                   </div>
                 )}
 
                 {/* Number + icon inline */}
-                <div className="flex items-center justify-between mb-4">
+                <div className="relative flex items-center justify-between mb-4">
                   <div className="font-display text-4xl text-primary-300/60 leading-none">
                     {s.n}
                   </div>
@@ -522,8 +552,8 @@ export default function LandingPage() {
                   </div>
                 </div>
 
-                <h3 className="text-xl font-bold tracking-tight">{s.title}</h3>
-                <p className="mt-2 text-sm text-white/70 leading-relaxed">{s.desc}</p>
+                <h3 className="relative text-xl font-bold tracking-tight">{s.title}</h3>
+                <p className="relative mt-2 text-sm text-white/70 leading-relaxed">{s.desc}</p>
               </motion.div>
             ))}
           </motion.div>
