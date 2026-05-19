@@ -4,10 +4,10 @@ import { useAuth } from "../context/AuthContext"
 import { fetchItems, fetchCategories } from "../services/api"
 import { formatPrice } from "../lib/utils"
 import { Button } from "../components/ui/Button"
-import { Input } from "../components/ui/input"
-import { Card, CardContent } from "../components/ui/card"
+import { Input } from "../components/ui/Input"
+import { Card, CardContent } from "../components/ui/Card"
 import { StatusBadge } from "../components/ui/Badge"
-import { Skeleton } from "../components/ui/skeleton"
+import { Skeleton } from "../components/ui/Skeleton"
 import { Search, Package, ShoppingCart, ArrowLeft, ArrowRight, X, Settings } from "lucide-react"
 
 function ItemCard({ item, role, onRent }) {

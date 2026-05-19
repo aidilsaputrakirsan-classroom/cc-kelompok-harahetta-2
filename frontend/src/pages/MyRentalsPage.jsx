@@ -7,7 +7,7 @@ import { useNavigate } from "react-router-dom"
 import { fetchMyRentals } from "../services/api"
 import { formatPrice } from "../lib/utils"
 import { Button } from "../components/ui/Button"
-import { Skeleton } from "../components/ui/skeleton"
+import { Skeleton } from "../components/ui/Skeleton"
 import {
   ClipboardList, ArrowLeft, ArrowRight, Calendar, Package,
   Clock, CheckCircle, XCircle, TrendingUp, Eye, ShoppingCart,

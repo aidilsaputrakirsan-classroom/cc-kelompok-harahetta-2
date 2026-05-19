@@ -12,16 +12,16 @@ import {
   fetchAllRentals,
 } from "../services/api"
 import { Button } from "../components/ui/Button"
-import { Input } from "../components/ui/input"
-import { Label } from "../components/ui/label"
-import { Card, CardContent } from "../components/ui/card"
+import { Input } from "../components/ui/Input"
+import { Label } from "../components/ui/Label"
+import { Card, CardContent } from "../components/ui/Card"
 import { StatusBadge } from "../components/ui/Badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table"
-import { Skeleton } from "../components/ui/skeleton"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/Tabs"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/Table"
+import { Skeleton } from "../components/ui/Skeleton"
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
-} from "../components/ui/dialog"
+} from "../components/ui/Dialog"
 import {
   Users, Package, ClipboardList, FolderOpen, ShieldCheck, Crown,
   BarChart3, Plus, Trash2, UserCheck, UserX, CheckCircle, XCircle,

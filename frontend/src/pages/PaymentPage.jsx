@@ -7,7 +7,7 @@ import {
 } from "../services/api"
 import { openSnap } from "../lib/midtrans"
 import { formatPrice } from "../lib/utils"
-import { Skeleton } from "../components/ui/skeleton"
+import { Skeleton } from "../components/ui/Skeleton"
 import PickupMap from "../components/PickupMap"
 import {
   ArrowLeft, CreditCard, CheckCircle, Loader2, Clock,

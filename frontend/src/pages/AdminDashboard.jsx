@@ -14,16 +14,16 @@ import {
   fetchWallet, fetchWalletTransactions, requestWithdrawal, fetchMyWithdrawals,
 } from "../services/api"
 import { Button } from "../components/ui/Button"
-import { Input } from "../components/ui/input"
-import { Label } from "../components/ui/label"
-import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card"
+import { Input } from "../components/ui/Input"
+import { Label } from "../components/ui/Label"
+import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/Card"
 import { StatusBadge } from "../components/ui/Badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs"
-import { Skeleton } from "../components/ui/skeleton"
-import { Separator } from "../components/ui/separator"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/Tabs"
+import { Skeleton } from "../components/ui/Skeleton"
+import { Separator } from "../components/ui/Separator"
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
-} from "../components/ui/dialog"
+} from "../components/ui/Dialog"
 import {
   Package, ClipboardList, Store, Plus, Pencil, Trash2,
   Calendar, CheckCircle, XCircle, Save, AlertTriangle, ImageIcon, X, Eye, CreditCard, MapPin,
