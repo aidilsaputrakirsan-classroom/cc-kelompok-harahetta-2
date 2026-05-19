@@ -82,7 +82,7 @@ const PUBLIC_NAV_LINKS = [
   { label: "Beranda", to: "/" },
   { label: "Katalog", to: "/catalog" },
   { label: "Tentang", to: "/about" },
-  { label: "Mulai",   to: "/login" },
+  { label: "Mulai", to: "/login" },
 ]
 
 function PublicLayout() {
