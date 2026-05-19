@@ -1,139 +1,113 @@
-# ============================================================
-# docker-compose.yml — Sewain App
-# Menjalankan 3 service: database (PostgreSQL), backend (FastAPI), frontend (React/Nginx)
-#
-# PROFILES:
-#   Gunakan --profile untuk memilih environment:
-#
-#   Development (hot-reload, port DB terbuka):
-#     docker compose --profile dev up -d --build
-#
-#   Production (no reload, port DB tertutup):
-#     docker compose --profile prod -f docker-compose.yml -f docker-compose.prod.yml up -d
-#
-# Perintah umum:
-#   - Stop semua service       : docker compose --profile dev down
-#   - Rebuild + jalankan ulang : docker compose --profile dev up -d --build
-#   - Lihat log realtime       : docker compose logs -f
-#   - Status services          : docker compose ps
-#
-# Network:
-#   - sewain-network: custom bridge network agar semua container
-#     berkomunikasi secara terisolasi & bisa saling resolve by name.
-# ============================================================
+# ==============================================
+# Docker Compose — Microservices Architecture
+# Sewain — Kelompok Harahetta-2
+# ==============================================
+# Services:
+# 1. auth-db      : PostgreSQL untuk Auth Service (port 5433)
+# 2. item-db      : PostgreSQL untuk Item Service (port 5434)
+# 3. auth-service : Authentication (port 8001)
+# 4. item-service : Inventory CRUD (port 8002)
+# 5. frontend     : React app (port 3000)
+# 6. gateway      : Nginx reverse proxy (port 80)
 
 services:
-
-  # ----------------------------------------------------------
-  # SERVICE: db
-  # Database PostgreSQL versi 16 (ringan, pakai Alpine Linux).
-  # Menyimpan semua data aplikasi Sewain.
-  # Port host 15432 → container 5432 (agar tidak bentrok dengan
-  # PostgreSQL lokal yang biasanya di port 5432).
-  # Data disimpan di volume `pgdata` supaya tidak hilang saat
-  # container di-restart.
-  # ----------------------------------------------------------
-  db:
-    container_name: sewain-db
+  # ================================
+  # DATABASES (Database per Service)
+  # ================================
+  auth-db:
     image: postgres:16-alpine
-    profiles: [dev, prod]
-    restart: unless-stopped
     environment:
+      POSTGRES_DB: auth_db
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: setiawan
-      POSTGRES_DB: data_sewain
-    ports:
-      - "15432:5432"
+      POSTGRES_PASSWORD: postgres
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - auth_db_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d data_sewain"]
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
-      timeout: 5s
-      retries: 10
-      start_period: 10s
-    networks:
-      - sewain-network
+      timeout: 3s
+      retries: 5
 
-  # ----------------------------------------------------------
-  # SERVICE: backend
-  # REST API berbasis FastAPI (Python), dijalankan dengan Uvicorn.
-  # Di-build dari Dockerfile lokal di folder ./backend.
-  # Membaca konfigurasi dari file .env.docker (API key, secret, dll).
-  # Menunggu service `db` sehat (healthy) sebelum start.
-  # Port host 8000 → container 8000.
-  # ----------------------------------------------------------
-  backend:
-    container_name: sewain-backend
-    build: ./backend
-    profiles: [dev, prod]
-    restart: unless-stopped
-    env_file:
-      - ./backend/.env.docker
+  item-db:
+    image: postgres:16-alpine
     environment:
-      DB_HOST: db
+      POSTGRES_DB: item_db
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: setiawan
-      POSTGRES_DB: data_sewain
-      APP_ENV: development
-    ports:
-      - "8000:8000"
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - item_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ================================
+  # BACKEND SERVICES
+  # ================================
+  auth-service:
+    build: ./services/auth-service
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@auth-db:5432/auth_db
+      SECRET_KEY: ${SECRET_KEY:-dev-secret-key-change-in-production}
+      CORS_ORIGINS: "http://localhost,http://localhost:5173"
     depends_on:
-      db:
+      auth-db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
-      interval: 30s
-      timeout: 10s
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 10s
+      timeout: 5s
       retries: 3
       start_period: 15s
-    networks:
-      - sewain-network
-    command:
-      ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
-
-  # ----------------------------------------------------------
-  # SERVICE: frontend
-  # Aplikasi React yang sudah di-build dan di-serve oleh Nginx.
-  # Di-build dari Dockerfile lokal di folder ./frontend.
-  # VITE_API_URL di-inject saat build agar frontend tahu
-  # alamat backend yang benar.
-  # Port host 3000 → container 80 (Nginx default port 80).
-  # Menunggu backend start terlebih dahulu sebelum dijalankan.
-  # Akses aplikasi: http://localhost:3000
-  # ----------------------------------------------------------
-  frontend:
-    container_name: sewain-frontend
-    image: alif10231056/sewain-frontend:v2
-    profiles: [dev, prod]
     restart: unless-stopped
-    ports:
-      - "3000:80"
+
+  item-service:
+    build: ./services/item-service
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@item-db:5432/item_db
+      AUTH_SERVICE_URL: http://auth-service:8001
+      CORS_ORIGINS: "http://localhost,http://localhost:5173"
     depends_on:
-      backend:
+      item-db:
         condition: service_healthy
-    networks:
-      - sewain-network
+      auth-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8002/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
 
-# ============================================================
-# VOLUMES
-# pgdata: volume persisten untuk menyimpan data PostgreSQL.
-# Data tetap ada meskipun container dihapus/di-restart.
-# Untuk menghapus data sepenuhnya: docker compose down -v
-# ============================================================
+  # ================================
+  # FRONTEND
+  # ================================
+  frontend:
+    build: ./frontend
+    environment:
+      VITE_API_URL: http://localhost
+    restart: unless-stopped
+
+  # ================================
+  # API GATEWAY
+  # ================================
+  gateway:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./services/gateway/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      item-service:
+        condition: service_healthy
+      frontend:
+        condition: service_started
+    restart: unless-stopped
+
 volumes:
-  pgdata:
-    name: sewain-pgdata
-
-# ============================================================
-# NETWORKS
-# sewain-network: custom bridge network untuk komunikasi antar container.
-# Keuntungan vs default network:
-#   - Container bisa saling resolve pakai nama service (db, backend, frontend)
-#   - Traffic terisolasi dari container lain di Docker
-#   - Lebih aman & sesuai best practice production
-# ============================================================
-networks:
-  sewain-network:
-    name: sewain-network
-    driver: bridge
+  auth_db_data:
+  item_db_data:
