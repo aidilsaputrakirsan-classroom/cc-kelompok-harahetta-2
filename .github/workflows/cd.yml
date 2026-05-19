@@ -497,6 +497,77 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       # ──────────────────────────────────────────────────────────────
+      # HEALTH CHECK — verifikasi backend live setelah deploy
+      # ──────────────────────────────────────────────────────────────
+      - name: Health check after deploy
+        if: steps.deploy.outcome == 'success'
+        run: |
+          set -e
+          domain="${{ steps.deploy.outputs.domain }}"
+
+          # Pastikan URL lengkap dengan https://
+          if [[ "$domain" != http* ]]; then
+            health_url="https://${domain}/api/health"
+          else
+            health_url="${domain}/api/health"
+          fi
+
+          echo "🏥 Health check URL: $health_url"
+          echo ""
+
+          max_retries=5
+          retry_delay=10
+          success=false
+
+          for i in $(seq 1 $max_retries); do
+            echo "  Attempt $i/$max_retries..."
+            http_code=$(curl -sS -o /tmp/health-response.json -w "%{http_code}" \
+              --max-time 15 \
+              --connect-timeout 10 \
+              "$health_url" 2>/dev/null || echo "000")
+
+            if [ "$http_code" = "200" ]; then
+              echo "  ✅ Health check passed (HTTP 200)"
+              echo ""
+              echo "  Response:"
+              cat /tmp/health-response.json
+              echo ""
+              success=true
+              break
+            else
+              echo "  ⚠️  HTTP $http_code — retrying in ${retry_delay}s..."
+              if [ -f /tmp/health-response.json ]; then
+                cat /tmp/health-response.json 2>/dev/null || true
+              fi
+              echo ""
+              sleep $retry_delay
+            fi
+          done
+
+          if [ "$success" = false ]; then
+            echo ""
+            echo "::error::❌ Health check GAGAL setelah $max_retries percobaan. Backend tidak merespons di $health_url"
+            {
+              echo ""
+              echo "## ❌ Health Check Failed"
+              echo ""
+              echo "Backend tidak merespons setelah deploy."
+              echo "- Endpoint: \`$health_url\`"
+              echo "- Percobaan: $max_retries kali (interval ${retry_delay}s)"
+              echo ""
+              echo "**Rollback:** Lihat [Deployment Guide](../../docs/deployment-guide.md) untuk instruksi rollback manual."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+
+          {
+            echo ""
+            echo "## 🏥 Health Check Passed"
+            echo ""
+            echo "Backend merespons OK di \`$health_url\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # ──────────────────────────────────────────────────────────────
       # SUMMARY
       # ──────────────────────────────────────────────────────────────
       - name: Write deploy summary
