@@ -10,7 +10,7 @@ import { fetchItem, fetchAdminPaymentInfo } from "../services/api"
 import { openChatRoomForItem } from "../services/chat"
 import { formatPrice } from "../lib/utils"
 import { Button } from "../components/ui/Button"
-import { Skeleton } from "../components/ui/skeleton"
+import { Skeleton } from "../components/ui/Skeleton"
 import { motion } from "framer-motion"
 import {
   ArrowLeft, Package, ShoppingCart, Tag, CheckCircle,

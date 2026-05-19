@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react"
 import { useAuth } from "../context/AuthContext"
 import { Button } from "../components/ui/Button"
-import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/Card"
 import { Badge } from "../components/ui/Badge"
-import { Separator } from "../components/ui/separator"
-import { Input } from "../components/ui/input"
+import { Separator } from "../components/ui/Separator"
+import { Input } from "../components/ui/Input"
 import { 
   CreditCard, CheckCircle, XCircle, Clock, Search, 
   Eye, AlertTriangle, Calendar, Package, User as UserIcon

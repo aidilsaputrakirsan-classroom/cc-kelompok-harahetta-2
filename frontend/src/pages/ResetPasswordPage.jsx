@@ -2,9 +2,9 @@ import { useState } from "react"
 import { useSearchParams, Link } from "react-router-dom"
 import { resetPassword } from "../services/api"
 import { Button } from "../components/ui/Button"
-import { Input } from "../components/ui/input"
-import { Label } from "../components/ui/label"
-import { Card, CardContent, CardTitle, CardDescription } from "../components/ui/card"
+import { Input } from "../components/ui/Input"
+import { Label } from "../components/ui/Label"
+import { Card, CardContent, CardTitle, CardDescription } from "../components/ui/Card"
 import { CheckCircle2, ArrowLeft } from "lucide-react"
 
 export default function ResetPasswordPage({ addToast }) {

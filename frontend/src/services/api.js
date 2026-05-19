@@ -1,3 +1,4 @@
+// Gateway URL — semua request melalui Nginx API Gateway (http://localhost di production)
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000"
 
 // ==================== TOKEN MANAGEMENT ====================
@@ -32,12 +33,29 @@ function extractErrorMessage(error, statusCode) {
 
 async function handleResponse(response) {
   if (response.status === 401) { clearToken(); throw new Error("UNAUTHORIZED") }
+  // Handle service unavailable (microservice down)
+  if (response.status === 503 || response.status === 504) {
+    throw new Error("Service temporarily unavailable. Please try again later.")
+  }
   if (!response.ok) {
     const error = await response.json().catch(() => ({}))
     throw new Error(extractErrorMessage(error, response.status))
   }
   if (response.status === 204) return null
   return response.json()
+}
+
+// Wrapper fetch dengan deteksi network/connection error
+async function apiFetch(url, options = {}) {
+  try {
+    return await fetch(url, options)
+  } catch (err) {
+    // Network error atau service down total
+    if (err instanceof TypeError && err.message.includes("fetch")) {
+      throw new Error("Service temporarily unavailable. Please check your connection.")
+    }
+    throw err
+  }
 }
 
 // ==================== AUTH API ====================

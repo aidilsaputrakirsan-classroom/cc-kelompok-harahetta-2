@@ -2,7 +2,7 @@ import { useState, useEffect } from "react"
 import { useSearchParams, Link } from "react-router-dom"
 import { verifyEmail } from "../services/api"
 import { Button } from "../components/ui/Button"
-import { Card, CardContent, CardTitle, CardDescription } from "../components/ui/card"
+import { Card, CardContent, CardTitle, CardDescription } from "../components/ui/Card"
 import { CheckCircle2, XCircle, Loader2 } from "lucide-react"
 
 export default function VerifyEmailPage() {

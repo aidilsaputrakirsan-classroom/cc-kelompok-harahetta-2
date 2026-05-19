@@ -13,7 +13,7 @@ import {
 } from "../services/api"
 import { formatPrice } from "../lib/utils"
 import { Button } from "../components/ui/Button"
-import { Skeleton } from "../components/ui/skeleton"
+import { Skeleton } from "../components/ui/Skeleton"
 import {
   ShoppingCart, ClipboardList, ArrowRight, ArrowLeft, ArrowUpRight,
   Package, CheckCircle, Clock, TrendingUp, Calendar, ChevronRight,
