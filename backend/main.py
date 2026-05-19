@@ -14,6 +14,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy.orm import joinedload
 from sqlalchemy import text
 
+from config import settings  # Konfigurasi terpusat berbasis environment
+
 from database import engine, get_db
 import chatbot
 import chat
@@ -51,6 +53,9 @@ import email_service
 # ==================== INIT ====================
 
 load_dotenv(override=True)  # override=True agar .env selalu menimpa shell env vars
+
+# Validasi konfigurasi saat startup (log warning jika ada config tidak aman di production)
+settings.validate()
 
 # Buat semua tabel di database
 Base.metadata.create_all(bind=engine)
@@ -126,13 +131,11 @@ app = FastAPI(
 )
 
 # ==================== CORS ====================
-
-allowed_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:5173,http://localhost:5174")
-origins_list = [origin.strip() for origin in allowed_origins.split(",")]
+# Dibaca dari settings (config.py) — otomatis beda antara dev dan production
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins_list,
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
