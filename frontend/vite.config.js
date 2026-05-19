@@ -29,6 +29,35 @@ export default defineConfig(({ mode }) => {
       port: 4173,
     },
 
+    // Production build optimizations — code splitting per vendor
+    build: {
+      chunkSizeWarningLimit: 600,
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            // React core
+            'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+            // Map libraries (heavy — ~400KB raw)
+            'vendor-map': ['leaflet', 'react-leaflet'],
+            // Animation
+            'vendor-motion': ['framer-motion'],
+            // Radix UI components
+            'vendor-radix': [
+              '@radix-ui/react-dialog',
+              '@radix-ui/react-scroll-area',
+              '@radix-ui/react-select',
+              '@radix-ui/react-separator',
+              '@radix-ui/react-slot',
+              '@radix-ui/react-tabs',
+              '@radix-ui/react-tooltip',
+            ],
+            // Utilities
+            'vendor-utils': ['clsx', 'tailwind-merge', 'class-variance-authority', 'lucide-react', 'sonner'],
+          },
+        },
+      },
+    },
+
     test: {
       globals: true,
       environment: 'jsdom',
