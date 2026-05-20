@@ -23,6 +23,7 @@ import AdminDashboard from "./pages/AdminDashboard"
 import SuperAdminPanel from "./pages/SuperAdminPanel"
 import OnboardingPage from "./pages/OnboardingPage"
 import ItemDetailPage from "./pages/ItemDetailPage"
+import ShopProfilePage from "./pages/ShopProfilePage"
 import AdminOnboardingPage from "./pages/AdminOnboardingPage"
 import AdminPaymentsPage from "./pages/AdminPaymentsPage"
 import AboutPage from "./pages/AboutPage"
@@ -112,6 +113,9 @@ function AdminLayout({ addToast }) {
             <Route path="/admin/profile" element={<RequireAdmin><AdminDashboard addToast={addToast} /></RequireAdmin>} />
             <Route path="/chat" element={<RequireAuth><ChatPage addToast={addToast} /></RequireAuth>} />
             <Route path="/chat/:roomId" element={<RequireAuth><ChatPage addToast={addToast} /></RequireAuth>} />
+            <Route path="/items/:itemId" element={<ItemDetailPage addToast={addToast} />} />
+            <Route path="/shops/:adminId" element={<ShopProfilePage addToast={addToast} />} />
+            <Route path="/catalog" element={<CatalogPage addToast={addToast} />} />
             <Route path="/superadmin" element={<RequireSuperAdmin><SuperAdminPanel addToast={addToast} /></RequireSuperAdmin>} />
             <Route path="/superadmin/*" element={<RequireSuperAdmin><SuperAdminPanel addToast={addToast} /></RequireSuperAdmin>} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
@@ -130,6 +134,7 @@ function UserAppLayout({ addToast }) {
         <Route path="/home" element={<RequireAuth><UserDashboard addToast={addToast} /></RequireAuth>} />
         <Route path="/catalog" element={<CatalogPage addToast={addToast} />} />
         <Route path="/items/:itemId" element={<ItemDetailPage addToast={addToast} />} />
+        <Route path="/shops/:adminId" element={<ShopProfilePage addToast={addToast} />} />
         <Route path="/onboarding" element={<RequireAuth><OnboardingPage addToast={addToast} /></RequireAuth>} />
         <Route path="/rentals/new" element={<RequireAuth><RentalPage addToast={addToast} /></RequireAuth>} />
         <Route path="/rentals/my" element={<RequireAuth><MyRentalsPage addToast={addToast} /></RequireAuth>} />
@@ -167,6 +172,7 @@ function AppContent() {
             <>
               <Route path="catalog" element={<CatalogPage addToast={addToast} />} />
               <Route path="items/:itemId" element={<ItemDetailPage addToast={addToast} />} />
+              <Route path="shops/:adminId" element={<ShopProfilePage addToast={addToast} />} />
             </>
           )}
           <Route path="login" element={

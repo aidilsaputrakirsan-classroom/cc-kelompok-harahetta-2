@@ -32,7 +32,7 @@ export default function LoginPage({ addToast }) {
       navigate("/dashboard")
     } catch (err) {
       const msg = err.message
-      if (msg === "UNAUTHORIZED") {
+      if (msg.includes("Sesi habis") || msg === "SESSION_EXPIRED") {
         addToast?.("Email atau password salah", "error")
       } else if (msg.includes("belum diverifikasi")) {
         addToast?.("Email belum diverifikasi. Cek inbox email Anda.", "error")

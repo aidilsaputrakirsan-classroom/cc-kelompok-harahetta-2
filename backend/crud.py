@@ -8,7 +8,7 @@ from typing import Optional, List
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_, func
 
-from models import User, AdminProfile, UserProfile, Category, Item, Rental, Payment
+from models import User, AdminProfile, UserProfile, Category, Item, Rental, Payment, Review
 from models import UserRole, VerificationStatus, ItemStatus, RentalStatus, PaymentStatus, PaymentMethod
 from models import Wallet, Withdrawal, WithdrawalStatus
 from schemas import (
@@ -20,6 +20,7 @@ from schemas import (
     RentalCreate, RentalStatusUpdate,
     VerificationAction,
     PaymentCreate, PaymentUpdate,
+    ReviewCreate, ReviewUpdate,
 )
 from auth import hash_password, verify_password
 
@@ -1645,3 +1646,271 @@ def update_withdrawal_status(
     db.commit()
     db.refresh(withdrawal)
     return withdrawal
+
+
+# ============================================================
+# REVIEW / TESTIMONI CRUD
+# ============================================================
+
+def _serialize_review(rv: Review) -> dict:
+    """
+    Bentuk dict yang siap di-validate ke ReviewResponse.
+    Mengisi field denormalized (user_nama, foto, item_nama, foto) jika relasi sudah di-load.
+    """
+    user = rv.user
+    item = rv.item
+    return {
+        "id": rv.id,
+        "rental_id": rv.rental_id,
+        "user_id": rv.user_id,
+        "item_id": rv.item_id,
+        "admin_id": rv.admin_id,
+        "rating": rv.rating,
+        "komentar": rv.komentar,
+        "created_at": rv.created_at,
+        "updated_at": rv.updated_at,
+        "user_nama": user.nama if user else None,
+        "user_foto_profil": user.foto_profil if user else None,
+        "item_nama": item.nama if item else None,
+        "item_foto_url": item.foto_url if item else None,
+    }
+
+
+def _build_summary(rows: list[tuple[int, int]], avg_total: tuple[float, int] | None = None) -> dict:
+    """
+    Bentuk dict summary {average, total, distribution} dari rows (rating, count).
+    avg_total opsional supaya pemanggil bisa pakai 1 query agregat tunggal.
+    """
+    distribution = {"1": 0, "2": 0, "3": 0, "4": 0, "5": 0}
+    total = 0
+    weighted = 0
+    for rating, count in rows:
+        if rating is None:
+            continue
+        distribution[str(int(rating))] = int(count)
+        total += int(count)
+        weighted += int(rating) * int(count)
+    if avg_total is not None:
+        avg, tot = avg_total
+        if tot:
+            return {
+                "average": round(float(avg or 0.0), 2),
+                "total": int(tot or 0),
+                "distribution": distribution,
+            }
+    average = round(weighted / total, 2) if total else 0.0
+    return {"average": average, "total": total, "distribution": distribution}
+
+
+def _summary_for_filter(db: Session, *, item_id: int | None = None, admin_id: int | None = None) -> dict:
+    """Hitung summary review berdasarkan filter item_id atau admin_id."""
+    q = db.query(Review.rating, func.count(Review.id))
+    if item_id is not None:
+        q = q.filter(Review.item_id == item_id)
+    if admin_id is not None:
+        q = q.filter(Review.admin_id == admin_id)
+    rows = q.group_by(Review.rating).all()
+    return _build_summary(rows)
+
+
+def get_review_by_rental(db: Session, rental_id: int) -> Review | None:
+    """Ambil review (jika ada) untuk rental tertentu."""
+    return (
+        db.query(Review)
+        .options(joinedload(Review.user), joinedload(Review.item))
+        .filter(Review.rental_id == rental_id)
+        .first()
+    )
+
+
+def get_review_by_id(db: Session, review_id: int) -> Review | None:
+    return (
+        db.query(Review)
+        .options(joinedload(Review.user), joinedload(Review.item))
+        .filter(Review.id == review_id)
+        .first()
+    )
+
+
+def create_review_for_rental(
+    db: Session,
+    *,
+    user_id: int,
+    rental_id: int,
+    data: ReviewCreate,
+) -> tuple[Review | None, str | None]:
+    """
+    Buat review untuk rental. Mengembalikan (review, error_msg).
+
+    Validasi:
+    - Rental ada & milik user
+    - Rental status == selesai
+    - Belum ada review untuk rental ini
+    """
+    rental = db.query(Rental).options(joinedload(Rental.item)).filter(Rental.id == rental_id).first()
+    if not rental:
+        return None, "Rental tidak ditemukan"
+    if rental.user_id != user_id:
+        return None, "Rental ini bukan milik Anda"
+    if rental.status != RentalStatus.selesai:
+        return None, "Hanya rental yang sudah selesai yang bisa direview"
+
+    existing = db.query(Review).filter(Review.rental_id == rental_id).first()
+    if existing:
+        return None, "Rental ini sudah pernah direview"
+
+    item = rental.item
+    if not item:
+        return None, "Barang tidak ditemukan"
+
+    review = Review(
+        rental_id=rental.id,
+        user_id=user_id,
+        item_id=item.id,
+        admin_id=item.admin_id,
+        rating=int(data.rating),
+        komentar=(data.komentar.strip() if data.komentar else None),
+    )
+    db.add(review)
+    db.commit()
+    db.refresh(review)
+    # Reload dengan relasi
+    return get_review_by_id(db, review.id), None
+
+
+def update_review(
+    db: Session,
+    *,
+    review_id: int,
+    user_id: int,
+    is_admin: bool,
+    data: ReviewUpdate,
+) -> tuple[Review | None, str | None]:
+    """
+    Update review. Pemilik bisa edit; super_admin/admin bisa edit untuk moderasi.
+    Pemilik dibatasi 7 hari sejak created_at.
+    """
+    review = db.query(Review).filter(Review.id == review_id).first()
+    if not review:
+        return None, "Review tidak ditemukan"
+    if not is_admin and review.user_id != user_id:
+        return None, "Anda bukan pemilik review ini"
+    if not is_admin and review.created_at:
+        from datetime import timezone
+        now = datetime.now(timezone.utc)
+        created = review.created_at if review.created_at.tzinfo else review.created_at.replace(tzinfo=timezone.utc)
+        if (now - created).days > 7:
+            return None, "Review hanya bisa diubah dalam 7 hari setelah dibuat"
+
+    if data.rating is not None:
+        review.rating = int(data.rating)
+    if data.komentar is not None:
+        review.komentar = data.komentar.strip() or None
+
+    db.commit()
+    db.refresh(review)
+    return get_review_by_id(db, review.id), None
+
+
+def delete_review(
+    db: Session,
+    *,
+    review_id: int,
+    user_id: int,
+    is_admin: bool,
+) -> tuple[bool, str | None]:
+    review = db.query(Review).filter(Review.id == review_id).first()
+    if not review:
+        return False, "Review tidak ditemukan"
+    if not is_admin and review.user_id != user_id:
+        return False, "Anda bukan pemilik review ini"
+    db.delete(review)
+    db.commit()
+    return True, None
+
+
+def get_reviews_by_item(
+    db: Session,
+    item_id: int,
+    skip: int = 0,
+    limit: int = 20,
+) -> dict:
+    """Ambil daftar review untuk item tertentu + summary."""
+    base = db.query(Review).filter(Review.item_id == item_id)
+    total = base.count()
+    reviews = (
+        base.options(joinedload(Review.user), joinedload(Review.item))
+        .order_by(Review.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+    summary = _summary_for_filter(db, item_id=item_id)
+    return {"summary": summary, "total": total, "reviews": reviews}
+
+
+def get_reviews_by_admin(
+    db: Session,
+    admin_id: int,
+    skip: int = 0,
+    limit: int = 20,
+) -> dict:
+    """Ambil daftar review untuk semua barang milik toko (admin) + summary."""
+    base = db.query(Review).filter(Review.admin_id == admin_id)
+    total = base.count()
+    reviews = (
+        base.options(joinedload(Review.user), joinedload(Review.item))
+        .order_by(Review.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+    summary = _summary_for_filter(db, admin_id=admin_id)
+    return {"summary": summary, "total": total, "reviews": reviews}
+
+
+def get_review_summary_for_item(db: Session, item_id: int) -> dict:
+    """Ringkas (avg, total, distribusi) untuk satu item."""
+    return _summary_for_filter(db, item_id=item_id)
+
+
+def get_review_summary_for_admin(db: Session, admin_id: int) -> dict:
+    """Ringkas (avg, total, distribusi) untuk satu admin/toko."""
+    return _summary_for_filter(db, admin_id=admin_id)
+
+
+# ============================================================
+# SHOP (Profil Toko) — public
+# ============================================================
+
+def get_shop_profile(db: Session, admin_id: int) -> dict | None:
+    """
+    Ambil profil toko publik: data admin + total_items + summary rating.
+    Return None jika admin tidak ditemukan.
+    """
+    profile = (
+        db.query(AdminProfile)
+        .options(joinedload(AdminProfile.user))
+        .filter(AdminProfile.id == admin_id)
+        .first()
+    )
+    if not profile:
+        return None
+
+    total_items = db.query(func.count(Item.id)).filter(Item.admin_id == admin_id).scalar() or 0
+    summary = _summary_for_filter(db, admin_id=admin_id)
+
+    return {
+        "admin_id": profile.id,
+        "user_id": profile.user_id,
+        "nama_usaha": profile.nama_usaha,
+        "alamat_usaha": profile.alamat_usaha,
+        "nomor_telepon": profile.nomor_telepon,
+        "latitude": profile.latitude,
+        "longitude": profile.longitude,
+        "foto_profil": (profile.user.foto_profil if profile.user else None),
+        "is_verified": bool(profile.user.is_verified) if profile.user else False,
+        "created_at": profile.created_at,
+        "total_items": int(total_items),
+        "rating": summary,
+    }

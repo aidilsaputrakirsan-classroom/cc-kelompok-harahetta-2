@@ -4,14 +4,16 @@
  */
 import { useState, useEffect, useCallback } from "react"
 import { useNavigate } from "react-router-dom"
-import { fetchMyRentals } from "../services/api"
+import { fetchMyRentals, fetchRentalReview, createRentalReview, updateReview } from "../services/api"
 import { formatPrice } from "../lib/utils"
 import { Button } from "../components/ui/Button"
 import { Skeleton } from "../components/ui/Skeleton"
+import RatingStars from "../components/RatingStars"
+import ReviewForm from "../components/ReviewForm"
 import {
   ClipboardList, ArrowLeft, ArrowRight, Calendar, Package,
   Clock, CheckCircle, XCircle, TrendingUp, Eye, ShoppingCart,
-  Hash, Timer, Store,
+  Hash, Timer, Store, Star, Pencil,
 } from "lucide-react"
 
 /* ─── status config ───────────────────────────────────────── */
@@ -45,7 +47,7 @@ function formatDate(d) {
 }
 
 /* ─── RentalCard ──────────────────────────────────────────── */
-function RentalCard({ rental }) {
+function RentalCard({ rental, review, onReview }) {
   const navigate = useNavigate()
   const item = rental.item
   const meta = STATUS_META[rental.status] || { label: rental.status, cls: "bg-muted text-muted-foreground", icon: Clock }
@@ -170,8 +172,44 @@ function RentalCard({ rental }) {
                   <ShoppingCart className="w-3.5 h-3.5 mr-1" /> Sewa lagi
                 </Button>
               )}
+              {rental.status === "selesai" && (
+                review ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="rounded-full text-xs"
+                    onClick={() => onReview?.(rental, review)}
+                  >
+                    <Pencil className="w-3.5 h-3.5 mr-1" /> Edit ulasan
+                  </Button>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="rounded-full text-xs border-amber-300 text-amber-700 hover:bg-amber-50"
+                    onClick={() => onReview?.(rental, null)}
+                  >
+                    <Star className="w-3.5 h-3.5 mr-1" /> Beri ulasan
+                  </Button>
+                )
+              )}
             </div>
           </div>
+
+          {/* Review preview */}
+          {rental.status === "selesai" && review && (
+            <div className="mt-3 px-3 py-2.5 rounded-xl bg-amber-50 border border-amber-200">
+              <div className="flex items-center gap-2 mb-1">
+                <RatingStars value={review.rating} size="sm" />
+                <span className="text-xs font-semibold text-amber-900">
+                  Ulasan kamu
+                </span>
+              </div>
+              {review.komentar && (
+                <p className="text-xs text-amber-900/80 line-clamp-2">{review.komentar}</p>
+              )}
+            </div>
+          )}
 
           {/* Catatan */}
           {rental.catatan && (
@@ -192,6 +230,8 @@ export default function MyRentalsPage({ addToast }) {
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState("")
   const [page, setPage] = useState(0)
+  const [reviewsByRental, setReviewsByRental] = useState({}) // { [rentalId]: review|null }
+  const [reviewModal, setReviewModal] = useState({ open: false, rental: null, review: null })
   const LIMIT = 8
 
   const load = useCallback(async () => {
@@ -212,6 +252,46 @@ export default function MyRentalsPage({ addToast }) {
   }, [statusFilter, page, addToast])
 
   useEffect(() => { load() }, [load])
+
+  // Setiap kali daftar rental berubah, lookup review untuk yang status === selesai
+  useEffect(() => {
+    const completed = rentals.filter(r => r.status === "selesai" && reviewsByRental[r.id] === undefined)
+    if (!completed.length) return
+    let cancelled = false
+    Promise.all(
+      completed.map(r =>
+        fetchRentalReview(r.id)
+          .then(rv => [r.id, rv])
+          .catch(() => [r.id, null]) // 404 → belum ada review
+      )
+    ).then(pairs => {
+      if (cancelled) return
+      setReviewsByRental(prev => {
+        const next = { ...prev }
+        pairs.forEach(([id, rv]) => { next[id] = rv })
+        return next
+      })
+    })
+    return () => { cancelled = true }
+  }, [rentals, reviewsByRental])
+
+  const handleOpenReview = (rental, review) => {
+    setReviewModal({ open: true, rental, review })
+  }
+
+  const handleSubmitReview = async ({ rating, komentar }) => {
+    const { rental, review } = reviewModal
+    if (!rental) return
+    let saved
+    if (review) {
+      saved = await updateReview(review.id, { rating, komentar })
+      addToast?.("Ulasan berhasil diperbarui", "success")
+    } else {
+      saved = await createRentalReview(rental.id, { rating, komentar })
+      addToast?.("Terima kasih atas ulasanmu!", "success")
+    }
+    setReviewsByRental(prev => ({ ...prev, [rental.id]: saved }))
+  }
 
   const totalPages = Math.max(1, Math.ceil(total / LIMIT))
 
@@ -293,7 +373,14 @@ export default function MyRentalsPage({ addToast }) {
       ) : (
         <>
           <div className="space-y-4">
-            {rentals.map(r => <RentalCard key={r.id} rental={r} />)}
+            {rentals.map(r => (
+              <RentalCard
+                key={r.id}
+                rental={r}
+                review={reviewsByRental[r.id] || null}
+                onReview={handleOpenReview}
+              />
+            ))}
           </div>
 
           {/* Pagination */}
@@ -322,6 +409,15 @@ export default function MyRentalsPage({ addToast }) {
           )}
         </>
       )}
+
+      {/* Review modal */}
+      <ReviewForm
+        open={reviewModal.open}
+        onClose={() => setReviewModal({ open: false, rental: null, review: null })}
+        initial={reviewModal.review}
+        onSubmit={handleSubmitReview}
+        itemNama={reviewModal.rental?.item?.nama}
+      />
     </div>
   )
 }

@@ -6,23 +6,26 @@
 import { useState, useEffect } from "react"
 import { useParams, useNavigate, Link } from "react-router-dom"
 import { useAuth } from "../context/AuthContext"
-import { fetchItem, fetchAdminPaymentInfo } from "../services/api"
+import { fetchItem, fetchAdminPaymentInfo, fetchItemReviews } from "../services/api"
 import { openChatRoomForItem } from "../services/chat"
 import { formatPrice } from "../lib/utils"
 import { Button } from "../components/ui/Button"
 import { Skeleton } from "../components/ui/Skeleton"
+import RatingStars from "../components/RatingStars"
+import ReviewSummary from "../components/ReviewSummary"
+import ReviewList from "../components/ReviewList"
 import { motion } from "framer-motion"
 import {
   ArrowLeft, Package, ShoppingCart, Tag, CheckCircle,
   XCircle, AlertTriangle, Store, Phone,
-  Calendar, MapPin, Shield, Timer, Clock, Star, MessageCircle, Loader2,
+  Calendar, MapPin, Shield, Timer, Clock, Star, MessageCircle, Loader2, ChevronRight,
 } from "lucide-react"
 
 /* ─── status ──────────────────────────────────────────────── */
 const STATUS_META = {
-  available:   { label: "Tersedia",       cls: "bg-primary/10 text-primary",     dot: "bg-primary" },
-  rented:      { label: "Sedang disewa",  cls: "bg-amber-100 text-amber-800",    dot: "bg-amber-500" },
-  unavailable: { label: "Tidak tersedia", cls: "bg-muted text-muted-foreground", dot: "bg-muted-foreground" },
+  available:   { label: "Tersedia",       cls: "bg-white/90 text-emerald-700 backdrop-blur-sm border border-emerald-200",     dot: "bg-emerald-500" },
+  rented:      { label: "Sedang disewa",  cls: "bg-white/90 text-amber-700 backdrop-blur-sm border border-amber-200",    dot: "bg-amber-500" },
+  unavailable: { label: "Tidak tersedia", cls: "bg-white/90 text-muted-foreground backdrop-blur-sm border border-border", dot: "bg-muted-foreground" },
 }
 
 function calcDays(s, e) { return Math.max(0, Math.ceil((new Date(e) - new Date(s)) / 86400000)) }
@@ -38,6 +41,9 @@ export default function ItemDetailPage({ addToast }) {
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate]     = useState("")
   const [openingChat, setOpeningChat] = useState(false)
+  const [reviewSummary, setReviewSummary] = useState({ average: 0, total: 0, distribution: {} })
+  const [recentReviews, setRecentReviews] = useState([])
+  const [loadingReviews, setLoadingReviews] = useState(true)
 
   const today = new Date().toISOString().split("T")[0]
   const days = startDate && endDate ? calcDays(startDate, endDate) : 0
@@ -50,12 +56,27 @@ export default function ItemDetailPage({ addToast }) {
         setItem(data)
         if (data.admin_id) fetchAdminPaymentInfo(data.admin_id).then(setAdminInfo).catch(() => {})
       } catch (err) {
-        if (err.message === "UNAUTHORIZED") { navigate("/login"); return }
+        if (err.message.includes("Sesi habis")) { addToast?.("Sesi habis, silakan login kembali", "warning"); navigate("/login"); return }
         addToast?.(err.message || "Barang tidak ditemukan", "error")
         navigate("/catalog")
       } finally { setLoading(false) }
     })()
   }, [itemId, navigate, addToast])
+
+  // Load review summary + 3 review terbaru
+  useEffect(() => {
+    let cancelled = false
+    setLoadingReviews(true)
+    fetchItemReviews(itemId, { limit: 3 })
+      .then((d) => {
+        if (cancelled) return
+        setReviewSummary(d.summary || { average: 0, total: 0, distribution: {} })
+        setRecentReviews(d.reviews || [])
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoadingReviews(false) })
+    return () => { cancelled = true }
+  }, [itemId])
 
   const handleRent = () => {
     if (!isAuthenticated) { addToast?.("Silakan login terlebih dahulu", "info"); navigate("/login"); return }
@@ -77,7 +98,7 @@ export default function ItemDetailPage({ addToast }) {
       const room = await openChatRoomForItem(Number(itemId))
       navigate(`/chat/${room.id}`)
     } catch (err) {
-      if (err.message === "UNAUTHORIZED") { navigate("/login"); return }
+      if (err.message.includes("Sesi habis")) { addToast?.("Sesi habis, silakan login kembali", "warning"); navigate("/login"); return }
       addToast?.(err.message || "Gagal membuka chat", "error")
     } finally {
       setOpeningChat(false)
@@ -171,7 +192,10 @@ export default function ItemDetailPage({ addToast }) {
           {/* Provider mini */}
           {adminInfo && (
             <div className="bg-secondary/60 rounded-2xl px-4 py-3 sm:max-w-xs w-full">
-              <div className="flex items-center gap-3">
+              <Link
+                to={`/shops/${item.admin_id}`}
+                className="flex items-center gap-3 group"
+              >
                 {adminInfo.foto_profil ? (
                   <img
                     src={adminInfo.foto_profil}
@@ -187,19 +211,29 @@ export default function ItemDetailPage({ addToast }) {
                   <Store className="w-4 h-4" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold tracking-tight truncate">{adminInfo.nama_usaha}</p>
+                  <p className="text-sm font-semibold tracking-tight truncate group-hover:text-primary transition-colors">
+                    {adminInfo.nama_usaha}
+                  </p>
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    {adminInfo.nomor_telepon && (
+                    {reviewSummary.total > 0 ? (
+                      <span className="inline-flex items-center gap-1">
+                        <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                        <span className="font-semibold text-foreground tabular-nums">
+                          {Number(reviewSummary.average).toFixed(1)}
+                        </span>
+                        <span>({reviewSummary.total})</span>
+                      </span>
+                    ) : adminInfo.nomor_telepon ? (
                       <span className="inline-flex items-center gap-1 truncate">
                         <Phone className="w-3 h-3 flex-shrink-0" /> {adminInfo.nomor_telepon}
                       </span>
-                    )}
+                    ) : null}
                   </div>
                 </div>
                 <span className="inline-flex items-center gap-1 text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full flex-shrink-0">
                   <CheckCircle className="w-3 h-3" /> Verified
                 </span>
-              </div>
+              </Link>
 
               {/* Tanya admin — di bawah info toko */}
               {!isAdmin && !isSuperAdmin && (
@@ -320,6 +354,43 @@ export default function ItemDetailPage({ addToast }) {
           </div>
         </div>
       </div>
+
+      {/* ═══ REVIEW SECTION ═══ */}
+      <section className="rounded-3xl border border-border bg-card p-6 md:p-8 space-y-5">
+        <div className="flex items-end justify-between gap-3 flex-wrap">
+          <div>
+            <h2 className="text-lg sm:text-xl font-bold tracking-tight inline-flex items-center gap-2">
+              <Star className="w-5 h-5 text-amber-400 fill-amber-400" />
+              Ulasan barang ini
+            </h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Penilaian dari penyewa yang sudah selesai pakai barang ini.
+            </p>
+          </div>
+          {item?.admin_id && reviewSummary.total > 0 && (
+            <Link
+              to={`/shops/${item.admin_id}`}
+              className="text-xs font-semibold text-primary hover:underline inline-flex items-center gap-1"
+            >
+              Lihat semua ulasan toko <ChevronRight className="w-3.5 h-3.5" />
+            </Link>
+          )}
+        </div>
+
+        {reviewSummary.total > 0 ? (
+          <>
+            <ReviewSummary summary={reviewSummary} />
+            <ReviewList reviews={recentReviews} loading={loadingReviews} />
+          </>
+        ) : (
+          <div className="rounded-2xl border border-dashed border-border bg-card p-8 text-center">
+            <Star className="w-10 h-10 text-muted-foreground/40 mx-auto mb-2" />
+            <p className="text-sm text-muted-foreground">
+              Belum ada ulasan untuk barang ini.
+            </p>
+          </div>
+        )}
+      </section>
     </motion.div>
   )
 }

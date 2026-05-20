@@ -645,3 +645,81 @@ class ChatRoomListResponse(BaseModel):
 class ChatMessageListResponse(BaseModel):
     total: int
     messages: List[ChatMessageResponse]
+
+
+# ============================================================
+# REVIEW / TESTIMONI SCHEMAS
+# ============================================================
+
+class ReviewCreate(BaseModel):
+    """Schema untuk user membuat review setelah rental selesai."""
+    rating: int = Field(..., ge=1, le=5, examples=[5])
+    komentar: Optional[str] = Field(
+        None,
+        max_length=1000,
+        examples=["Barangnya bagus, owner ramah!"],
+    )
+
+
+class ReviewUpdate(BaseModel):
+    """Schema untuk update review (rating dan/atau komentar)."""
+    rating: Optional[int] = Field(None, ge=1, le=5)
+    komentar: Optional[str] = Field(None, max_length=1000)
+
+
+class ReviewResponse(BaseModel):
+    """Schema response satu review."""
+    id: int
+    rental_id: int
+    user_id: int
+    item_id: int
+    admin_id: int
+    rating: int
+    komentar: Optional[str]
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    # Denormalized untuk tampilan
+    user_nama: Optional[str] = None
+    user_foto_profil: Optional[str] = None
+    item_nama: Optional[str] = None
+    item_foto_url: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class ReviewSummary(BaseModel):
+    """Ringkasan rating: rata-rata, total, dan distribusi 1..5."""
+    average: float = 0.0
+    total: int = 0
+    distribution: dict = Field(default_factory=lambda: {"1": 0, "2": 0, "3": 0, "4": 0, "5": 0})
+
+
+class ReviewListResponse(BaseModel):
+    """Response list review + summary."""
+    summary: ReviewSummary
+    total: int
+    reviews: List[ReviewResponse]
+
+
+# ============================================================
+# SHOP (TOKO) SCHEMAS — profil publik penyedia
+# ============================================================
+
+class ShopResponse(BaseModel):
+    """Profil publik toko (admin) — untuk halaman profil toko."""
+    admin_id: int
+    user_id: int
+    nama_usaha: str
+    alamat_usaha: Optional[str] = None
+    nomor_telepon: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    foto_profil: Optional[str] = None
+    is_verified: bool = False
+    created_at: Optional[datetime] = None
+    total_items: int = 0
+    rating: ReviewSummary = Field(default_factory=ReviewSummary)
+
+    class Config:
+        from_attributes = True
