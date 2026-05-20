@@ -30,6 +30,7 @@ import {
   Wallet, ArrowDownToLine, Clock, Ban,
 } from "lucide-react"
 import MapPicker from "../components/MapPicker"
+import ConfirmDialog from "../components/ConfirmDialog"
 import { getRentalDeadline, formatDeadline } from "../lib/rental"
 
 const defaultItem = { nama: "", deskripsi: "", harga_per_hari: "", stok: 1, foto_url: "", category_id: "" }
@@ -238,6 +239,8 @@ export default function AdminDashboard({ addToast }) {
   const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(true)
   const [deletingId, setDeletingId] = useState(null)
+  const [confirmDelete, setConfirmDelete] = useState({ open: false, id: null })
+  const [confirmPayAction, setConfirmPayAction] = useState({ open: false, id: null, action: null, msg: "" })
   const [rentalFilter, setRentalFilter] = useState("")
   const [rentalsLoading, setRentalsLoading] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
@@ -326,7 +329,12 @@ export default function AdminDashboard({ addToast }) {
     setModalOpen(true)
   }
   const handleDelete = async (id) => {
-    if (!confirm("Yakin hapus barang ini? Jika ada proses sewa aktif (pending/disetujui/sedang disewa), barang akan dinonaktifkan. Jika tidak ada, barang akan dihapus permanen.")) return
+    setConfirmDelete({ open: true, id })
+  }
+  const doDelete = async () => {
+    const id = confirmDelete.id
+    setConfirmDelete({ open: false, id: null })
+    if (!id) return
     setDeletingId(id)
     try {
       await deleteItem(id)
@@ -357,14 +365,26 @@ export default function AdminDashboard({ addToast }) {
     finally { setRentalUpdatingId(null) }
   }
   const handleConfirmPayment = async (paymentId) => {
-    if (!confirm("Konfirmasi pembayaran ini?")) return
-    try { await confirmPayment(paymentId, "completed"); addToast?.("Pembayaran dikonfirmasi", "success"); setPreviewBukti(null); await loadRentals() }
-    catch (err) { addToast?.(err.message, "error") }
+    setConfirmPayAction({ open: true, id: paymentId, action: "confirm", msg: "Konfirmasi pembayaran ini? Status rental akan diubah menjadi 'Sedang Disewa'." })
   }
   const handleRejectPayment = async (paymentId) => {
-    if (!confirm("Tolak pembayaran ini?")) return
-    try { await confirmPayment(paymentId, "failed"); addToast?.("Pembayaran ditolak", "success"); setPreviewBukti(null); await loadRentals() }
-    catch (err) { addToast?.(err.message, "error") }
+    setConfirmPayAction({ open: true, id: paymentId, action: "reject", msg: "Tolak pembayaran ini? Penyewa perlu upload ulang bukti." })
+  }
+  const doPayAction = async () => {
+    const { id, action } = confirmPayAction
+    setConfirmPayAction({ open: false, id: null, action: null, msg: "" })
+    if (!id) return
+    try {
+      if (action === "confirm") {
+        await confirmPayment(id, "completed")
+        addToast?.("Pembayaran dikonfirmasi", "success")
+      } else {
+        await confirmPayment(id, "failed")
+        addToast?.("Pembayaran ditolak", "success")
+      }
+      setPreviewBukti(null)
+      await loadRentals()
+    } catch (err) { addToast?.(err.message, "error") }
   }
   const handleWithdraw = async (e) => {
     e.preventDefault(); setWdSubmitting(true)
@@ -753,6 +773,26 @@ export default function AdminDashboard({ addToast }) {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Confirm Dialogs */}
+      <ConfirmDialog
+        open={confirmDelete.open}
+        onConfirm={doDelete}
+        onCancel={() => setConfirmDelete({ open: false, id: null })}
+        title="Hapus barang?"
+        description="Jika ada proses sewa aktif (pending/disetujui/sedang disewa), barang akan dinonaktifkan. Jika tidak ada, barang akan dihapus permanen."
+        confirmText="Ya, hapus"
+        variant="destructive"
+      />
+      <ConfirmDialog
+        open={confirmPayAction.open}
+        onConfirm={doPayAction}
+        onCancel={() => setConfirmPayAction({ open: false, id: null, action: null, msg: "" })}
+        title={confirmPayAction.action === "confirm" ? "Konfirmasi pembayaran?" : "Tolak pembayaran?"}
+        description={confirmPayAction.msg}
+        confirmText={confirmPayAction.action === "confirm" ? "Ya, konfirmasi" : "Ya, tolak"}
+        variant={confirmPayAction.action === "reject" ? "destructive" : "default"}
+      />
     </div>
   )
 }

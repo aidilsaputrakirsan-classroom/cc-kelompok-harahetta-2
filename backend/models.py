@@ -6,7 +6,8 @@ Semua tabel sesuai skema implementation_plan_sewain
 import enum
 from sqlalchemy import (
     Column, Integer, String, Float, DateTime, Text,
-    Boolean, Enum as SAEnum, Date, ForeignKey, UniqueConstraint, Index
+    Boolean, Enum as SAEnum, Date, ForeignKey, UniqueConstraint, Index,
+    CheckConstraint,
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -443,3 +444,47 @@ class ChatMessage(Base):
 
     def __repr__(self):
         return f"<ChatMessage(id={self.id}, room_id={self.room_id}, sender_id={self.sender_id})>"
+
+
+# ============================================================
+# TABEL reviews — Review/Testimoni dari Penyewa
+# ============================================================
+
+class Review(Base):
+    """
+    Review/testimoni dari penyewa setelah rental selesai.
+
+    Aturan:
+    - Hanya rental dengan status 'selesai' yang bisa direview
+    - 1 rental = 1 review (UNIQUE rental_id)
+    - Review nempel ke rental → secara tidak langsung ke item & admin (toko)
+    - Rating 1..5
+    """
+
+    __tablename__ = "reviews"
+    __table_args__ = (
+        UniqueConstraint("rental_id", name="uq_review_rental"),
+        CheckConstraint("rating >= 1 AND rating <= 5", name="ck_review_rating_range"),
+        Index("ix_review_item", "item_id"),
+        Index("ix_review_admin", "admin_id"),
+        Index("ix_review_user", "user_id"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    rental_id = Column(Integer, ForeignKey("rentals.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    item_id = Column(Integer, ForeignKey("items.id", ondelete="CASCADE"), nullable=False)
+    admin_id = Column(Integer, ForeignKey("admins.id", ondelete="CASCADE"), nullable=False)
+    rating = Column(Integer, nullable=False)
+    komentar = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
+
+    # Relationships
+    rental = relationship("Rental", foreign_keys=[rental_id])
+    user = relationship("User", foreign_keys=[user_id])
+    item = relationship("Item", foreign_keys=[item_id])
+    admin = relationship("AdminProfile", foreign_keys=[admin_id])
+
+    def __repr__(self):
+        return f"<Review(id={self.id}, rental_id={self.rental_id}, rating={self.rating})>"

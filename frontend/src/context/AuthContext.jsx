@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback } from "react"
 import { login as apiLogin, register as apiRegister, getMe, clearToken, setToken } from "../services/api"
+import { toast } from "sonner"
 
 const AuthContext = createContext(null)
 
@@ -31,6 +32,10 @@ export function AuthProvider({ children }) {
             setUser(null)
             localStorage.removeItem("sewain_token")
             localStorage.removeItem("sewain_user")
+            // Delay toast sedikit agar Toaster sudah mounted
+            setTimeout(() => {
+              toast.warning("Sesi habis, silakan login kembali", { id: "session-expired" })
+            }, 100)
           })
           .finally(() => setLoading(false))
         return

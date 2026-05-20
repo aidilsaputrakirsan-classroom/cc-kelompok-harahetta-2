@@ -9,7 +9,7 @@ import { useAuth } from "../context/AuthContext"
 import {
   fetchMyRentals, fetchItems, fetchMyPayments, createPaymentForRental,
   uploadPaymentProof, fetchAdminPaymentInfo, fetchRentalPickupInfo,
-  requestReturn,
+  requestReturn, fetchRentalReview, createRentalReview, updateReview,
 } from "../services/api"
 import { formatPrice } from "../lib/utils"
 import { Button } from "../components/ui/Button"
@@ -19,9 +19,12 @@ import {
   Package, CheckCircle, Clock, TrendingUp, Calendar, ChevronRight,
   Sparkles, BadgeCheck, XCircle, Upload, X, CreditCard, Loader2,
   Building2, QrCode, Copy, AlertTriangle, MapPin, Navigation, RefreshCw,
+  Star, Pencil,
 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import PickupMap from "../components/PickupMap"
+import RatingStars from "../components/RatingStars"
+import ReviewForm from "../components/ReviewForm"
 import { getRentalDeadline, formatDeadline } from "../lib/rental"
 
 /* ─── status meta ─────────────────────────────────────────── */
@@ -170,6 +173,8 @@ export default function UserDashboard({ addToast }) {
   const [pickupModal, setPickupModal]   = useState(null)
   const [, setPickupLoading]            = useState(false)
   const [returnLoadingId, setReturnLoadingId] = useState(null)
+  const [reviewsByRental, setReviewsByRental] = useState({})
+  const [reviewModal, setReviewModal] = useState({ open: false, rental: null, review: null })
   const [adminPayInfo, setAdminPayInfo] = useState(null)
   const [buktiFile, setBuktiFile]       = useState(null)
   const [buktiCatatan, setBuktiCatatan] = useState("")
@@ -279,6 +284,46 @@ export default function UserDashboard({ addToast }) {
     } finally {
       setReturnLoadingId(null)
     }
+  }
+
+  // Load reviews for completed rentals
+  useEffect(() => {
+    const completed = allRentals.filter(r => r.status === "selesai" && reviewsByRental[r.id] === undefined)
+    if (!completed.length) return
+    let cancelled = false
+    Promise.all(
+      completed.map(r =>
+        fetchRentalReview(r.id)
+          .then(rv => [r.id, rv])
+          .catch(() => [r.id, null])
+      )
+    ).then(pairs => {
+      if (cancelled) return
+      setReviewsByRental(prev => {
+        const next = { ...prev }
+        pairs.forEach(([id, rv]) => { next[id] = rv })
+        return next
+      })
+    })
+    return () => { cancelled = true }
+  }, [allRentals])
+
+  const handleOpenReview = (rental, review) => {
+    setReviewModal({ open: true, rental, review })
+  }
+
+  const handleSubmitReview = async ({ rating, komentar }) => {
+    const { rental, review } = reviewModal
+    if (!rental) return
+    let saved
+    if (review) {
+      saved = await updateReview(review.id, { rating, komentar })
+      addToast?.("Ulasan berhasil diperbarui", "success")
+    } else {
+      saved = await createRentalReview(rental.id, { rating, komentar })
+      addToast?.("Terima kasih atas ulasanmu!", "success")
+    }
+    setReviewsByRental(prev => ({ ...prev, [rental.id]: saved }))
   }
 
   /* ── derived ── */
@@ -662,13 +707,41 @@ export default function UserDashboard({ addToast }) {
                       )}
 
                       {r.status === "selesai" && (
-                        <div className="mt-3 pt-3 border-t border-border/60">
-                          <button
-                            onClick={() => navigate(`/items/${r.item_id}`)}
-                            className="w-full inline-flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-semibold bg-primary/10 text-primary hover:bg-primary/15 transition"
-                          >
-                            <RefreshCw className="w-3.5 h-3.5" /> Sewa lagi
-                          </button>
+                        <div className="mt-3 pt-3 border-t border-border/60 space-y-2">
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => navigate(`/items/${r.item_id}`)}
+                              className="flex-1 inline-flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-semibold bg-primary/10 text-primary hover:bg-primary/15 transition"
+                            >
+                              <RefreshCw className="w-3.5 h-3.5" /> Sewa lagi
+                            </button>
+                            {reviewsByRental[r.id] ? (
+                              <button
+                                onClick={() => handleOpenReview(r, reviewsByRental[r.id])}
+                                className="flex-1 inline-flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-semibold border border-border hover:border-primary hover:text-primary transition"
+                              >
+                                <Pencil className="w-3.5 h-3.5" /> Edit ulasan
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleOpenReview(r, null)}
+                                className="flex-1 inline-flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-semibold border border-amber-300 text-amber-700 hover:bg-amber-50 transition"
+                              >
+                                <Star className="w-3.5 h-3.5" /> Beri ulasan
+                              </button>
+                            )}
+                          </div>
+                          {reviewsByRental[r.id] && (
+                            <div className="px-3 py-2 rounded-xl bg-amber-50 border border-amber-200">
+                              <div className="flex items-center gap-2">
+                                <RatingStars value={reviewsByRental[r.id].rating} size="sm" />
+                                <span className="text-[10px] font-semibold text-amber-900">Ulasan kamu</span>
+                              </div>
+                              {reviewsByRental[r.id].komentar && (
+                                <p className="text-[11px] text-amber-900/80 mt-1 line-clamp-1">{reviewsByRental[r.id].komentar}</p>
+                              )}
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -907,6 +980,15 @@ export default function UserDashboard({ addToast }) {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* ══ REVIEW MODAL ════════════════════════════════════ */}
+      <ReviewForm
+        open={reviewModal.open}
+        onClose={() => setReviewModal({ open: false, rental: null, review: null })}
+        initial={reviewModal.review}
+        onSubmit={handleSubmitReview}
+        itemNama={reviewModal.rental?.item?.nama}
+      />
     </>
   )
 }

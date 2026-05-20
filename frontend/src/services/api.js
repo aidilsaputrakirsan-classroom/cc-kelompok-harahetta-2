@@ -32,7 +32,7 @@ function extractErrorMessage(error, statusCode) {
 }
 
 async function handleResponse(response) {
-  if (response.status === 401) { clearToken(); throw new Error("UNAUTHORIZED") }
+  if (response.status === 401) { clearToken(); throw new Error("Sesi habis, silakan login kembali") }
   // Handle service unavailable (microservice down)
   if (response.status === 503 || response.status === 504) {
     throw new Error("Service temporarily unavailable. Please try again later.")
@@ -320,6 +320,73 @@ export async function requestReturn(rentalId) {
 // ==================== ADMIN PAYMENT INFO (public) ====================
 export async function fetchAdminPaymentInfo(adminId) {
   const res = await fetch(`${API_URL}/admins/${adminId}/payment-info`)
+  return handleResponse(res)
+}
+
+// ==================== SHOP / TOKO (public) ====================
+export async function fetchShop(adminId) {
+  const res = await fetch(`${API_URL}/admins/${adminId}/shop`)
+  return handleResponse(res)
+}
+
+export async function fetchShopItems(adminId, params = {}) {
+  const q = new URLSearchParams()
+  if (params.search) q.append("search", params.search)
+  if (params.status) q.append("status", params.status)
+  q.append("skip", params.skip ?? 0)
+  q.append("limit", params.limit ?? 24)
+  const res = await fetch(`${API_URL}/admins/${adminId}/items?${q}`)
+  return handleResponse(res)
+}
+
+export async function fetchShopReviews(adminId, params = {}) {
+  const q = new URLSearchParams()
+  q.append("skip", params.skip ?? 0)
+  q.append("limit", params.limit ?? 20)
+  const res = await fetch(`${API_URL}/admins/${adminId}/reviews?${q}`)
+  return handleResponse(res)
+}
+
+// ==================== REVIEWS (item & rental) ====================
+export async function fetchItemReviews(itemId, params = {}) {
+  const q = new URLSearchParams()
+  q.append("skip", params.skip ?? 0)
+  q.append("limit", params.limit ?? 20)
+  const res = await fetch(`${API_URL}/items/${itemId}/reviews?${q}`)
+  return handleResponse(res)
+}
+
+export async function fetchRentalReview(rentalId) {
+  const res = await fetch(`${API_URL}/rentals/${rentalId}/review`, { headers: authOnlyHeaders() })
+  return handleResponse(res)
+}
+
+export async function createRentalReview(rentalId, { rating, komentar }) {
+  const res = await fetch(`${API_URL}/rentals/${rentalId}/review`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify({ rating, komentar }),
+  })
+  return handleResponse(res)
+}
+
+export async function updateReview(reviewId, { rating, komentar }) {
+  const body = {}
+  if (rating !== undefined) body.rating = rating
+  if (komentar !== undefined) body.komentar = komentar
+  const res = await fetch(`${API_URL}/reviews/${reviewId}`, {
+    method: "PUT",
+    headers: authHeaders(),
+    body: JSON.stringify(body),
+  })
+  return handleResponse(res)
+}
+
+export async function deleteReview(reviewId) {
+  const res = await fetch(`${API_URL}/reviews/${reviewId}`, {
+    method: "DELETE",
+    headers: authOnlyHeaders(),
+  })
   return handleResponse(res)
 }
 

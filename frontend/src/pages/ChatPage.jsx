@@ -167,7 +167,7 @@ export default function ChatPage({ addToast }) {
       const data = await fetchMyChatRooms()
       setRooms(data?.rooms || [])
     } catch (err) {
-      if (err.message === "UNAUTHORIZED") { navigate("/login"); return }
+      if (err.message.includes("Sesi habis")) { addToast?.("Sesi habis, silakan login kembali", "warning"); navigate("/login"); return }
       addToast?.(err.message || "Gagal memuat daftar chat", "error")
     } finally {
       setLoadingRooms(false)
@@ -202,7 +202,7 @@ export default function ChatPage({ addToast }) {
         setRooms((prev) => prev.map((r) => (r.id === activeRoomId ? { ...r, unread_count: 0 } : r)))
       } catch (err) {
         if (cancelled) return
-        if (err.message === "UNAUTHORIZED") { navigate("/login"); return }
+        if (err.message.includes("Sesi habis")) { addToast?.("Sesi habis, silakan login kembali", "warning"); navigate("/login"); return }
         addToast?.(err.message || "Gagal memuat chat", "error")
         navigate("/chat")
         return
@@ -322,7 +322,7 @@ export default function ChatPage({ addToast }) {
         const saved = await apiSendMessage(activeRoomId, body)
         setMessages((prev) => prev.some((m) => m.id === saved.id) ? prev : [...prev, saved])
       } catch (err) {
-        if (err.message === "UNAUTHORIZED") { navigate("/login"); return }
+        if (err.message.includes("Sesi habis")) { addToast?.("Sesi habis, silakan login kembali", "warning"); navigate("/login"); return }
         addToast?.(err.message || "Gagal mengirim pesan", "error")
         setInput(body) // restore
       }

@@ -294,7 +294,6 @@ export default function LandingPage() {
                 {/* Big card */}
                 <MediaSlot
                   video="/images/hero/HEROCARDVIDEO.mp4"
-                  poster="/images/hero/orangherobesar.png"
                   alt="Sewain — Sewa barang apa saja"
                   label="Hero · video / gambar utama"
                   ratio="aspect-[4/5]"

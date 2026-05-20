@@ -41,6 +41,8 @@ from schemas import (
     # Wallet & Withdrawal
     WalletResponse, WithdrawalCreate, WithdrawalResponse,
     WithdrawalListResponse, WithdrawalActionByAdmin,
+    # Review & Shop
+    ReviewCreate, ReviewUpdate, ReviewResponse, ReviewListResponse, ShopResponse,
 )
 from auth import (
     create_access_token, get_current_user,
@@ -2167,3 +2169,203 @@ def process_withdrawal(
         raise HTTPException(status_code=result["code"], detail=result["error"])
 
     return result
+
+
+# ════════════════════════════════════════════════════════════
+# 🏪 SHOP (Profil Toko) — public
+# ════════════════════════════════════════════════════════════
+
+@app.get(
+    "/admins/{admin_id}/shop",
+    response_model=ShopResponse,
+    tags=["🏪 Admin — Profil Usaha"],
+    summary="[Public] Profil toko + ringkasan rating",
+)
+def get_shop(
+    admin_id: int,
+    db: Session = Depends(get_db),
+):
+    """Ambil profil publik toko: data admin, total barang, dan summary rating."""
+    shop = crud.get_shop_profile(db=db, admin_id=admin_id)
+    if not shop:
+        raise HTTPException(status_code=404, detail=f"Toko (admin_id={admin_id}) tidak ditemukan")
+    return shop
+
+
+@app.get(
+    "/admins/{admin_id}/items",
+    response_model=ItemListResponse,
+    tags=["🏪 Admin — Profil Usaha"],
+    summary="[Public] Daftar barang milik toko",
+)
+def get_shop_items(
+    admin_id: int,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    search: str = Query(None, description="Cari nama/deskripsi barang dalam toko"),
+    item_status: str = Query(None, alias="status", description="Filter: available | rented | unavailable"),
+    db: Session = Depends(get_db),
+):
+    """Daftar semua barang dari satu toko (admin)."""
+    profile = crud.get_admin_profile_by_id(db=db, admin_id=admin_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail=f"Toko (admin_id={admin_id}) tidak ditemukan")
+    return crud.get_items(
+        db=db,
+        skip=skip,
+        limit=limit,
+        search=search,
+        admin_id=admin_id,
+        status=item_status,
+    )
+
+
+@app.get(
+    "/admins/{admin_id}/reviews",
+    response_model=ReviewListResponse,
+    tags=["⭐ Reviews"],
+    summary="[Public] Daftar review/testimoni untuk toko",
+)
+def get_shop_reviews(
+    admin_id: int,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+):
+    """Daftar review dari semua barang milik toko + summary."""
+    profile = crud.get_admin_profile_by_id(db=db, admin_id=admin_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail=f"Toko (admin_id={admin_id}) tidak ditemukan")
+    result = crud.get_reviews_by_admin(db=db, admin_id=admin_id, skip=skip, limit=limit)
+    reviews = [crud._serialize_review(r) for r in result["reviews"]]
+    return {"summary": result["summary"], "total": result["total"], "reviews": reviews}
+
+
+# ════════════════════════════════════════════════════════════
+# ⭐ REVIEWS — testimoni rental
+# ════════════════════════════════════════════════════════════
+
+@app.get(
+    "/items/{item_id}/reviews",
+    response_model=ReviewListResponse,
+    tags=["⭐ Reviews"],
+    summary="[Public] Daftar review untuk satu barang",
+)
+def list_item_reviews(
+    item_id: int,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+):
+    """Ambil semua review untuk satu barang + summary."""
+    result = crud.get_reviews_by_item(db=db, item_id=item_id, skip=skip, limit=limit)
+    reviews = [crud._serialize_review(r) for r in result["reviews"]]
+    return {"summary": result["summary"], "total": result["total"], "reviews": reviews}
+
+
+@app.get(
+    "/rentals/{rental_id}/review",
+    response_model=ReviewResponse,
+    tags=["⭐ Reviews"],
+    summary="Ambil review untuk satu rental (jika ada)",
+)
+def get_rental_review(
+    rental_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """User cek apakah rental-nya sudah punya review (untuk render tombol Review/Edit)."""
+    rental = crud.get_rental(db=db, rental_id=rental_id)
+    if not rental:
+        raise HTTPException(status_code=404, detail="Rental tidak ditemukan")
+
+    from models import UserRole as UR
+    if current_user.role == UR.user and rental.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Bukan rental Anda")
+
+    review = crud.get_review_by_rental(db=db, rental_id=rental_id)
+    if not review:
+        raise HTTPException(status_code=404, detail="Belum ada review untuk rental ini")
+    return crud._serialize_review(review)
+
+
+@app.post(
+    "/rentals/{rental_id}/review",
+    response_model=ReviewResponse,
+    status_code=201,
+    tags=["⭐ Reviews"],
+    summary="Buat review untuk rental yang sudah selesai",
+)
+def create_rental_review(
+    rental_id: int,
+    data: ReviewCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """
+    Penyewa membuat review setelah barang dikembalikan (rental status = `selesai`).
+    Setiap rental hanya bisa direview satu kali.
+    """
+    review, err = crud.create_review_for_rental(
+        db=db, user_id=current_user.id, rental_id=rental_id, data=data
+    )
+    if err:
+        # 404 untuk rental tidak ada, 403 bukan milik user, 400 untuk validasi lain
+        if "tidak ditemukan" in err.lower():
+            raise HTTPException(status_code=404, detail=err)
+        if "bukan milik" in err.lower():
+            raise HTTPException(status_code=403, detail=err)
+        raise HTTPException(status_code=400, detail=err)
+    return crud._serialize_review(review)
+
+
+@app.put(
+    "/reviews/{review_id}",
+    response_model=ReviewResponse,
+    tags=["⭐ Reviews"],
+    summary="Update review (pemilik dlm 7 hari, atau super_admin)",
+)
+def update_review_endpoint(
+    review_id: int,
+    data: ReviewUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    from models import UserRole as UR
+    is_admin = current_user.role in (UR.admin, UR.super_admin)
+    review, err = crud.update_review(
+        db=db, review_id=review_id, user_id=current_user.id,
+        is_admin=is_admin, data=data,
+    )
+    if err:
+        if "tidak ditemukan" in err.lower():
+            raise HTTPException(status_code=404, detail=err)
+        if "bukan pemilik" in err.lower():
+            raise HTTPException(status_code=403, detail=err)
+        raise HTTPException(status_code=400, detail=err)
+    return crud._serialize_review(review)
+
+
+@app.delete(
+    "/reviews/{review_id}",
+    status_code=204,
+    tags=["⭐ Reviews"],
+    summary="Hapus review (pemilik atau super_admin)",
+)
+def delete_review_endpoint(
+    review_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    from models import UserRole as UR
+    is_admin = current_user.role in (UR.admin, UR.super_admin)
+    ok, err = crud.delete_review(
+        db=db, review_id=review_id, user_id=current_user.id, is_admin=is_admin,
+    )
+    if not ok:
+        if err and "tidak ditemukan" in err.lower():
+            raise HTTPException(status_code=404, detail=err)
+        if err and "bukan pemilik" in err.lower():
+            raise HTTPException(status_code=403, detail=err)
+        raise HTTPException(status_code=400, detail=err or "Gagal menghapus review")
+    return

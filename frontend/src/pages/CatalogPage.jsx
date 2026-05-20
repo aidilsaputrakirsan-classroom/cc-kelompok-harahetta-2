@@ -29,9 +29,9 @@ const catalogNavLinks = [
 
 /* ─── status ──────────────────────────────────────────────── */
 const STATUS_CONFIG = {
-  available:   { label: "Tersedia",        cls: "bg-emerald-100 text-emerald-800 shadow-sm" },
-  rented:      { label: "Disewa",          cls: "bg-amber-100 text-amber-800 shadow-sm" },
-  unavailable: { label: "Tidak tersedia",  cls: "bg-muted text-muted-foreground shadow-sm" },
+  available:   { label: "Tersedia",        cls: "bg-white/90 text-emerald-700 backdrop-blur-sm shadow-sm border border-emerald-200" },
+  rented:      { label: "Disewa",          cls: "bg-white/90 text-amber-700 backdrop-blur-sm shadow-sm border border-amber-200" },
+  unavailable: { label: "Tidak tersedia",  cls: "bg-white/90 text-muted-foreground backdrop-blur-sm shadow-sm border border-border" },
 }
 
 /* ─── ItemCard ────────────────────────────────────────────── */
