@@ -1,6 +1,6 @@
 # 🛵 SEWAIN — Platform Sewa Barang Online
 
-![CI Pipeline](https://github.com/harahetta2/cc-kelompok-harahetta-2/actions/workflows/ci.yml/badge.svg)
+![CI Pipeline](https://github.com/aidilsaputrakirsan-classroom/cc-kelompok-harahetta-2/actions/workflows/ci.yml/badge.svg)
 
 > Aplikasi web penyewaan barang multi-role berbasis FastAPI, React, dan PostgreSQL, dengan pengelolaan Docker serta pengujian melalui GitHub Actions, Pytest, dan Vitest untuk memastikan keandalan sistem.
 >
@@ -8,6 +8,16 @@
 > **Tim:** Kelompok Harahetta-2
 
 ---
+
+## Live Demo Aplikasi 
+
+production dapat diakses melalui URL berikut: 
+| Layanan | URL | 
+|---|---| 
+| Live Demo Application | `https://cc-kelompok-harahetta-2.akhzafachrozy.my.id/` | 
+
+---
+
 
 ## Daftar Isi
 
@@ -58,15 +68,18 @@ SEWAIN memiliki tiga peran utama dalam sistem:
 | Super Admin | Manajemen Admin | Pengelolaan Penyedia | Login sebagai Super Admin, melihat daftar seluruh admin (penyedia), menambahkan admin baru, mengedit data admin, dan menghapus admin. |
 |  | Manajemen Konten | Pengelolaan Kategori Barang | Mengelola kategori barang yang tersedia di dalam platform. |
 |  | Monitoring | Pengawasan Platform | Melihat seluruh aktivitas penyewaan dan melakukan monitoring keseluruhan platform secara menyeluruh. |
+|  | AI Assistant | Monitoring & Bantuan Sistem | Menggunakan chatbot AI untuk membantu monitoring aktivitas platform, memberikan ringkasan data penyewaan, serta membantu menjawab pertanyaan terkait penggunaan sistem. |
 | Admin (Penyedia Barang) | Profil & Usaha | Pengelolaan Profil Usaha | Login sebagai admin dan mengelola profil usaha penyewaan. |
 |  | Manajemen Produk | Pengelolaan Barang | Menambahkan barang yang disewakan, mengedit data barang, menghapus barang, mengatur harga sewa, dan mengatur jumlah atau stok barang. |
 |  | Manajemen Order | Kontrol Permintaan Sewa | Melihat daftar permintaan sewa dari user, menyetujui atau menolak permintaan sewa. |
 |  | Monitoring Transaksi | Status Penyewaan | Mengubah status penyewaan menjadi Pending, Disetujui, Sedang Disewa, atau Selesai. |
+|  | AI Assistant | Rekomendasi & Bantuan Penyedia | Chatbot AI membantu admin dalam memberikan rekomendasi pengelolaan barang, menjawab pertanyaan penggunaan sistem, serta membantu memberikan respon otomatis kepada user terkait penyewaan. |
 | User (Penyewa) | Akun & Profil | Registrasi & Data Diri | Registrasi akun, login, melengkapi data diri berupa nama lengkap, nama orang tua, alamat tempat tinggal, dan share location melalui peta atau koordinat. |
 |  | Verifikasi Identitas | Validasi Legalitas | Upload foto KTP, upload foto selfie dengan KTP, dan melihat status verifikasi berupa Menunggu Verifikasi, Disetujui, atau Ditolak. |
 |  | Aturan Sistem | Validasi Penyewaan | User hanya dapat melakukan penyewaan apabila data diri telah lengkap dan verifikasi identitas telah disetujui oleh admin. |
 |  | Penyewaan | Proses Pemesanan | Melihat katalog barang dari berbagai penyedia, melihat detail barang, mencari barang, serta mengajukan penyewaan dengan memilih tanggal mulai dan tanggal selesai. |
 |  | Monitoring | Status & Riwayat | Melihat status penyewaan berupa Pending, Disetujui, Sedang Disewa, atau Selesai, serta melihat riwayat penyewaan sebelumnya. |
+|  | AI Assistant | Chatbot Bantuan Penyewaan | User dapat menggunakan chatbot AI untuk mencari rekomendasi barang, menanyakan prosedur penyewaan, mendapatkan bantuan penggunaan aplikasi, serta memperoleh jawaban otomatis terkait status penyewaan dan informasi barang. |
 
 ---
 
@@ -272,7 +285,7 @@ make pr-check
 | 4 | Full-Stack Integration | ✅ |
 | 5-7 | Docker & Compose | ✅ |
 | 8 | UTS Demo | ✅ |
-| 9-11 | CI/CD Pipeline | ⬜ |
+| 9-11 | CI/CD Pipeline | ✅ |
 | 12-14 | Microservices | ⬜ |
 | 15-16 | Final & UAS | ⬜ |
 
