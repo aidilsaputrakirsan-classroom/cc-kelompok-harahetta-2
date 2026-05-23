@@ -13,7 +13,7 @@ import Navbar from "../components/Layout/Navbar"
 import Footer from "../components/Layout/Footer"
 import {
   Search, Package, ShoppingCart, ArrowLeft, ArrowRight, X,
-  Sparkles, CheckCircle, Clock, Eye, SlidersHorizontal, Filter, Store, MapPin,
+  Sparkles, Eye, SlidersHorizontal, Filter, Store, MapPin,
 } from "lucide-react"
 
 /* ─── motion ──────────────────────────────────────────────── */
@@ -70,9 +70,6 @@ function ItemCard({ item, onRent, index }) {
         </div>
 
         {/* Badges */}
-        <span className={`absolute top-3 right-3 text-[10px] font-bold px-2.5 py-1 rounded-full ${st.cls}`}>
-          {st.label}
-        </span>
         {item.category && (
           <span className="absolute top-3 left-3 text-[10px] font-semibold px-2 py-1 rounded-full bg-background/90 text-primary backdrop-blur">
             {item.category.nama}
@@ -113,25 +110,14 @@ function ItemCard({ item, onRent, index }) {
             </div>
             <div className="text-xs text-muted-foreground">/ hari · stok {item.stok}</div>
           </div>
-          {item.status === "available" ? (
-            <Button
-              size="sm"
-              className="rounded-full px-4"
-              onClick={() => onRent(item)}
-              disabled={item.stok <= 0}
-            >
-              <ShoppingCart className="w-3.5 h-3.5 mr-1" /> Sewa
-            </Button>
-          ) : (
-            <Button
-              size="sm"
-              variant="outline"
-              className="rounded-full px-4"
-              onClick={() => navigate(`/items/${item.id}`)}
-            >
-              Detail
-            </Button>
-          )}
+          <Button
+            size="sm"
+            className="rounded-full px-4"
+            onClick={() => onRent(item)}
+            disabled={item.stok <= 0}
+          >
+            <ShoppingCart className="w-3.5 h-3.5 mr-1" /> Sewa
+          </Button>
         </div>
       </div>
     </motion.div>
@@ -184,7 +170,9 @@ export default function CatalogPage({ addToast }) {
   const [search, setSearch]             = useState(initialSearch)
   const [searchInput, setSearchInput]   = useState(initialSearch)
   const [categoryId, setCategoryId]     = useState("")
-  const [statusFilter, setStatusFilter] = useState("")
+  const [sortPrice, setSortPrice]       = useState("") // "asc" | "desc" | ""
+  const [priceMin, setPriceMin]         = useState("")
+  const [priceMax, setPriceMax]         = useState("")
   const [cityFilter, setCityFilter]     = useState("")
   const [page, setPage]                 = useState(0)
   const [filterOpen, setFilterOpen]     = useState(false)
@@ -205,8 +193,10 @@ export default function CatalogPage({ addToast }) {
       const params = { skip: page * LIMIT, limit: LIMIT }
       if (search)       params.search = search
       if (categoryId)   params.category_id = categoryId
-      if (statusFilter) params.status = statusFilter
       if (cityFilter)   params.city = cityFilter
+      if (sortPrice)    params.sort_price = sortPrice
+      if (priceMin)     params.price_min = priceMin
+      if (priceMax)     params.price_max = priceMax
       const data = await fetchItems(params)
       setItems(Array.isArray(data) ? data : (data?.items || []))
       setTotal(data?.total || 0)
@@ -215,7 +205,7 @@ export default function CatalogPage({ addToast }) {
     } finally {
       setLoading(false)
     }
-  }, [search, categoryId, statusFilter, cityFilter, page, addToast])
+  }, [search, categoryId, sortPrice, priceMin, priceMax, cityFilter, page, addToast])
 
   useEffect(() => { load() }, [load])
 
@@ -229,7 +219,9 @@ export default function CatalogPage({ addToast }) {
     setSearch("")
     setSearchInput("")
     setCategoryId("")
-    setStatusFilter("")
+    setSortPrice("")
+    setPriceMin("")
+    setPriceMax("")
     setCityFilter("")
     setPage(0)
   }
@@ -239,35 +231,68 @@ export default function CatalogPage({ addToast }) {
     navigate(`/rentals/new?item=${item.id}`)
   }
 
-  const hasFilter = !!(search || categoryId || statusFilter || cityFilter)
+  const hasFilter = !!(search || categoryId || sortPrice || priceMin || priceMax || cityFilter)
   const totalPages = Math.max(1, Math.ceil(total / LIMIT))
 
   /* ─── reusable filter section (desktop sidebar / mobile sheet) ── */
   const FilterPanel = (
     <div className="space-y-7">
+      {/* Urutkan Harga */}
       <div>
         <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">
-          Status
+          Urutkan Harga
         </p>
         <div className="flex flex-wrap gap-2">
           {[
-            { v: "",          label: "Semua",     icon: null },
-            { v: "available", label: "Tersedia",  icon: CheckCircle },
-            { v: "rented",    label: "Disewa",    icon: Clock },
-          ].map(({ v, label, icon: Icon }) => (
+            { v: "",     label: "Default" },
+            { v: "asc",  label: "Termurah" },
+            { v: "desc", label: "Termahal" },
+          ].map(({ v, label }) => (
             <button
-              key={v || "all"}
-              onClick={() => { setStatusFilter(v); setPage(0); setFilterOpen(false) }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-colors border ${
-                statusFilter === v
+              key={v || "default"}
+              onClick={() => { setSortPrice(v); setPage(0); setFilterOpen(false) }}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors border ${
+                sortPrice === v
                   ? "bg-primary text-primary-foreground border-primary"
                   : "bg-background text-muted-foreground border-border hover:border-primary hover:text-primary"
               }`}
             >
-              {Icon && <Icon className="w-3 h-3" />} {label}
+              {label}
             </button>
           ))}
         </div>
+      </div>
+
+      {/* Range Harga */}
+      <div>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">
+          Range Harga
+        </p>
+        <div className="flex items-center gap-2">
+          <input
+            type="number"
+            placeholder="Min"
+            value={priceMin}
+            onChange={(e) => setPriceMin(e.target.value)}
+            className="w-full px-3 py-2 rounded-xl border border-border bg-background text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+          />
+          <span className="text-xs text-muted-foreground">—</span>
+          <input
+            type="number"
+            placeholder="Max"
+            value={priceMax}
+            onChange={(e) => setPriceMax(e.target.value)}
+            className="w-full px-3 py-2 rounded-xl border border-border bg-background text-xs focus:outline-none focus:ring-1 focus:ring-primary"
+          />
+        </div>
+        {(priceMin || priceMax) && (
+          <button
+            onClick={() => { setPriceMin(""); setPriceMax(""); setPage(0) }}
+            className="mt-2 text-[10px] text-destructive hover:underline"
+          >
+            Reset harga
+          </button>
+        )}
       </div>
 
       {cities.length > 0 && (
@@ -468,10 +493,18 @@ export default function CatalogPage({ addToast }) {
                         </button>
                       </span>
                     )}
-                    {statusFilter && (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium capitalize">
-                        {statusFilter}
-                        <button onClick={() => { setStatusFilter(""); setPage(0) }} className="hover:opacity-80">
+                    {sortPrice && (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium">
+                        {sortPrice === "asc" ? "Termurah" : "Termahal"}
+                        <button onClick={() => { setSortPrice(""); setPage(0) }} className="hover:opacity-80">
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    )}
+                    {(priceMin || priceMax) && (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium">
+                        Harga: {priceMin || "0"} — {priceMax || "∞"}
+                        <button onClick={() => { setPriceMin(""); setPriceMax(""); setPage(0) }} className="hover:opacity-80">
                           <X className="w-3 h-3" />
                         </button>
                       </span>

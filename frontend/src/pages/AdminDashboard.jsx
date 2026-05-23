@@ -188,7 +188,9 @@ function AdminRentalCard({ rental, payment, onUpdateStatus, onViewBukti, onConfi
                   </Button>
                 </>
               )}
-              <Button size="sm" variant="outline" className="rounded-full" onClick={() => onUpdateStatus(rental.id, "sedang_disewa")}>Proses sewa</Button>
+              {payment?.status === "completed" && (
+                <Button size="sm" variant="outline" className="rounded-full" onClick={() => onUpdateStatus(rental.id, "sedang_disewa")}>Proses sewa</Button>
+              )}
             </>
           )}
           {rental.status === "sedang_disewa" && (
@@ -243,6 +245,8 @@ export default function AdminDashboard({ addToast }) {
   const [confirmPayAction, setConfirmPayAction] = useState({ open: false, id: null, action: null, msg: "" })
   const [rentalFilter, setRentalFilter] = useState("")
   const [rentalsLoading, setRentalsLoading] = useState(false)
+  const [pendingCount, setPendingCount] = useState(0)
+  const [activeCount, setActiveCount] = useState(0)
   const [modalOpen, setModalOpen] = useState(false)
   const [editingItem, setEditingItem] = useState(null)
   const [form, setForm] = useState(defaultItem)
@@ -273,11 +277,15 @@ export default function AdminDashboard({ addToast }) {
   const loadRentals = useCallback(async () => {
     setRentalsLoading(true)
     try {
-      const [rentalData, paymentData] = await Promise.all([
+      const [rentalData, paymentData, pendingData, activeData] = await Promise.all([
         fetchAdminRentals({ status: rentalFilter || undefined }),
         fetchAdminPayments({ limit: 100 }),
+        fetchAdminRentals({ status: "pending" }),
+        fetchAdminRentals({ status: "sedang_disewa" }),
       ])
       setRentals(rentalData.rentals || [])
+      setPendingCount((pendingData.rentals || []).length)
+      setActiveCount((activeData.rentals || []).length)
       const map = {}
       for (const p of (paymentData.payments || [])) map[p.rental_id] = p
       setPaymentMap(map)
@@ -457,7 +465,14 @@ export default function AdminDashboard({ addToast }) {
       <Tabs defaultValue="items">
         <TabsList className="rounded-full p-1 bg-muted/40 border border-border/60">
           <TabsTrigger value="items" className="rounded-full"><Package className="w-4 h-4 mr-1.5" /> Barang ({items.length})</TabsTrigger>
-          <TabsTrigger value="rentals" className="rounded-full" onClick={loadRentals}><ClipboardList className="w-4 h-4 mr-1.5" /> Sewa masuk</TabsTrigger>
+          <TabsTrigger value="rentals" className="rounded-full relative" onClick={loadRentals}>
+            <ClipboardList className="w-4 h-4 mr-1.5" /> Sewa masuk
+            {pendingCount > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] flex items-center justify-center text-[10px] font-bold text-white bg-red-500 rounded-full px-1 shadow-sm">
+                {pendingCount}
+              </span>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="wallet" className="rounded-full" onClick={loadWallet}><Wallet className="w-4 h-4 mr-1.5" /> Saldo</TabsTrigger>
           <TabsTrigger value="profile" className="rounded-full"><Store className="w-4 h-4 mr-1.5" /> Profil usaha</TabsTrigger>
         </TabsList>
@@ -519,8 +534,20 @@ export default function AdminDashboard({ addToast }) {
           <div className="flex gap-2 flex-wrap">
             {["", "pending", "disetujui", "sedang_disewa", "selesai", "ditolak"].map(s => (
               <button key={s || "all"} onClick={() => setRentalFilter(s)}
-                className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-colors border ${rentalFilter === s ? "bg-primary text-primary-foreground border-primary" : "bg-background text-muted-foreground border-border hover:border-primary hover:text-primary"}`}
-              >{s || "Semua"}</button>
+                className={`relative px-3.5 py-1.5 rounded-full text-xs font-semibold transition-colors border ${rentalFilter === s ? "bg-primary text-primary-foreground border-primary" : "bg-background text-muted-foreground border-border hover:border-primary hover:text-primary"}`}
+              >
+                {s || "Semua"}
+                {s === "pending" && pendingCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-[16px] flex items-center justify-center text-[9px] font-bold text-white bg-red-500 rounded-full px-0.5 shadow-sm">
+                    {pendingCount}
+                  </span>
+                )}
+                {s === "sedang_disewa" && activeCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-[16px] flex items-center justify-center text-[9px] font-bold text-white bg-teal-500 rounded-full px-0.5 shadow-sm">
+                    {activeCount}
+                  </span>
+                )}
+              </button>
             ))}
           </div>
           {rentalsLoading ? (

@@ -89,7 +89,7 @@ export default function RentalPage({ addToast }) {
 
       <h1 className="text-2xl font-bold tracking-tight">Ajukan Sewa</h1>
 
-      <div className="grid md:grid-cols-2 gap-6">
+      <div className="grid md:grid-cols-2 gap-6 items-start">
         {/* Left: item info */}
         <div className="rounded-3xl overflow-hidden border border-border bg-card">
           <div className="aspect-video overflow-hidden bg-secondary">

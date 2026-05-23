@@ -512,6 +512,9 @@ def get_items(
     admin_id: Optional[int] = None,
     status: Optional[str] = None,
     city: Optional[str] = None,
+    sort_price: Optional[str] = None,
+    price_min: Optional[float] = None,
+    price_max: Optional[float] = None,
 ) -> dict:
     """
     Ambil daftar barang sewa dengan pagination, search, dan filter.
@@ -521,6 +524,9 @@ def get_items(
     - admin_id: filter by penyedia (untuk admin melihat barang miliknya)
     - status: filter by status (available, rented, unavailable)
     - city: filter by kota dari alamat_usaha admin (contoh: 'Balikpapan')
+    - sort_price: 'asc' (termurah) atau 'desc' (termahal)
+    - price_min: harga minimum per hari
+    - price_max: harga maksimum per hari
     """
     query = db.query(Item).options(joinedload(Item.category), joinedload(Item.admin))
 
@@ -547,6 +553,12 @@ def get_items(
         except ValueError:
             pass
 
+    # Price range filter
+    if price_min is not None:
+        query = query.filter(Item.harga_per_hari >= price_min)
+    if price_max is not None:
+        query = query.filter(Item.harga_per_hari <= price_max)
+
     # Filter by kota (parse client-side dari alamat_usaha)
     if city:
         city_norm = city.strip().lower()
@@ -561,12 +573,25 @@ def get_items(
             if it.admin and extract_city(it.admin.alamat_usaha) and
             extract_city(it.admin.alamat_usaha).lower() == city_norm
         ]
+        # Sort by price if requested
+        if sort_price == "asc":
+            filtered.sort(key=lambda x: x.harga_per_hari)
+        elif sort_price == "desc":
+            filtered.sort(key=lambda x: x.harga_per_hari, reverse=True)
         total = len(filtered)
         items = filtered[skip:skip + limit]
         return {"total": total, "items": items}
 
+    # Sort
+    if sort_price == "asc":
+        order = Item.harga_per_hari.asc()
+    elif sort_price == "desc":
+        order = Item.harga_per_hari.desc()
+    else:
+        order = Item.created_at.desc()
+
     total = query.count()
-    items = query.order_by(Item.created_at.desc()).offset(skip).limit(limit).all()
+    items = query.order_by(order).offset(skip).limit(limit).all()
 
     return {"total": total, "items": items}
 
