@@ -177,6 +177,9 @@ export async function fetchItems(params = {}) {
   if (params.category_id) q.append("category_id", params.category_id)
   if (params.status) q.append("status", params.status)
   if (params.city) q.append("city", params.city)
+  if (params.sort_price) q.append("sort_price", params.sort_price)
+  if (params.price_min) q.append("price_min", params.price_min)
+  if (params.price_max) q.append("price_max", params.price_max)
   q.append("skip", params.skip ?? 0)
   q.append("limit", params.limit ?? 20)
   const res = await fetch(`${API_URL}/items?${q}`, { headers: authOnlyHeaders() })
@@ -447,6 +450,15 @@ export async function chargeMidtransForRental(rentalId) {
     method: "POST",
     headers: authHeaders(),
     body: JSON.stringify({}),
+  })
+  return handleResponse(res)
+}
+
+export async function chargeDirectMidtrans(rentalId, { payment_type, bank }) {
+  const res = await fetch(`${API_URL}/payments/rentals/${rentalId}/charge-direct`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify({ payment_type, bank }),
   })
   return handleResponse(res)
 }

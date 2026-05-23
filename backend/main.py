@@ -6,7 +6,7 @@ Semua endpoint REST API sesuai implementation_plan_sewain (Modul 1-4)
 import os
 from dotenv import load_dotenv
 from typing import List
-from fastapi import FastAPI, Depends, HTTPException, Query, status, BackgroundTasks
+from fastapi import FastAPI, Depends, HTTPException, Query, status, BackgroundTasks, Body
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -947,6 +947,9 @@ def list_items(
     category: str = Query(None, description="Filter by nama kategori, contoh: electronics"),
     item_status: str = Query(None, alias="status", description="Filter: available | rented | unavailable"),
     city: str = Query(None, description="Filter by kota dari alamat usaha admin, contoh: Balikpapan"),
+    sort_price: str = Query(None, description="Sort harga: asc (termurah) | desc (termahal)"),
+    price_min: float = Query(None, description="Harga minimum per hari"),
+    price_max: float = Query(None, description="Harga maksimum per hari"),
     db: Session = Depends(get_db),
 ):
     """
@@ -960,8 +963,16 @@ def list_items(
     - `category`: Filter berdasarkan nama kategori (contoh: `electronics`, `outdoor`)
     - `status`: Filter berdasarkan ketersediaan (available, rented, unavailable)
     - `city`: Filter berdasarkan kota lokasi usaha admin (contoh: `Balikpapan`)
+    - `sort_price`: Urutkan harga (asc = termurah, desc = termahal)
+    - `price_min`: Harga minimum per hari
+    - `price_max`: Harga maksimum per hari
     - `skip` & `limit`: Pagination
     """
+    # Katalog publik: default hanya tampilkan barang available
+    # (barang unavailable/rented tidak muncul di katalog user)
+    if not item_status:
+        item_status = "available"
+
     return crud.get_items(
         db=db,
         skip=skip,
@@ -971,6 +982,9 @@ def list_items(
         category=category,
         status=item_status,
         city=city,
+        sort_price=sort_price,
+        price_min=price_min,
+        price_max=price_max,
     )
 
 
@@ -1892,6 +1906,119 @@ def create_midtrans_charge(
         jumlah=payment.jumlah,
         status=payment.status.value,
     )
+
+
+@app.post(
+    "/payments/rentals/{rental_id}/charge-direct",
+    tags=["💳 Payments — Pembayaran"],
+    summary="[User] Charge langsung via Midtrans Core API (tanpa popup Snap)",
+)
+def create_direct_charge(
+    rental_id: int,
+    body: dict = Body(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_verified_user),
+):
+    """
+    Charge langsung ke Midtrans Core API dengan metode pembayaran spesifik.
+
+    Body JSON:
+      - payment_type: "qris" | "bank_transfer" | "gopay" | "shopeepay"
+      - bank: (opsional, untuk bank_transfer) "bca" | "bni" | "bri" | "mandiri" | "permata"
+
+    Response berisi info pembayaran (VA number, QR URL, deeplink, dll).
+    """
+    from models import Rental, Payment, Item, UserProfile
+    from models import RentalStatus, PaymentStatus, PaymentMethod
+
+    payment_type = body.get("payment_type")
+    bank = body.get("bank")
+
+    if not payment_type:
+        raise HTTPException(status_code=400, detail="payment_type wajib diisi")
+
+    valid_types = ["qris", "bank_transfer", "gopay", "shopeepay"]
+    if payment_type not in valid_types:
+        raise HTTPException(status_code=400, detail=f"payment_type harus salah satu dari: {valid_types}")
+
+    if payment_type == "bank_transfer" and not bank:
+        raise HTTPException(status_code=400, detail="bank wajib diisi untuk bank_transfer (bca/bni/bri/mandiri/permata)")
+
+    # Validasi rental
+    rental = db.query(Rental).filter(Rental.id == rental_id).first()
+    if not rental:
+        raise HTTPException(status_code=404, detail="Rental tidak ditemukan")
+    if rental.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Rental ini bukan milik Anda")
+    if rental.status != RentalStatus.disetujui:
+        raise HTTPException(status_code=400, detail="Rental belum disetujui admin")
+
+    # Ambil/buat payment
+    payment = db.query(Payment).filter(Payment.rental_id == rental_id).first()
+    if not payment:
+        item_for_admin = db.query(Item).filter(Item.id == rental.item_id).first()
+        if not item_for_admin:
+            raise HTTPException(status_code=404, detail="Item tidak ditemukan")
+        payment = Payment(
+            rental_id=rental_id,
+            user_id=rental.user_id,
+            admin_id=item_for_admin.admin_id,
+            jumlah=rental.total_harga,
+            metode_pembayaran=PaymentMethod.midtrans,
+            status=PaymentStatus.pending,
+        )
+        db.add(payment)
+        db.commit()
+        db.refresh(payment)
+
+    if payment.status == PaymentStatus.completed:
+        raise HTTPException(status_code=400, detail="Pembayaran sudah lunas")
+
+    # Generate order_id baru
+    order_id = midtrans_service.build_order_id(rental_id)
+
+    # Ambil data item & user
+    item = db.query(Item).filter(Item.id == rental.item_id).first()
+    user_profile = db.query(UserProfile).filter(UserProfile.user_id == rental.user_id).first()
+    phone = user_profile.nomor_telepon if user_profile else None
+
+    try:
+        response = midtrans_service.create_core_charge(
+            order_id=order_id,
+            gross_amount=int(round(rental.total_harga)),
+            payment_type=payment_type,
+            item_name=(item.nama if item else f"Sewa #{rental_id}"),
+            customer_name=current_user.nama,
+            customer_email=current_user.email,
+            customer_phone=phone,
+            bank=bank,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Gagal charge Midtrans: {e}")
+
+    # Update payment record
+    payment.midtrans_order_id = order_id
+    payment.metode_pembayaran = PaymentMethod.midtrans
+    payment.status = PaymentStatus.pending
+
+    # Simpan payment_channel
+    channel = payment_type
+    if payment_type == "bank_transfer":
+        channel = f"{bank}_va"
+    elif payment_type == "echannel":
+        channel = "mandiri_bill"
+    payment.payment_channel = channel
+
+    db.commit()
+    db.refresh(payment)
+
+    return {
+        "payment_id": payment.id,
+        "order_id": order_id,
+        "payment_type": payment_type,
+        "status": response.get("transaction_status", "pending"),
+        "midtrans_response": response,
+    }
 
 
 @app.post(

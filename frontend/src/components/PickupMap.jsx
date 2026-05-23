@@ -37,8 +37,9 @@ export default function PickupMap({ lat, lng, label }) {
         scrollWheelZoom={false}
       >
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='Imagery &copy; <a href="https://www.google.com/maps">Google</a>'
+          url="https://mt1.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}"
+          maxZoom={20}
         />
         <Marker position={position}>
           <Popup>

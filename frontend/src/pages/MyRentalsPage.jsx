@@ -4,16 +4,21 @@
  */
 import { useState, useEffect, useCallback } from "react"
 import { useNavigate } from "react-router-dom"
-import { fetchMyRentals, fetchRentalReview, createRentalReview, updateReview } from "../services/api"
+import { fetchMyRentals, fetchRentalReview, createRentalReview, updateReview, fetchMyPayments, fetchRentalPickupInfo } from "../services/api"
 import { formatPrice } from "../lib/utils"
+import { getRentalDeadline, formatDeadline } from "../lib/rental"
 import { Button } from "../components/ui/Button"
 import { Skeleton } from "../components/ui/Skeleton"
 import RatingStars from "../components/RatingStars"
 import ReviewForm from "../components/ReviewForm"
+import PickupMap from "../components/PickupMap"
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle,
+} from "../components/ui/Dialog"
 import {
   ClipboardList, ArrowLeft, ArrowRight, Calendar, Package,
   Clock, CheckCircle, XCircle, TrendingUp, Eye, ShoppingCart,
-  Hash, Timer, Store, Star, Pencil,
+  Hash, Timer, Store, Star, Pencil, CreditCard, MapPin, Navigation, AlertTriangle,
 } from "lucide-react"
 
 /* ─── status config ───────────────────────────────────────── */
@@ -46,8 +51,75 @@ function formatDate(d) {
   })
 }
 
+/* ─── Payment status config ───────────────────────────────── */
+const PAYMENT_STATUS_META = {
+  pending:   { label: "Menunggu Pembayaran", cls: "bg-amber-100 text-amber-800" },
+  completed: { label: "Lunas", cls: "bg-primary/10 text-primary" },
+  failed:    { label: "Pembayaran Ditolak", cls: "bg-rose-100 text-rose-700" },
+  cancelled: { label: "Dibatalkan", cls: "bg-muted text-muted-foreground" },
+}
+
+/* ─── RentalCountdown ─────────────────────────────────────── */
+function RentalCountdown({ rental }) {
+  const [t, setT] = useState({ d: 0, h: 0, m: 0, s: 0 })
+  const [expired, setExpired] = useState(false)
+
+  const deadline = getRentalDeadline(rental)
+  const deadlineMs = deadline ? deadline.getTime() : null
+  const deadlineLabel = deadline ? formatDeadline(deadline) : ""
+
+  useEffect(() => {
+    if (!deadlineMs) return
+    const calc = () => {
+      const diff = deadlineMs - Date.now()
+      if (diff <= 0) { setExpired(true); return }
+      setExpired(false)
+      setT({
+        d: Math.floor(diff / 86400000),
+        h: Math.floor((diff / 3600000) % 24),
+        m: Math.floor((diff / 60000) % 60),
+        s: Math.floor((diff / 1000) % 60),
+      })
+    }
+    calc()
+    const tick = setInterval(calc, 1000)
+    return () => clearInterval(tick)
+  }, [deadlineMs])
+
+  if (!deadlineMs) return null
+
+  if (expired) {
+    return (
+      <div className="mt-3 flex items-center gap-2 px-3 py-2 rounded-xl bg-red-50 border border-red-200">
+        <AlertTriangle className="w-4 h-4 text-red-600 flex-shrink-0" />
+        <div>
+          <p className="text-xs font-bold text-red-700">Waktu sewa habis</p>
+          {deadlineLabel && <p className="text-[10px] text-red-600">Berakhir {deadlineLabel}</p>}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="mt-3 flex items-center justify-between px-3 py-2 rounded-xl bg-slate-50 border border-slate-200">
+      <div>
+        <p className="text-xs font-semibold text-slate-600 flex items-center gap-1">
+          <Clock className="w-3.5 h-3.5" /> Sisa waktu sewa
+        </p>
+        {deadlineLabel && <p className="text-[10px] text-slate-500">Tanggal selesai: {deadlineLabel}</p>}
+      </div>
+      <div className="flex items-center gap-1 font-mono text-xs font-bold text-slate-800">
+        {t.d > 0 && <span className="bg-white border border-slate-200 px-1.5 py-0.5 rounded">{t.d}h</span>}
+        <span className="bg-white border border-slate-200 px-1.5 py-0.5 rounded">{String(t.h).padStart(2, "0")}j</span>
+        <span className="bg-white border border-slate-200 px-1.5 py-0.5 rounded">{String(t.m).padStart(2, "0")}m</span>
+        <span className="bg-white border border-slate-200 px-1.5 py-0.5 rounded">{String(t.s).padStart(2, "0")}s</span>
+      </div>
+    </div>
+  )
+}
+
 /* ─── RentalCard ──────────────────────────────────────────── */
-function RentalCard({ rental, review, onReview }) {
+function RentalCard({ rental, review, payment, onReview, onPickup }) {
   const navigate = useNavigate()
   const item = rental.item
   const meta = STATUS_META[rental.status] || { label: rental.status, cls: "bg-muted text-muted-foreground", icon: Clock }
@@ -73,6 +145,12 @@ function RentalCard({ rental, review, onReview }) {
           <span className={`absolute top-3 left-3 inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full ${meta.cls}`}>
             <StatusIcon className="w-3 h-3" /> {meta.label}
           </span>
+          {/* Payment status badge */}
+          {payment && rental.status !== "ditolak" && (
+            <span className={`absolute top-3 right-3 inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full ${PAYMENT_STATUS_META[payment.status]?.cls || "bg-muted text-muted-foreground"}`}>
+              <CreditCard className="w-3 h-3" /> {PAYMENT_STATUS_META[payment.status]?.label || payment.status}
+            </span>
+          )}
         </button>
 
         {/* Details */}
@@ -139,6 +217,49 @@ function RentalCard({ rental, review, onReview }) {
             </div>
           </div>
 
+          {/* Status info banner */}
+          {rental.status === "disetujui" && payment?.status === "completed" && (
+            <div className="mt-4 space-y-2">
+              <div className="flex items-center gap-2">
+                <CreditCard className="w-4 h-4 text-primary" />
+                <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary">
+                  <CheckCircle className="w-3.5 h-3.5" /> Pembayaran terkonfirmasi
+                </span>
+              </div>
+              <button
+                onClick={() => onPickup?.(rental)}
+                className="w-full inline-flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-semibold border border-border hover:border-primary hover:text-primary hover:bg-primary/5 transition"
+              >
+                <MapPin className="w-3.5 h-3.5" />
+                Lihat lokasi pengambilan
+              </button>
+            </div>
+          )}
+
+          {rental.status === "disetujui" && payment?.status !== "completed" && (
+            <div className="mt-4 flex items-center gap-2">
+              <CreditCard className="w-4 h-4 text-amber-600" />
+              <span className="text-xs font-semibold text-amber-700">Menunggu pembayaran</span>
+            </div>
+          )}
+
+          {rental.status === "sedang_disewa" && (
+            <div className="mt-4 space-y-2">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-teal-600" />
+                <span className="text-xs font-semibold text-teal-700">Barang sedang disewa</span>
+              </div>
+              <button
+                onClick={() => onPickup?.(rental, true)}
+                className="w-full inline-flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-semibold border border-border hover:border-primary hover:text-primary hover:bg-primary/5 transition"
+              >
+                <MapPin className="w-3.5 h-3.5" />
+                Alamat pengembalian barang
+              </button>
+              <RentalCountdown rental={rental} />
+            </div>
+          )}
+
           {/* Bottom row: harga/hari + penyedia + actions */}
           <div className="mt-4 pt-4 border-t border-border/60 flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-4 text-xs text-muted-foreground">
@@ -155,6 +276,29 @@ function RentalCard({ rental, review, onReview }) {
             </div>
 
             <div className="flex items-center gap-2">
+              {/* Payment status badge + Bayar button */}
+              {payment && rental.status !== "ditolak" && (
+                <>
+                  {payment.status !== "completed" && (
+                    <Button
+                      size="sm"
+                      className="rounded-full text-xs"
+                      onClick={() => navigate(`/payment/${rental.id}`)}
+                    >
+                      <CreditCard className="w-3.5 h-3.5 mr-1" /> Bayar
+                    </Button>
+                  )}
+                </>
+              )}
+              {rental.status === "disetujui" && !payment && (
+                <Button
+                  size="sm"
+                  className="rounded-full text-xs"
+                  onClick={() => navigate(`/payment/${rental.id}`)}
+                >
+                  <CreditCard className="w-3.5 h-3.5 mr-1" /> Bayar
+                </Button>
+              )}
               <Button
                 size="sm"
                 variant="outline"
@@ -232,18 +376,27 @@ export default function MyRentalsPage({ addToast }) {
   const [page, setPage] = useState(0)
   const [reviewsByRental, setReviewsByRental] = useState({}) // { [rentalId]: review|null }
   const [reviewModal, setReviewModal] = useState({ open: false, rental: null, review: null })
+  const [paymentMap, setPaymentMap] = useState({}) // { [rentalId]: payment }
+  const [pickupModal, setPickupModal] = useState(null) // { pickup info + isReturn }
+  const [pickupLoading, setPickupLoading] = useState(false)
   const LIMIT = 8
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const data = await fetchMyRentals({
-        status: statusFilter || undefined,
-        skip: page * LIMIT,
-        limit: LIMIT,
-      })
+      const [data, paymentData] = await Promise.all([
+        fetchMyRentals({
+          status: statusFilter || undefined,
+          skip: page * LIMIT,
+          limit: LIMIT,
+        }),
+        fetchMyPayments({ limit: 100 }),
+      ])
       setRentals(data.rentals || [])
       setTotal(data.total || 0)
+      const map = {}
+      for (const p of (paymentData.payments || [])) map[p.rental_id] = p
+      setPaymentMap(map)
     } catch (err) {
       addToast?.(err.message, "error")
     } finally {
@@ -277,6 +430,18 @@ export default function MyRentalsPage({ addToast }) {
 
   const handleOpenReview = (rental, review) => {
     setReviewModal({ open: true, rental, review })
+  }
+
+  const handlePickup = async (rental, isReturn = false) => {
+    setPickupLoading(true)
+    try {
+      const info = await fetchRentalPickupInfo(rental.id)
+      setPickupModal({ ...info, isReturn, tanggal_mulai: rental.tanggal_mulai, tanggal_selesai: rental.tanggal_selesai })
+    } catch {
+      addToast?.("Koordinat lokasi belum tersedia", "error")
+    } finally {
+      setPickupLoading(false)
+    }
   }
 
   const handleSubmitReview = async ({ rating, komentar }) => {
@@ -378,7 +543,9 @@ export default function MyRentalsPage({ addToast }) {
                 key={r.id}
                 rental={r}
                 review={reviewsByRental[r.id] || null}
+                payment={paymentMap[r.id] || null}
                 onReview={handleOpenReview}
+                onPickup={handlePickup}
               />
             ))}
           </div>
@@ -418,6 +585,56 @@ export default function MyRentalsPage({ addToast }) {
         onSubmit={handleSubmitReview}
         itemNama={reviewModal.rental?.item?.nama}
       />
+
+      {/* Pickup location modal */}
+      <Dialog open={!!pickupModal} onOpenChange={() => setPickupModal(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MapPin className="w-5 h-5 text-primary" />
+              {pickupModal?.isReturn ? "Lokasi pengembalian" : "Lokasi pengambilan"}
+            </DialogTitle>
+          </DialogHeader>
+          {pickupModal && (
+            <div className="space-y-4">
+              <div className="bg-slate-50 rounded-2xl p-4 space-y-1.5">
+                {pickupModal.pickup_nama_usaha && (
+                  <p className="font-bold text-slate-800">{pickupModal.pickup_nama_usaha}</p>
+                )}
+                {pickupModal.pickup_alamat && (
+                  <p className="text-sm text-slate-600">{pickupModal.pickup_alamat}</p>
+                )}
+                {pickupModal.pickup_telepon && (
+                  <p className="text-sm text-slate-500">📞 {pickupModal.pickup_telepon}</p>
+                )}
+                <p className="text-xs text-slate-400">
+                  📅 {new Date(pickupModal.tanggal_mulai).toLocaleDateString("id-ID")} — {new Date(pickupModal.tanggal_selesai).toLocaleDateString("id-ID")}
+                </p>
+              </div>
+
+              {pickupModal.pickup_latitude && pickupModal.pickup_longitude && (
+                <PickupMap
+                  lat={pickupModal.pickup_latitude}
+                  lng={pickupModal.pickup_longitude}
+                  label={pickupModal.pickup_nama_usaha || "Lokasi"}
+                />
+              )}
+
+              {pickupModal.pickup_latitude && pickupModal.pickup_longitude && (
+                <a
+                  href={`https://www.google.com/maps?q=${pickupModal.pickup_latitude},${pickupModal.pickup_longitude}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-3 rounded-2xl bg-primary text-white font-bold text-sm flex items-center justify-center gap-2 hover:bg-primary/90 transition"
+                >
+                  <Navigation className="w-4 h-4" />
+                  Buka di Google Maps
+                </a>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

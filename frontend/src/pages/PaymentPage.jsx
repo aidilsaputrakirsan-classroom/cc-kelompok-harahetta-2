@@ -3,16 +3,15 @@ import { useParams, useNavigate } from "react-router-dom"
 import {
   fetchMyRentals, fetchMyPayments,
   fetchAdminPaymentInfo, fetchRentalPickupInfo,
-  chargeMidtransForRental, syncMidtransPayment,
+  chargeDirectMidtrans, syncMidtransPayment,
 } from "../services/api"
-import { openSnap } from "../lib/midtrans"
 import { formatPrice } from "../lib/utils"
 import { Skeleton } from "../components/ui/Skeleton"
 import PickupMap from "../components/PickupMap"
 import {
   ArrowLeft, CreditCard, CheckCircle, Loader2, Clock,
   AlertTriangle, BadgeCheck, MapPin, Navigation,
-  Calendar, RefreshCw, Shield, XCircle,
+  Calendar, RefreshCw, Shield, XCircle, QrCode, Building2, Smartphone,
 } from "lucide-react"
 
 
@@ -31,6 +30,74 @@ const RENTAL_STATUS = {
   ditolak:       { label: "Ditolak",                    cls: "bg-red-100 text-red-700" },
 }
 
+/* Payment method options */
+const PAYMENT_METHODS = [
+  {
+    id: "qris",
+    label: "QRIS",
+    description: "Scan QR — GoPay, OVO, DANA, ShopeePay, dll",
+    icon: QrCode,
+    type: "qris",
+    bank: null,
+  },
+  {
+    id: "gopay",
+    label: "GoPay",
+    description: "Bayar langsung via GoPay",
+    icon: Smartphone,
+    type: "gopay",
+    bank: null,
+  },
+  {
+    id: "shopeepay",
+    label: "ShopeePay",
+    description: "Bayar langsung via ShopeePay",
+    icon: Smartphone,
+    type: "shopeepay",
+    bank: null,
+  },
+  {
+    id: "bca_va",
+    label: "BCA Virtual Account",
+    description: "Transfer via ATM/Mobile Banking BCA",
+    icon: Building2,
+    type: "bank_transfer",
+    bank: "bca",
+  },
+  {
+    id: "bni_va",
+    label: "BNI Virtual Account",
+    description: "Transfer via ATM/Mobile Banking BNI",
+    icon: Building2,
+    type: "bank_transfer",
+    bank: "bni",
+  },
+  {
+    id: "bri_va",
+    label: "BRI Virtual Account",
+    description: "Transfer via ATM/Mobile Banking BRI",
+    icon: Building2,
+    type: "bank_transfer",
+    bank: "bri",
+  },
+  {
+    id: "mandiri_va",
+    label: "Mandiri Bill Payment",
+    description: "Transfer via ATM/Mobile Banking Mandiri",
+    icon: Building2,
+    type: "bank_transfer",
+    bank: "mandiri",
+  },
+  {
+    id: "permata_va",
+    label: "Permata Virtual Account",
+    description: "Transfer via ATM/Mobile Banking Permata",
+    icon: Building2,
+    type: "bank_transfer",
+    bank: "permata",
+  },
+]
+
 
 export default function PaymentPage({ addToast }) {
   const { rentalId } = useParams()
@@ -41,14 +108,14 @@ export default function PaymentPage({ addToast }) {
   const [adminInfo, setAdminInfo]   = useState(null)
   const [pickupInfo, setPickupInfo] = useState(null)
   const [loading, setLoading]       = useState(true)
-  const [paying, setPaying]         = useState(false)
+  const [charging, setCharging]     = useState(null) // id of method being charged
   const [syncing, setSyncing]       = useState(false)
+  const [chargeResult, setChargeResult] = useState(null) // result from direct charge
 
   const loadAll = async () => {
     const id = parseInt(rentalId, 10)
     if (Number.isNaN(id)) { navigate("/home"); return }
 
-    // Ambil rental milik user
     const rentalsData = await fetchMyRentals({ limit: 100 }).catch(() => ({ rentals: [] }))
     const rentals = Array.isArray(rentalsData) ? rentalsData : (rentalsData?.rentals || [])
     const r = rentals.find(x => x.id === id)
@@ -58,18 +125,15 @@ export default function PaymentPage({ addToast }) {
     }
     setRental(r)
 
-    // Ambil payment terkait
     const paymentsData = await fetchMyPayments({ limit: 100 }).catch(() => ({ payments: [] }))
     const pays = Array.isArray(paymentsData) ? paymentsData : (paymentsData?.payments || [])
     const pay = pays.find(x => x.rental_id === id) || null
     setPayment(pay)
 
-    // Pickup info (kalau sudah bayar)
     if (pay?.status === "completed" || ["sedang_disewa", "selesai"].includes(r.status)) {
       fetchRentalPickupInfo(id).then(setPickupInfo).catch(() => {})
     }
 
-    // Kontak penyedia
     if (r.item?.admin_id) {
       fetchAdminPaymentInfo(r.item.admin_id).then(setAdminInfo).catch(() => {})
     }
@@ -78,48 +142,34 @@ export default function PaymentPage({ addToast }) {
   useEffect(() => {
     setLoading(true)
     loadAll().finally(() => setLoading(false))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rentalId])
 
-  // ── Trigger Midtrans Snap popup
-  const handlePayNow = async () => {
-    setPaying(true)
+  // Handle direct charge
+  const handleCharge = async (method) => {
+    setCharging(method.id)
     try {
-      const charge = await chargeMidtransForRental(rentalId)
-      await openSnap(charge.snap_token, {
-        onSuccess: async () => {
-          addToast?.("Pembayaran berhasil! Status sedang disinkronkan...", "success")
-          // Sync dari Midtrans langsung (lebih cepat dari menunggu webhook saat testing)
-          await syncMidtransPayment(charge.payment_id).catch(() => {})
-          await loadAll()
-        },
-        onPending: async () => {
-          addToast?.("Menunggu konfirmasi pembayaran", "info")
-          await loadAll()
-        },
-        onError: () => {
-          addToast?.("Pembayaran gagal diproses", "error")
-        },
-        onClose: async () => {
-          // User menutup popup tanpa menyelesaikan
-          addToast?.("Popup ditutup. Anda bisa melanjutkan pembayaran kapan saja.", "info")
-          await loadAll()
-        },
+      const result = await chargeDirectMidtrans(rentalId, {
+        payment_type: method.type,
+        bank: method.bank,
       })
+      setChargeResult(result)
+      addToast?.("Pembayaran berhasil dibuat! Ikuti instruksi di bawah.", "success")
+      await loadAll()
     } catch (err) {
-      addToast?.(err.message || "Gagal membuka payment gateway", "error")
+      addToast?.(err.message || "Gagal membuat pembayaran", "error")
     } finally {
-      setPaying(false)
+      setCharging(null)
     }
   }
 
-  // ── Manual sync kalau webhook telat
+  // Manual sync
   const handleSync = async () => {
     if (!payment?.id) return
     setSyncing(true)
     try {
       await syncMidtransPayment(payment.id)
       await loadAll()
+      setChargeResult(null)
       addToast?.("Status pembayaran berhasil diperbarui", "success")
     } catch (err) {
       addToast?.(err.message || "Gagal sync status", "error")
@@ -146,6 +196,14 @@ export default function PaymentPage({ addToast }) {
   const payMeta    = payment ? (PAY_STATUS[payment.status] || PAY_STATUS.pending) : null
   const rs         = RENTAL_STATUS[rental.status] || RENTAL_STATUS.pending
   const PayIcon    = payMeta?.icon || Clock
+
+  // Extract payment info from charge result
+  const midResp = chargeResult?.midtrans_response
+  const vaNumbers = midResp?.va_numbers || []
+  const qrUrl = midResp?.actions?.find(a => a.name === "generate-qr-code")?.url
+    || midResp?.actions?.find(a => a.name === "deeplink-redirect")?.url
+  const billKey = midResp?.bill_key
+  const billerCode = midResp?.biller_code
 
   return (
     <div className="max-w-2xl mx-auto space-y-5 pb-10">
@@ -175,7 +233,7 @@ export default function PaymentPage({ addToast }) {
           <div>
             <p className="font-bold">Menunggu Persetujuan Admin</p>
             <p className="text-xs text-blue-700 mt-0.5">
-              Admin sedang meninjau permintaan sewamu. Tombol bayar akan muncul setelah disetujui.
+              Admin sedang meninjau permintaan sewamu. Pilihan pembayaran akan muncul setelah disetujui.
             </p>
           </div>
         </div>
@@ -217,71 +275,149 @@ export default function PaymentPage({ addToast }) {
         </div>
       </div>
 
-      {/* Kartu Bayar Sekarang */}
-      {canPay && (
+      {/* Pilih Metode Pembayaran */}
+      {canPay && !chargeResult && (
         <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-5 space-y-4">
           <div className="flex items-start gap-3">
             <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center flex-shrink-0">
               <CreditCard className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <p className="font-black text-slate-800">Bayar via Midtrans</p>
+              <p className="font-black text-slate-800">Pilih Metode Pembayaran</p>
               <p className="text-xs text-slate-500 mt-0.5">
-                Pilih metode pembayaran favoritmu: QRIS, Virtual Account (BCA/Mandiri/BNI/BRI),
-                GoPay, ShopeePay, atau kartu kredit.
+                Klik metode yang kamu inginkan untuk langsung membuat pembayaran.
               </p>
             </div>
           </div>
 
-          {/* Metode tersedia — daftar informatif, pemilihan sebenarnya ada di popup Snap */}
-          <div className="space-y-1.5">
-            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">
-              Metode tersedia
-            </p>
-            <div className="flex flex-wrap gap-1.5 text-[11px] text-slate-500 select-none">
-              {["QRIS", "GoPay", "ShopeePay", "BCA VA", "Mandiri VA", "BNI VA", "BRI VA", "Kartu Kredit"].map(m => (
-                <span
-                  key={m}
-                  className="px-2 py-0.5 rounded-md bg-slate-50 border border-slate-100 font-medium cursor-default"
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {PAYMENT_METHODS.map(method => {
+              const Icon = method.icon
+              return (
+                <button
+                  key={method.id}
+                  onClick={() => handleCharge(method)}
+                  disabled={charging !== null}
+                  className="flex items-center gap-3 p-4 rounded-2xl border border-slate-200 hover:border-primary hover:bg-primary/5 transition-all text-left disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {m}
-                </span>
-              ))}
-            </div>
-            <p className="text-[11px] text-slate-400 italic pt-1">
-              Pilih metode di popup yang muncul setelah klik <span className="font-semibold">Bayar Sekarang</span>.
-            </p>
+                  <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center flex-shrink-0">
+                    {charging === method.id ? (
+                      <Loader2 className="w-5 h-5 text-primary animate-spin" />
+                    ) : (
+                      <Icon className="w-5 h-5 text-slate-600" />
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-semibold text-sm text-slate-800">{method.label}</p>
+                    <p className="text-[11px] text-slate-500 truncate">{method.description}</p>
+                  </div>
+                </button>
+              )
+            })}
           </div>
-
-          <button
-            onClick={handlePayNow}
-            disabled={paying}
-            className="w-full py-3 rounded-2xl bg-primary text-white font-bold text-sm flex items-center justify-center gap-2 hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition"
-          >
-            {paying
-              ? <><Loader2 className="w-4 h-4 animate-spin" /> Membuka Popup...</>
-              : <><CreditCard className="w-4 h-4" /> Bayar Sekarang</>
-            }
-          </button>
-
-          {/* Sync jika webhook telat */}
-          {payment?.midtrans_order_id && (
-            <button
-              onClick={handleSync}
-              disabled={syncing}
-              className="w-full text-xs font-semibold text-slate-500 hover:text-primary flex items-center justify-center gap-1.5 py-1 disabled:opacity-50"
-            >
-              {syncing
-                ? <><Loader2 className="w-3 h-3 animate-spin" /> Menyinkronkan...</>
-                : <><RefreshCw className="w-3 h-3" /> Sudah bayar tapi status belum update?</>
-              }
-            </button>
-          )}
 
           <div className="flex items-center gap-2 text-[11px] text-slate-400 justify-center pt-1">
             <Shield className="w-3 h-3" />
-            <span>Transaksi diproses aman oleh Midtrans (sandbox)</span>
+            <span>Transaksi diproses aman oleh Midtrans</span>
           </div>
+        </div>
+      )}
+
+      {/* Instruksi Pembayaran (setelah charge) */}
+      {canPay && chargeResult && (
+        <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-5 space-y-4">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-amber-100 flex items-center justify-center flex-shrink-0">
+              <Clock className="w-5 h-5 text-amber-600" />
+            </div>
+            <div>
+              <p className="font-black text-slate-800">Instruksi Pembayaran</p>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Selesaikan pembayaran sebelum batas waktu berakhir.
+              </p>
+            </div>
+          </div>
+
+          {/* VA Numbers */}
+          {vaNumbers.length > 0 && (
+            <div className="bg-slate-50 rounded-2xl p-4 space-y-3">
+              {vaNumbers.map((va, i) => (
+                <div key={i}>
+                  <p className="text-xs text-slate-500 uppercase font-semibold">{va.bank} Virtual Account</p>
+                  <p className="text-2xl font-mono font-bold text-slate-800 tracking-wider mt-1 select-all">{va.va_number}</p>
+                </div>
+              ))}
+              <p className="text-xs text-slate-500">
+                Transfer tepat <span className="font-bold text-slate-700">{formatPrice(rental.total_harga)}</span> ke nomor VA di atas.
+              </p>
+            </div>
+          )}
+
+          {/* Mandiri Bill Payment */}
+          {billerCode && billKey && (
+            <div className="bg-slate-50 rounded-2xl p-4 space-y-2">
+              <div>
+                <p className="text-xs text-slate-500 uppercase font-semibold">Biller Code</p>
+                <p className="text-xl font-mono font-bold text-slate-800 select-all">{billerCode}</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-500 uppercase font-semibold">Bill Key</p>
+                <p className="text-xl font-mono font-bold text-slate-800 select-all">{billKey}</p>
+              </div>
+              <p className="text-xs text-slate-500">
+                Transfer tepat <span className="font-bold text-slate-700">{formatPrice(rental.total_harga)}</span> menggunakan Mandiri Bill Payment.
+              </p>
+            </div>
+          )}
+
+          {/* QR Code / Deeplink */}
+          {qrUrl && (
+            <div className="bg-slate-50 rounded-2xl p-4 flex flex-col items-center gap-3">
+              <img src={qrUrl} alt="QR Code" className="w-48 h-48 rounded-xl" />
+              <p className="text-xs text-slate-500 text-center">
+                Scan QR code di atas menggunakan aplikasi e-wallet kamu.
+              </p>
+            </div>
+          )}
+
+          {/* GoPay/ShopeePay deeplink */}
+          {midResp?.actions && !qrUrl && (
+            <div className="bg-slate-50 rounded-2xl p-4 space-y-2">
+              {midResp.actions.filter(a => a.name === "deeplink-redirect" || a.name === "get-status").map((action, i) => (
+                action.name === "deeplink-redirect" && (
+                  <a
+                    key={i}
+                    href={action.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block w-full py-3 rounded-2xl bg-primary text-white font-bold text-sm text-center hover:bg-primary/90 transition"
+                  >
+                    Buka Aplikasi untuk Bayar
+                  </a>
+                )
+              ))}
+            </div>
+          )}
+
+          {/* Sync button */}
+          <button
+            onClick={handleSync}
+            disabled={syncing}
+            className="w-full py-3 rounded-2xl bg-primary text-white font-bold text-sm flex items-center justify-center gap-2 hover:bg-primary/90 disabled:opacity-50 transition"
+          >
+            {syncing
+              ? <><Loader2 className="w-4 h-4 animate-spin" /> Mengecek status...</>
+              : <><RefreshCw className="w-4 h-4" /> Sudah bayar? Cek status</>
+            }
+          </button>
+
+          {/* Pilih metode lain */}
+          <button
+            onClick={() => setChargeResult(null)}
+            className="w-full text-xs font-semibold text-slate-500 hover:text-primary py-1"
+          >
+            ← Pilih metode pembayaran lain
+          </button>
         </div>
       )}
 
@@ -355,7 +491,6 @@ export default function PaymentPage({ addToast }) {
         </div>
       )}
 
-      {/* Info kontak admin (opsional, tetap ditampilkan) */}
       {adminInfo?.nomor_telepon && (
         <p className="text-center text-xs text-slate-400">
           Butuh bantuan? Hubungi penyedia: <span className="font-semibold text-slate-600">{adminInfo.nomor_telepon}</span>

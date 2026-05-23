@@ -87,8 +87,9 @@ export default function MapPicker({ latitude, longitude, onChange }) {
           zoomControl={true}
         >
           <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            attribution='Imagery &copy; <a href="https://www.google.com/maps">Google</a>'
+            url="https://mt1.google.com/vt/lyrs=s,h&x={x}&y={y}&z={z}"
+            maxZoom={20}
           />
           <MapCenterTracker onCenterChange={handleCenterChange} />
         </MapContainer>

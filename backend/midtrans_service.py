@@ -56,6 +56,14 @@ def _snap_client() -> midtransclient.Snap:
     )
 
 
+def _core_client() -> midtransclient.CoreApi:
+    return midtransclient.CoreApi(
+        is_production=is_production(),
+        server_key=get_server_key(),
+        client_key=get_client_key(),
+    )
+
+
 # ============================================================
 # HELPERS
 # ============================================================
@@ -199,3 +207,78 @@ def fetch_transaction_status(order_id: str) -> dict:
         client_key=get_client_key(),
     )
     return core.transactions.status(order_id)
+
+
+# ============================================================
+# CORE API: Direct Charge (tanpa Snap popup)
+# ============================================================
+
+def create_core_charge(
+    *,
+    order_id: str,
+    gross_amount: int,
+    payment_type: str,
+    item_name: str,
+    customer_name: str,
+    customer_email: str,
+    customer_phone: Optional[str] = None,
+    bank: Optional[str] = None,
+) -> dict:
+    """
+    Charge langsung via Midtrans Core API.
+
+    payment_type bisa:
+      - "qris" → return QR code URL
+      - "bank_transfer" → return VA number (butuh param bank: bca/bni/bri/mandiri/permata)
+      - "gopay" → return deeplink + QR URL
+      - "shopeepay" → return deeplink URL
+      - "echannel" → Mandiri Bill Payment
+
+    Return dict dengan info pembayaran (VA number, QR URL, dll).
+    """
+    gross_amount = int(round(gross_amount))
+    core = _core_client()
+
+    payload = {
+        "payment_type": payment_type,
+        "transaction_details": {
+            "order_id": order_id,
+            "gross_amount": gross_amount,
+        },
+        "item_details": [{
+            "id": f"RENTAL-{order_id}",
+            "price": gross_amount,
+            "quantity": 1,
+            "name": item_name[:50],
+        }],
+        "customer_details": {
+            "first_name": (customer_name or "Customer")[:20],
+            "email": customer_email,
+            "phone": customer_phone or "",
+        },
+    }
+
+    # Payment-type specific params
+    if payment_type == "bank_transfer":
+        if bank == "mandiri":
+            # Mandiri uses echannel
+            payload["payment_type"] = "echannel"
+            payload["echannel"] = {
+                "bill_info1": "Payment:",
+                "bill_info2": item_name[:20],
+            }
+        else:
+            payload["bank_transfer"] = {"bank": bank or "bca"}
+
+    elif payment_type == "qris":
+        payload["qris"] = {"acquirer": "gopay"}
+
+    elif payment_type == "gopay":
+        payload["gopay"] = {"enable_callback": True}
+
+    elif payment_type == "shopeepay":
+        finish_url = os.getenv("MIDTRANS_FINISH_REDIRECT_URL", "http://localhost:5173/payment/finish")
+        payload["shopeepay"] = {"callback_url": finish_url}
+
+    response = core.charge(payload)
+    return response
