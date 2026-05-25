@@ -9,10 +9,11 @@ import { Button } from "../components/ui/Button"
 import { motion } from "framer-motion"
 import Navbar from "../components/Layout/Navbar"
 import Footer from "../components/Layout/Footer"
+import PromoTicketCard from "../components/PromoTicketCard"
 import { fetchPublicStats } from "../services/api"
 import {
   ArrowRight, ArrowUpRight, Search, ShieldCheck, Sparkles, Star,
-  Wallet, MapPin, MessageSquare, Camera, Tent, Zap, Box, ChevronDown,
+  Wallet, MapPin, MessageSquare, Camera, Tent, Zap, Box,
   CheckCircle2, Quote,
 } from "lucide-react"
 
@@ -204,12 +205,12 @@ export default function LandingPage() {
       {/* ══════════════════════════════════════════════════════
           HERO
       ══════════════════════════════════════════════════════ */}
-      <section className="relative pt-28 pb-20 md:pt-32 md:pb-28 bg-hero-pattern overflow-hidden">
+      <section className="relative pt-20 pb-12 md:pt-24 md:pb-16 bg-hero-pattern overflow-x-hidden">
         {/* dotted ambient */}
         <div className="absolute inset-0 bg-dot-grid opacity-[0.35] [mask-image:radial-gradient(ellipse_at_center,black_20%,transparent_70%)] pointer-events-none" />
 
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="grid lg:grid-cols-12 gap-12 lg:gap-8 items-center">
+          <div className="grid lg:grid-cols-12 gap-12 lg:gap-8 items-start">
             {/* Copy */}
             <div className="lg:col-span-7">
               <motion.div {...fadeUp(0)}>
@@ -221,14 +222,14 @@ export default function LandingPage() {
 
               <motion.h1
                 {...fadeUp(0.05)}
-                className="relative mt-6 text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight leading-[1.1]"
+                className="relative mt-4 text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight leading-[1.1]"
               >
                 {/* Background image behind text — tilted for aesthetic */}
                 <img
                   src="/images/hero/cardkecil.jpg"
                   alt=""
                   aria-hidden="true"
-                  className="absolute top-1/2 left-[60%] -translate-x-1/2 -translate-y-1/2 w-56 md:w-72 lg:w-80 h-auto rounded-3xl opacity-25 rotate-[6deg] pointer-events-none select-none"
+                  className="absolute top-1/2 left-[60%] -translate-x-1/2 -translate-y-1/2 w-48 md:w-60 lg:w-64 h-auto rounded-3xl opacity-25 rotate-[6deg] pointer-events-none select-none"
                 />
                 <span className="relative z-10">
                   Sewa apa saja,{" "}
@@ -239,18 +240,23 @@ export default function LandingPage() {
 
               <motion.p
                 {...fadeUp(0.1)}
-                className="mt-6 text-lg text-muted-foreground max-w-xl leading-relaxed"
+                className="mt-4 text-base text-muted-foreground max-w-xl leading-relaxed"
               >
                 Sewain menghubungkan kamu dengan ribuan penyedia barang terverifikasi.
                 Mulai dari kamera, alat camping, hingga peralatan event. Semua dalam
                 satu platform yang aman, cepat, dan transparan.
               </motion.p>
 
+              {/* Promo ticket — tampil hanya jika ada promo featured */}
+              <div className="mt-5">
+                <PromoTicketCard />
+              </div>
+
               {/* Search bar */}
               <motion.form
                 {...fadeUp(0.15)}
                 onSubmit={handleHeroSearch}
-                className="mt-8 flex items-center bg-card border border-border rounded-full p-1.5 pl-5 shadow-soft max-w-xl focus-within:ring-2 focus-within:ring-primary/30 transition"
+                className="mt-5 flex items-center bg-card border border-border rounded-full p-1.5 pl-5 shadow-soft max-w-xl focus-within:ring-2 focus-within:ring-primary/30 transition"
               >
                 <Search className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                 <input
@@ -268,7 +274,7 @@ export default function LandingPage() {
               {/* Trust line */}
               <motion.div
                 {...fadeUp(0.2)}
-                className="mt-8 flex flex-wrap items-center gap-6 text-sm text-muted-foreground"
+                className="mt-4 flex flex-wrap items-center gap-6 text-sm text-muted-foreground"
               >
                 <div className="flex items-center gap-3 bg-primary/5 border border-primary/15 rounded-full px-4 py-2">
                   <div className="relative flex items-center justify-center">
@@ -289,7 +295,7 @@ export default function LandingPage() {
                 initial={{ opacity: 0, scale: 0.96 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ duration: 0.8, ease, delay: 0.2 }}
-                className="relative"
+                className="relative lg:sticky lg:top-24"
               >
                 {/* Big card */}
                 <MediaSlot
@@ -327,22 +333,6 @@ export default function LandingPage() {
             </div>
           </div>
 
-          {/* Scroll cue */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 1.2, duration: 0.6 }}
-            className="mt-14 flex justify-center"
-          >
-            <motion.div
-              animate={{ y: [0, 6, 0] }}
-              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-              className="flex flex-col items-center gap-1.5 text-muted-foreground"
-            >
-              <span className="text-[10px] tracking-[0.25em] uppercase">Scroll</span>
-              <ChevronDown className="w-4 h-4" />
-            </motion.div>
-          </motion.div>
         </div>
       </section>
 

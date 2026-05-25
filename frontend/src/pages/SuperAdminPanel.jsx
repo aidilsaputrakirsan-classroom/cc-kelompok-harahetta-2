@@ -10,6 +10,7 @@ import {
   fetchCategories, createCategory, deleteCategory,
   fetchPendingVerifications, verifyUser,
   fetchAllRentals,
+  fetchPromoCodes, createPromoCode, updatePromoCode, deletePromoCode, fetchPromoRedemptions,
 } from "../services/api"
 import { Button } from "../components/ui/Button"
 import { Input } from "../components/ui/Input"
@@ -26,6 +27,7 @@ import {
   Users, Package, ClipboardList, FolderOpen, ShieldCheck, Crown,
   BarChart3, Plus, Trash2, UserCheck, UserX, CheckCircle, XCircle,
   Calendar, DollarSign, Eye, ImageOff, RefreshCw, Pencil,
+  Tag, Gift, TrendingDown, History,
 } from "lucide-react"
 
 /* ─── StatCard ────────────────────────────────────────────── */
@@ -65,6 +67,30 @@ export default function SuperAdminPanel({ addToast }) {
   const [editForm, setEditForm] = useState({ nama: "", role: "user", is_active: true })
   const [savingEdit, setSavingEdit] = useState(false)
 
+  // ── PROMO state
+  const [promos, setPromos] = useState([])
+  const [promoLoading, setPromoLoading] = useState(false)
+  const [promoModalOpen, setPromoModalOpen] = useState(false)
+  const [editPromo, setEditPromo] = useState(null)         // null = create mode, object = edit mode
+  const [savingPromo, setSavingPromo] = useState(false)
+  const [redemptionsModal, setRedemptionsModal] = useState(null)  // { promo, data }
+  const [promoForm, setPromoForm] = useState({
+    code: "",
+    nama: "",
+    deskripsi: "",
+    discount_type: "percentage",
+    discount_value: 50,
+    max_discount: 50000,
+    min_order: 0,
+    eligibility: "new_user",
+    max_uses_per_user: 1,
+    max_total_uses: "",
+    is_active: true,
+    is_featured: true,
+    valid_from: "",
+    valid_until: "",
+  })
+
   const load = useCallback(async () => {
     setLoading(true)
     try {
@@ -91,6 +117,116 @@ export default function SuperAdminPanel({ addToast }) {
   const loadRentals = useCallback(async () => {
     try { const data = await fetchAllRentals({ status: rentalStatusFilter || undefined }); setRentals(Array.isArray(data) ? data : (data?.rentals || [])) } catch {}
   }, [rentalStatusFilter])
+
+  // ── PROMO loaders & handlers
+  const loadPromos = useCallback(async () => {
+    setPromoLoading(true)
+    try {
+      const data = await fetchPromoCodes()
+      setPromos(data?.promos || [])
+    } catch (err) { addToast?.(err.message, "error") }
+    finally { setPromoLoading(false) }
+  }, [addToast])
+
+  const resetPromoForm = () => setPromoForm({
+    code: "",
+    nama: "",
+    deskripsi: "",
+    discount_type: "percentage",
+    discount_value: 50,
+    max_discount: 50000,
+    min_order: 0,
+    eligibility: "new_user",
+    max_uses_per_user: 1,
+    max_total_uses: "",
+    is_active: true,
+    is_featured: true,
+    valid_from: "",
+    valid_until: "",
+  })
+
+  const openCreatePromo = () => {
+    setEditPromo(null)
+    resetPromoForm()
+    setPromoModalOpen(true)
+  }
+
+  const openEditPromo = (p) => {
+    setEditPromo(p)
+    setPromoForm({
+      code: p.code,
+      nama: p.nama,
+      deskripsi: p.deskripsi || "",
+      discount_type: p.discount_type,
+      discount_value: p.discount_value,
+      max_discount: p.max_discount ?? "",
+      min_order: p.min_order ?? 0,
+      eligibility: p.eligibility,
+      max_uses_per_user: p.max_uses_per_user,
+      max_total_uses: p.max_total_uses ?? "",
+      is_active: p.is_active,
+      is_featured: p.is_featured,
+      valid_from: p.valid_from ? p.valid_from.slice(0, 16) : "",
+      valid_until: p.valid_until ? p.valid_until.slice(0, 16) : "",
+    })
+    setPromoModalOpen(true)
+  }
+
+  const handleSavePromo = async (e) => {
+    e.preventDefault()
+    setSavingPromo(true)
+    try {
+      const payload = {
+        ...promoForm,
+        discount_value: parseFloat(promoForm.discount_value),
+        max_discount: promoForm.max_discount === "" || promoForm.max_discount === null ? null : parseFloat(promoForm.max_discount),
+        min_order: parseFloat(promoForm.min_order || 0),
+        max_uses_per_user: parseInt(promoForm.max_uses_per_user || 1),
+        max_total_uses: promoForm.max_total_uses === "" || promoForm.max_total_uses === null ? null : parseInt(promoForm.max_total_uses),
+        valid_from: promoForm.valid_from || null,
+        valid_until: promoForm.valid_until || null,
+      }
+      if (editPromo) {
+        // Saat edit, code tidak boleh diubah → exclude
+        const { code, ...rest } = payload
+        await updatePromoCode(editPromo.id, rest)
+        addToast?.("Promo diperbarui", "success")
+      } else {
+        await createPromoCode(payload)
+        addToast?.("Promo dibuat", "success")
+      }
+      setPromoModalOpen(false)
+      loadPromos()
+    } catch (err) {
+      addToast?.(err.message, "error")
+    } finally {
+      setSavingPromo(false)
+    }
+  }
+
+  const handleTogglePromoActive = async (p) => {
+    try {
+      await updatePromoCode(p.id, { is_active: !p.is_active })
+      addToast?.(`Promo ${!p.is_active ? "diaktifkan" : "dinonaktifkan"}`, "success")
+      loadPromos()
+    } catch (err) { addToast?.(err.message, "error") }
+  }
+
+  const handleDeletePromo = async (id) => {
+    if (!confirm("Hapus promo ini? Jika sudah pernah dipakai, akan di-nonaktifkan saja.")) return
+    try {
+      await deletePromoCode(id)
+      addToast?.("Promo dihapus/dinonaktifkan", "success")
+      loadPromos()
+    } catch (err) { addToast?.(err.message, "error") }
+  }
+
+  const handleViewRedemptions = async (promo) => {
+    try {
+      const data = await fetchPromoRedemptions(promo.id)
+      setRedemptionsModal({ promo, data })
+    } catch (err) { addToast?.(err.message, "error") }
+  }
 
   useEffect(() => { load() }, [load])
   useEffect(() => { loadRentals() }, [loadRentals])
@@ -156,6 +292,7 @@ export default function SuperAdminPanel({ addToast }) {
           <TabsTrigger value="categories" className="rounded-full"><FolderOpen className="w-4 h-4 mr-1.5" /> Kategori</TabsTrigger>
           <TabsTrigger value="verifications" className="rounded-full" onClick={loadVerifications}><ShieldCheck className="w-4 h-4 mr-1.5" /> Verifikasi</TabsTrigger>
           <TabsTrigger value="rentals" className="rounded-full" onClick={loadRentals}><ClipboardList className="w-4 h-4 mr-1.5" /> Transaksi</TabsTrigger>
+          <TabsTrigger value="promos" className="rounded-full" onClick={loadPromos}><Tag className="w-4 h-4 mr-1.5" /> Promo</TabsTrigger>
         </TabsList>
 
         {/* ═══ STATS ═══ */}
@@ -346,6 +483,84 @@ export default function SuperAdminPanel({ addToast }) {
             </div>
           )}
         </TabsContent>
+
+        {/* ═══ PROMOS ═══ */}
+        <TabsContent value="promos" className="space-y-5 mt-6">
+          <div className="flex justify-between items-center flex-wrap gap-2">
+            <h2 className="text-lg font-bold tracking-tight flex items-center gap-2">
+              <Gift className="w-5 h-5 text-primary" /> Kupon promo platform
+            </h2>
+            <Button onClick={openCreatePromo} className="rounded-full"><Plus className="w-4 h-4 mr-1.5" /> Buat promo</Button>
+          </div>
+
+          {promoLoading ? (
+            <Skeleton className="h-40 rounded-2xl" />
+          ) : promos.length === 0 ? (
+            <div className="text-center py-16">
+              <div className="w-16 h-16 rounded-3xl bg-secondary flex items-center justify-center mx-auto mb-4">
+                <Tag className="w-7 h-7 text-muted-foreground" />
+              </div>
+              <h3 className="text-lg font-semibold">Belum ada promo</h3>
+              <p className="text-sm text-muted-foreground mt-1">Klik "Buat promo" untuk menambah kupon baru</p>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-border bg-card overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Kode</TableHead>
+                    <TableHead>Nama</TableHead>
+                    <TableHead>Diskon</TableHead>
+                    <TableHead>Eligibility</TableHead>
+                    <TableHead>Pakai</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Aksi</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {promos.map(p => (
+                    <TableRow key={p.id}>
+                      <TableCell><span className="font-mono font-bold text-primary">{p.code}</span></TableCell>
+                      <TableCell className="font-semibold">{p.nama}</TableCell>
+                      <TableCell className="text-sm">
+                        {p.discount_type === "percentage"
+                          ? <>{Math.round(p.discount_value)}%{p.max_discount ? ` (max ${formatPrice(p.max_discount)})` : ""}</>
+                          : <>{formatPrice(p.discount_value)}</>
+                        }
+                      </TableCell>
+                      <TableCell><StatusBadge status={p.eligibility} label={p.eligibility === "new_user" ? "Pengguna baru" : "Semua"} /></TableCell>
+                      <TableCell className="text-sm">
+                        {p.used_count}{p.max_total_uses ? ` / ${p.max_total_uses}` : ""}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col gap-0.5">
+                          <StatusBadge status={p.is_active ? "disetujui" : "ditolak"} label={p.is_active ? "Aktif" : "Nonaktif"} />
+                          {p.is_featured && <span className="text-[10px] font-semibold text-primary">★ Featured</span>}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-1.5 justify-end">
+                          <Button size="sm" variant="outline" className="rounded-full h-8 w-8 p-0" onClick={() => handleViewRedemptions(p)} title="Riwayat pemakaian">
+                            <History className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button size="sm" variant="outline" className="rounded-full h-8 w-8 p-0" onClick={() => handleTogglePromoActive(p)} title={p.is_active ? "Nonaktifkan" : "Aktifkan"}>
+                            {p.is_active ? <XCircle className="w-3.5 h-3.5" /> : <CheckCircle className="w-3.5 h-3.5" />}
+                          </Button>
+                          <Button size="sm" variant="outline" className="rounded-full h-8 w-8 p-0" onClick={() => openEditPromo(p)} title="Edit">
+                            <Pencil className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button size="sm" variant="destructive" className="rounded-full h-8 w-8 p-0" onClick={() => handleDeletePromo(p.id)} title="Hapus">
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </TabsContent>
       </Tabs>
 
       {/* ═══ EDIT USER DIALOG ═══ */}
@@ -405,6 +620,215 @@ export default function SuperAdminPanel({ addToast }) {
               <Button type="submit" loading={savingCat}>Tambah</Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* ═══ PROMO CREATE/EDIT DIALOG ═══ */}
+      <Dialog open={promoModalOpen} onOpenChange={setPromoModalOpen}>
+        <DialogContent className="sm:max-w-[560px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editPromo ? `Edit promo — ${editPromo.code}` : "Buat promo baru"}</DialogTitle>
+            <DialogDescription>
+              {editPromo
+                ? "Ubah detail kupon. Kode tidak bisa diubah setelah dibuat."
+                : "Definisikan kupon promo platform-wide."}
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSavePromo} className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Kode *</Label>
+                <Input
+                  placeholder="WELCOME50"
+                  value={promoForm.code}
+                  onChange={(e) => setPromoForm(p => ({ ...p, code: e.target.value.toUpperCase() }))}
+                  required
+                  disabled={!!editPromo}
+                  className="font-mono uppercase"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Nama *</Label>
+                <Input
+                  placeholder="Promo Pengguna Baru"
+                  value={promoForm.nama}
+                  onChange={(e) => setPromoForm(p => ({ ...p, nama: e.target.value }))}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Deskripsi (tampil di landing page)</Label>
+              <textarea
+                className="flex min-h-[60px] w-full rounded-xl border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                placeholder="Diskon 50% untuk transaksi pertama..."
+                value={promoForm.deskripsi}
+                onChange={(e) => setPromoForm(p => ({ ...p, deskripsi: e.target.value }))}
+              />
+            </div>
+
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-2">
+                <Label>Tipe</Label>
+                <select
+                  className="flex h-9 w-full rounded-xl border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  value={promoForm.discount_type}
+                  onChange={(e) => setPromoForm(p => ({ ...p, discount_type: e.target.value }))}
+                >
+                  <option value="percentage">Persentase</option>
+                  <option value="fixed">Nominal tetap</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label>Nilai *</Label>
+                <Input
+                  type="number" step="0.01" min={0.01}
+                  placeholder={promoForm.discount_type === "percentage" ? "50" : "50000"}
+                  value={promoForm.discount_value}
+                  onChange={(e) => setPromoForm(p => ({ ...p, discount_value: e.target.value }))}
+                  required
+                />
+                <p className="text-[10px] text-muted-foreground">{promoForm.discount_type === "percentage" ? "1-100 %" : "Nominal Rp"}</p>
+              </div>
+              <div className="space-y-2">
+                <Label>Max diskon</Label>
+                <Input
+                  type="number" min={0}
+                  placeholder="50000"
+                  value={promoForm.max_discount}
+                  onChange={(e) => setPromoForm(p => ({ ...p, max_discount: e.target.value }))}
+                />
+                <p className="text-[10px] text-muted-foreground">Cap potongan (Rp)</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-2">
+                <Label>Min order</Label>
+                <Input
+                  type="number" min={0}
+                  placeholder="0"
+                  value={promoForm.min_order}
+                  onChange={(e) => setPromoForm(p => ({ ...p, min_order: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Eligibility</Label>
+                <select
+                  className="flex h-9 w-full rounded-xl border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  value={promoForm.eligibility}
+                  onChange={(e) => setPromoForm(p => ({ ...p, eligibility: e.target.value }))}
+                >
+                  <option value="new_user">Pengguna baru</option>
+                  <option value="all">Semua user</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <Label>Max pakai/user</Label>
+                <Input
+                  type="number" min={1}
+                  value={promoForm.max_uses_per_user}
+                  onChange={(e) => setPromoForm(p => ({ ...p, max_uses_per_user: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Kuota total (kosongkan = unlimited)</Label>
+              <Input
+                type="number" min={1}
+                placeholder="Unlimited"
+                value={promoForm.max_total_uses}
+                onChange={(e) => setPromoForm(p => ({ ...p, max_total_uses: e.target.value }))}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label>Berlaku dari</Label>
+                <Input
+                  type="datetime-local"
+                  value={promoForm.valid_from}
+                  onChange={(e) => setPromoForm(p => ({ ...p, valid_from: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Berlaku sampai</Label>
+                <Input
+                  type="datetime-local"
+                  value={promoForm.valid_until}
+                  onChange={(e) => setPromoForm(p => ({ ...p, valid_until: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-4 pt-2">
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={promoForm.is_active}
+                  onChange={(e) => setPromoForm(p => ({ ...p, is_active: e.target.checked }))}
+                  className="rounded border-input"
+                />
+                Aktif
+              </label>
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={promoForm.is_featured}
+                  onChange={(e) => setPromoForm(p => ({ ...p, is_featured: e.target.checked }))}
+                  className="rounded border-input"
+                />
+                Tampilkan di landing page
+              </label>
+            </div>
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setPromoModalOpen(false)}>Batal</Button>
+              <Button type="submit" loading={savingPromo}>{editPromo ? "Simpan" : "Buat"}</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* ═══ PROMO REDEMPTIONS DIALOG ═══ */}
+      <Dialog open={!!redemptionsModal} onOpenChange={(open) => { if (!open) setRedemptionsModal(null) }}>
+        <DialogContent className="sm:max-w-[640px] max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Riwayat pemakaian — {redemptionsModal?.promo?.code}</DialogTitle>
+            <DialogDescription>
+              {redemptionsModal?.data?.total || 0} pemakaian · total diskon dibagikan: {formatPrice(redemptionsModal?.data?.total_discount_given || 0)}
+            </DialogDescription>
+          </DialogHeader>
+          {redemptionsModal?.data?.redemptions?.length ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>User ID</TableHead>
+                  <TableHead>Rental ID</TableHead>
+                  <TableHead>Subtotal</TableHead>
+                  <TableHead>Diskon</TableHead>
+                  <TableHead>Final</TableHead>
+                  <TableHead>Tanggal</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {redemptionsModal.data.redemptions.map(r => (
+                  <TableRow key={r.id}>
+                    <TableCell>#{r.user_id}</TableCell>
+                    <TableCell>#{r.rental_id}</TableCell>
+                    <TableCell className="text-muted-foreground">{formatPrice(r.original_amount)}</TableCell>
+                    <TableCell className="text-emerald-600 font-semibold">−{formatPrice(r.discount_amount)}</TableCell>
+                    <TableCell className="font-semibold">{formatPrice(r.final_amount)}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{new Date(r.redeemed_at).toLocaleString("id-ID")}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <div className="text-center py-8 text-sm text-muted-foreground">Belum ada pemakaian</div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

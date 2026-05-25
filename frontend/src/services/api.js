@@ -565,3 +565,67 @@ export async function fetchMyWithdrawals(params = {}) {
   const res = await fetch(`${API_URL}/admin/wallet/withdrawals?${q}`, { headers: authOnlyHeaders() })
   return handleResponse(res)
 }
+
+
+// ==================== PROMO / DISKON ====================
+
+// [Public] Promo aktif untuk banner di landing page
+export async function fetchFeaturedPromos() {
+  const res = await fetch(`${API_URL}/promos/featured`)
+  return handleResponse(res)
+}
+
+// [User] Validasi/preview kupon di halaman checkout
+export async function validatePromo({ code, item_id, tanggal_mulai, tanggal_selesai }) {
+  const res = await fetch(`${API_URL}/promos/validate`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify({ code, item_id, tanggal_mulai, tanggal_selesai }),
+  })
+  return handleResponse(res)
+}
+
+// [Super Admin] CRUD kupon
+export async function fetchPromoCodes(params = {}) {
+  const q = new URLSearchParams()
+  q.append("skip", params.skip ?? 0)
+  q.append("limit", params.limit ?? 50)
+  const res = await fetch(`${API_URL}/superadmin/promos?${q.toString()}`, {
+    headers: authOnlyHeaders(),
+  })
+  return handleResponse(res)
+}
+
+export async function createPromoCode(data) {
+  const res = await fetch(`${API_URL}/superadmin/promos`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify(data),
+  })
+  return handleResponse(res)
+}
+
+export async function updatePromoCode(promoId, data) {
+  const res = await fetch(`${API_URL}/superadmin/promos/${promoId}`, {
+    method: "PUT",
+    headers: authHeaders(),
+    body: JSON.stringify(data),
+  })
+  return handleResponse(res)
+}
+
+export async function deletePromoCode(promoId) {
+  const res = await fetch(`${API_URL}/superadmin/promos/${promoId}`, {
+    method: "DELETE",
+    headers: authOnlyHeaders(),
+  })
+  if (!res.ok && res.status !== 204) return handleResponse(res)
+  return true
+}
+
+export async function fetchPromoRedemptions(promoId) {
+  const res = await fetch(`${API_URL}/superadmin/promos/${promoId}/redemptions`, {
+    headers: authOnlyHeaders(),
+  })
+  return handleResponse(res)
+}
