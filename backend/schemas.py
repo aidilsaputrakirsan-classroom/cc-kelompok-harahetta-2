@@ -55,6 +55,16 @@ class PaymentMethodEnum(str, enum.Enum):
     midtrans = "midtrans"
 
 
+class DiscountTypeEnum(str, enum.Enum):
+    percentage = "percentage"
+    fixed = "fixed"
+
+
+class PromoEligibilityEnum(str, enum.Enum):
+    new_user = "new_user"
+    all = "all"
+
+
 # ============================================================
 # AUTH SCHEMAS
 # ============================================================
@@ -375,6 +385,7 @@ class RentalCreate(BaseModel):
     tanggal_mulai: date = Field(..., examples=["2026-04-10"])
     tanggal_selesai: date = Field(..., examples=["2026-04-15"])
     catatan: Optional[str] = Field(None, examples=["Tolong siapkan baterai cadangan"])
+    promo_code: Optional[str] = Field(None, examples=["WELCOME50"], max_length=50)
 
     @field_validator("tanggal_selesai")
     @classmethod
@@ -383,6 +394,14 @@ class RentalCreate(BaseModel):
         if "tanggal_mulai" in info.data and tanggal_selesai <= info.data["tanggal_mulai"]:
             raise ValueError("Tanggal selesai harus setelah tanggal mulai")
         return tanggal_selesai
+
+    @field_validator("promo_code")
+    @classmethod
+    def normalize_promo_code(cls, v):
+        if v is None:
+            return None
+        v = v.strip().upper()
+        return v or None
 
 
 class RentalStatusUpdate(BaseModel):
@@ -401,6 +420,11 @@ class RentalResponse(BaseModel):
     total_harga: float
     status: RentalStatusEnum
     catatan: Optional[str]
+    # ── Promo / diskon
+    promo_code_id: Optional[int] = None
+    discount_amount: Optional[float] = None
+    original_amount: Optional[float] = None
+    promo_code: Optional["PromoCodeBriefResponse"] = None
     # ── Snapshot info pickup (diisi saat rental disetujui)
     pickup_alamat: Optional[str] = None
     pickup_latitude: Optional[float] = None
@@ -723,3 +747,185 @@ class ShopResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# ============================================================
+# PROMO CODE SCHEMAS — Diskon / Kupon Platform
+# ============================================================
+
+class PromoCodeCreate(BaseModel):
+    """Schema super admin membuat kupon promo baru."""
+    code: str = Field(..., min_length=2, max_length=50, examples=["WELCOME50"])
+    nama: str = Field(..., min_length=2, max_length=100, examples=["Promo Pengguna Baru"])
+    deskripsi: Optional[str] = Field(None, examples=["Diskon 50% untuk transaksi pertama"])
+
+    discount_type: DiscountTypeEnum = Field(DiscountTypeEnum.percentage)
+    discount_value: float = Field(..., gt=0, examples=[50])
+    max_discount: Optional[float] = Field(None, ge=0, examples=[50000])
+    min_order: float = Field(0.0, ge=0)
+
+    eligibility: PromoEligibilityEnum = Field(PromoEligibilityEnum.all)
+    max_uses_per_user: int = Field(1, ge=1)
+    max_total_uses: Optional[int] = Field(None, ge=1)
+
+    is_active: bool = Field(True)
+    is_featured: bool = Field(False)
+    valid_from: Optional[datetime] = None
+    valid_until: Optional[datetime] = None
+
+    @field_validator("code")
+    @classmethod
+    def normalize_code(cls, v: str) -> str:
+        v = v.strip().upper()
+        if not re.match(r"^[A-Z0-9_-]+$", v):
+            raise ValueError("Code hanya boleh huruf, angka, '-' atau '_'")
+        return v
+
+    @field_validator("discount_value")
+    @classmethod
+    def validate_discount_value(cls, v, info):
+        dtype = info.data.get("discount_type")
+        if dtype == DiscountTypeEnum.percentage and (v <= 0 or v > 100):
+            raise ValueError("Untuk percentage, discount_value harus 1-100")
+        return v
+
+
+class PromoCodeUpdate(BaseModel):
+    """Schema update kupon (semua field opsional)."""
+    nama: Optional[str] = Field(None, min_length=2, max_length=100)
+    deskripsi: Optional[str] = None
+    discount_type: Optional[DiscountTypeEnum] = None
+    discount_value: Optional[float] = Field(None, gt=0)
+    max_discount: Optional[float] = Field(None, ge=0)
+    min_order: Optional[float] = Field(None, ge=0)
+    eligibility: Optional[PromoEligibilityEnum] = None
+    max_uses_per_user: Optional[int] = Field(None, ge=1)
+    max_total_uses: Optional[int] = Field(None, ge=1)
+    is_active: Optional[bool] = None
+    is_featured: Optional[bool] = None
+    valid_from: Optional[datetime] = None
+    valid_until: Optional[datetime] = None
+
+
+class PromoCodeBriefResponse(BaseModel):
+    """Versi ringkas untuk embed di RentalResponse."""
+    id: int
+    code: str
+    nama: str
+    discount_type: DiscountTypeEnum
+    discount_value: float
+    max_discount: Optional[float] = None
+
+    class Config:
+        from_attributes = True
+
+
+class PromoCodeResponse(BaseModel):
+    """Response lengkap untuk super admin."""
+    id: int
+    code: str
+    nama: str
+    deskripsi: Optional[str] = None
+
+    discount_type: DiscountTypeEnum
+    discount_value: float
+    max_discount: Optional[float] = None
+    min_order: float
+
+    eligibility: PromoEligibilityEnum
+    max_uses_per_user: int
+    max_total_uses: Optional[int] = None
+    used_count: int
+
+    is_active: bool
+    is_featured: bool
+    valid_from: Optional[datetime] = None
+    valid_until: Optional[datetime] = None
+
+    created_by: Optional[int] = None
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class PromoCodeListResponse(BaseModel):
+    total: int
+    promos: List[PromoCodeResponse]
+
+
+class PromoCodePublicResponse(BaseModel):
+    """
+    Response publik untuk landing page (tanpa data sensitif/internal).
+    """
+    code: str
+    nama: str
+    deskripsi: Optional[str] = None
+    discount_type: DiscountTypeEnum
+    discount_value: float
+    max_discount: Optional[float] = None
+    min_order: float
+    eligibility: PromoEligibilityEnum
+    valid_until: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+# ── Validate / preview diskon (saat user klik "Gunakan" di checkout)
+
+class PromoValidateRequest(BaseModel):
+    code: str = Field(..., min_length=1, max_length=50, examples=["WELCOME50"])
+    item_id: int
+    tanggal_mulai: date
+    tanggal_selesai: date
+
+    @field_validator("code")
+    @classmethod
+    def normalize_code(cls, v: str) -> str:
+        return v.strip().upper()
+
+    @field_validator("tanggal_selesai")
+    @classmethod
+    def validate_dates(cls, v, info):
+        if "tanggal_mulai" in info.data and v <= info.data["tanggal_mulai"]:
+            raise ValueError("Tanggal selesai harus setelah tanggal mulai")
+        return v
+
+
+class PromoValidateResponse(BaseModel):
+    valid: bool
+    code: Optional[str] = None
+    nama: Optional[str] = None
+    original_amount: Optional[float] = None
+    discount_amount: Optional[float] = None
+    final_amount: Optional[float] = None
+    message: str
+
+
+# ── Audit / log redemptions (super admin)
+
+class PromoRedemptionResponse(BaseModel):
+    id: int
+    promo_code_id: int
+    user_id: int
+    rental_id: int
+    original_amount: float
+    discount_amount: float
+    final_amount: float
+    redeemed_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class PromoRedemptionListResponse(BaseModel):
+    total: int
+    total_discount_given: float
+    redemptions: List[PromoRedemptionResponse]
+
+
+
+# Resolve forward references (RentalResponse → PromoCodeBriefResponse)
+RentalResponse.model_rebuild()

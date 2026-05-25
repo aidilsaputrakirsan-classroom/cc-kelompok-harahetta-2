@@ -43,6 +43,11 @@ from schemas import (
     WithdrawalListResponse, WithdrawalActionByAdmin,
     # Review & Shop
     ReviewCreate, ReviewUpdate, ReviewResponse, ReviewListResponse, ShopResponse,
+    # Promo
+    PromoCodeCreate, PromoCodeUpdate, PromoCodeResponse, PromoCodeListResponse,
+    PromoCodePublicResponse,
+    PromoValidateRequest, PromoValidateResponse,
+    PromoRedemptionListResponse,
 )
 from auth import (
     create_access_token, get_current_user,
@@ -108,8 +113,78 @@ def _ensure_rental_due_at_column() -> None:
         print(f"[startup] Gagal menambah kolom due_at: {exc}")
 
 
+def _ensure_promo_tables_and_columns() -> None:
+    """
+    Idempotent migration untuk fitur promo/diskon:
+    - Tambah kolom promo_code_id / discount_amount / original_amount di tabel rentals
+    - Buat tabel promo_codes & promo_redemptions jika belum ada
+    - Seed kupon default WELCOME50 (sekali saja)
+    """
+    try:
+        from sqlalchemy import inspect as sa_inspect
+        from datetime import datetime, timedelta
+
+        is_sqlite = str(engine.url).startswith("sqlite")
+        FLOAT_TYPE = "REAL" if is_sqlite else "DOUBLE PRECISION"
+        TIMESTAMP_TYPE = "TIMESTAMP" if is_sqlite else "TIMESTAMP WITH TIME ZONE"
+        BOOL_TRUE = "1" if is_sqlite else "TRUE"
+
+        insp = sa_inspect(engine)
+
+        # 1. Tambah kolom di tabel rentals
+        if insp.has_table("rentals"):
+            rcols = {c["name"] for c in insp.get_columns("rentals")}
+            new_cols = [
+                ("promo_code_id", "INTEGER"),
+                ("discount_amount", FLOAT_TYPE),
+                ("original_amount", FLOAT_TYPE),
+            ]
+            with engine.begin() as conn:
+                for col_name, col_type in new_cols:
+                    if col_name in rcols:
+                        continue
+                    try:
+                        conn.execute(text(f"ALTER TABLE rentals ADD COLUMN {col_name} {col_type}"))
+                        print(f"[startup] Kolom rentals.{col_name} ditambahkan.")
+                    except Exception as e:
+                        print(f"[startup] Gagal tambah rentals.{col_name}: {e}")
+
+        # 2. Buat tabel promo_codes & promo_redemptions
+        Base.metadata.create_all(bind=engine)  # SQLAlchemy auto-create yang missing
+
+        # 3. Seed default kupon WELCOME50
+        with engine.begin() as conn:
+            existing = conn.execute(
+                text("SELECT id FROM promo_codes WHERE UPPER(code) = 'WELCOME50'")
+            ).first()
+            if not existing:
+                valid_until = datetime.utcnow() + timedelta(days=365)
+                conn.execute(
+                    text(f"""
+                        INSERT INTO promo_codes (
+                            code, nama, deskripsi,
+                            discount_type, discount_value, max_discount, min_order,
+                            eligibility, max_uses_per_user, max_total_uses, used_count,
+                            is_active, is_featured, valid_until
+                        ) VALUES (
+                            'WELCOME50',
+                            'Promo Pengguna Baru',
+                            'Diskon 50% untuk transaksi pertama kamu di Sewain. Maksimal potongan Rp 50.000.',
+                            'percentage', 50, 50000, 0,
+                            'new_user', 1, NULL, 0,
+                            {BOOL_TRUE}, {BOOL_TRUE}, :valid_until
+                        )
+                    """),
+                    {"valid_until": valid_until},
+                )
+                print("[startup] Seed kupon WELCOME50 berhasil.")
+    except Exception as exc:  # noqa: BLE001
+        print(f"[startup] Gagal migrate promo: {exc}")
+
+
 _ensure_user_photo_column()
 _ensure_rental_due_at_column()
+_ensure_promo_tables_and_columns()
 
 # ==================== APP INSTANCE ====================
 
@@ -2496,3 +2571,145 @@ def delete_review_endpoint(
             raise HTTPException(status_code=403, detail=err)
         raise HTTPException(status_code=400, detail=err or "Gagal menghapus review")
     return
+
+
+
+# ============================================================
+# PROMO / DISKON — Public, User, Super Admin
+# ============================================================
+
+# ── Public: Banner promo di landing page
+
+@app.get(
+    "/promos/featured",
+    response_model=List[PromoCodePublicResponse],
+    tags=["🎁 Promo — Diskon"],
+    summary="[Public] Promo aktif untuk ditampilkan di landing page",
+)
+def list_featured_promos(
+    db: Session = Depends(get_db),
+):
+    """
+    List promo yang sedang aktif & flagged sebagai featured.
+    Dipakai banner di LandingPage.
+    """
+    return crud.get_featured_promos(db=db, limit=3)
+
+
+# ── User: Validasi/preview diskon di halaman checkout
+
+@app.post(
+    "/promos/validate",
+    response_model=PromoValidateResponse,
+    tags=["🎁 Promo — Diskon"],
+    summary="[User] Cek apakah kode promo bisa dipakai untuk transaksi ini",
+)
+def validate_promo_endpoint(
+    data: PromoValidateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """
+    Preview diskon SEBELUM membuat rental. User submit kode promo
+    + item_id + tanggal sewa, server return breakdown harga.
+    """
+    result = crud.validate_promo_for_user(
+        db=db,
+        user_id=current_user.id,
+        code=data.code,
+        item_id=data.item_id,
+        tanggal_mulai=data.tanggal_mulai,
+        tanggal_selesai=data.tanggal_selesai,
+    )
+    return result
+
+
+# ── Super Admin: CRUD kupon
+
+@app.get(
+    "/superadmin/promos",
+    response_model=PromoCodeListResponse,
+    tags=["👑 Super Admin"],
+    summary="[Super Admin] List semua kupon promo",
+)
+def superadmin_list_promos(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_super_admin),
+):
+    return crud.get_promo_codes(db=db, skip=skip, limit=limit)
+
+
+@app.post(
+    "/superadmin/promos",
+    response_model=PromoCodeResponse,
+    status_code=201,
+    tags=["👑 Super Admin"],
+    summary="[Super Admin] Buat kupon promo baru",
+)
+def superadmin_create_promo(
+    data: PromoCodeCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_super_admin),
+):
+    result = crud.create_promo_code(db=db, super_admin_id=current_user.id, data=data)
+    if isinstance(result, dict) and "error" in result:
+        raise HTTPException(status_code=result.get("code", 400), detail=result["error"])
+    return result
+
+
+@app.put(
+    "/superadmin/promos/{promo_id}",
+    response_model=PromoCodeResponse,
+    tags=["👑 Super Admin"],
+    summary="[Super Admin] Update kupon promo",
+)
+def superadmin_update_promo(
+    promo_id: int,
+    data: PromoCodeUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_super_admin),
+):
+    promo = crud.update_promo_code(db=db, promo_id=promo_id, data=data)
+    if not promo:
+        raise HTTPException(status_code=404, detail=f"Promo ID {promo_id} tidak ditemukan")
+    return promo
+
+
+@app.delete(
+    "/superadmin/promos/{promo_id}",
+    status_code=204,
+    tags=["👑 Super Admin"],
+    summary="[Super Admin] Hapus / nonaktifkan kupon",
+)
+def superadmin_delete_promo(
+    promo_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_super_admin),
+):
+    """
+    Hapus kupon. Jika sudah pernah dipakai (ada redemption), akan
+    di-soft-delete (is_active=False) demi menjaga integritas history.
+    """
+    ok = crud.delete_promo_code(db=db, promo_id=promo_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail=f"Promo ID {promo_id} tidak ditemukan")
+    return
+
+
+@app.get(
+    "/superadmin/promos/{promo_id}/redemptions",
+    response_model=PromoRedemptionListResponse,
+    tags=["👑 Super Admin"],
+    summary="[Super Admin] Riwayat pemakaian kupon",
+)
+def superadmin_promo_redemptions(
+    promo_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_super_admin),
+):
+    promo = crud.get_promo_code(db=db, promo_id=promo_id)
+    if not promo:
+        raise HTTPException(status_code=404, detail=f"Promo ID {promo_id} tidak ditemukan")
+    return crud.get_promo_redemptions(db=db, promo_id=promo_id)

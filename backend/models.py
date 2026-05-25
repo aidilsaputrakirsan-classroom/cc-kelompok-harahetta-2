@@ -66,6 +66,16 @@ class WithdrawalStatus(str, enum.Enum):
     rejected = "rejected"
 
 
+class DiscountType(str, enum.Enum):
+    percentage = "percentage"
+    fixed = "fixed"
+
+
+class PromoEligibility(str, enum.Enum):
+    new_user = "new_user"   # khusus pengguna yang belum pernah punya rental aktif/selesai
+    all = "all"             # semua user
+
+
 # ============================================================
 # TABEL users — Semua Pengguna Platform
 # ============================================================
@@ -249,9 +259,13 @@ class Rental(Base):
     item_id = Column(Integer, ForeignKey("items.id", ondelete="CASCADE"), nullable=False)
     tanggal_mulai = Column(Date, nullable=False)
     tanggal_selesai = Column(Date, nullable=False)
-    total_harga = Column(Float, nullable=False)  # Kalkulasi otomatis: harga_per_hari × durasi
+    total_harga = Column(Float, nullable=False)  # Harga FINAL setelah diskon (yang dibayar user)
     status = Column(SAEnum(RentalStatus), nullable=False, default=RentalStatus.pending)
     catatan = Column(Text, nullable=True)        # Catatan dari user atau admin
+    # ── Promo / diskon
+    promo_code_id = Column(Integer, ForeignKey("promo_codes.id", ondelete="SET NULL"), nullable=True)
+    discount_amount = Column(Float, nullable=True, default=0.0)  # Nominal potongan (Rp)
+    original_amount = Column(Float, nullable=True)               # Subtotal sebelum diskon
     # ── Snapshot alamat pickup (diambil saat rental disetujui)
     pickup_alamat = Column(Text, nullable=True)
     pickup_latitude = Column(Float, nullable=True)
@@ -268,6 +282,8 @@ class Rental(Base):
     user = relationship("User", back_populates="rentals")
     item = relationship("Item", back_populates="rentals")
     payment = relationship("Payment", back_populates="rental", uselist=False)
+    promo_code = relationship("PromoCode", foreign_keys=[promo_code_id])
+    promo_redemption = relationship("PromoRedemption", back_populates="rental", uselist=False)
 
     def __repr__(self):
         return f"<Rental(id={self.id}, user_id={self.user_id}, item_id={self.item_id}, status='{self.status}')>"
@@ -488,3 +504,84 @@ class Review(Base):
 
     def __repr__(self):
         return f"<Review(id={self.id}, rental_id={self.rental_id}, rating={self.rating})>"
+
+
+# ============================================================
+# TABEL promo_codes — Kupon / Kode Promo Platform
+# ============================================================
+
+class PromoCode(Base):
+    """
+    Kupon promo platform-wide. Hanya super admin yang bisa CRUD.
+    Diskon ditanggung platform (bukan admin penyedia).
+    """
+    __tablename__ = "promo_codes"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    code = Column(String(50), unique=True, nullable=False, index=True)  # mis. WELCOME50
+    nama = Column(String(100), nullable=False)                          # Label internal
+    deskripsi = Column(Text, nullable=True)                             # Untuk landing page
+
+    # ── Aturan diskon
+    discount_type = Column(SAEnum(DiscountType), nullable=False, default=DiscountType.percentage)
+    discount_value = Column(Float, nullable=False)                      # 50 (artinya 50%) atau nominal Rp
+    max_discount = Column(Float, nullable=True)                         # Cap potongan (Rp). NULL = no cap
+    min_order = Column(Float, nullable=False, default=0.0)              # Minimum subtotal
+
+    # ── Eligibility & limit
+    eligibility = Column(SAEnum(PromoEligibility), nullable=False, default=PromoEligibility.all)
+    max_uses_per_user = Column(Integer, nullable=False, default=1)
+    max_total_uses = Column(Integer, nullable=True)                     # NULL = unlimited
+    used_count = Column(Integer, nullable=False, default=0)             # Counter pemakaian sukses
+
+    # ── Status & visibility
+    is_active = Column(Boolean, nullable=False, default=True)
+    is_featured = Column(Boolean, nullable=False, default=False)        # Tampilkan di landing
+    valid_from = Column(DateTime(timezone=True), nullable=True)
+    valid_until = Column(DateTime(timezone=True), nullable=True)
+
+    created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
+
+    # Relationships
+    creator = relationship("User", foreign_keys=[created_by])
+    redemptions = relationship("PromoRedemption", back_populates="promo_code", cascade="all, delete-orphan")
+
+    def __repr__(self):
+        return f"<PromoCode(id={self.id}, code='{self.code}', value={self.discount_value})>"
+
+
+# ============================================================
+# TABEL promo_redemptions — Audit Pemakaian Kupon
+# ============================================================
+
+class PromoRedemption(Base):
+    """
+    Catatan setiap pemakaian kupon oleh user pada satu rental.
+    Mencegah double-spend (UNIQUE per rental_id) dan jadi audit trail.
+    """
+    __tablename__ = "promo_redemptions"
+    __table_args__ = (
+        Index("ix_promo_redemption_user", "user_id"),
+        Index("ix_promo_redemption_promo", "promo_code_id"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    promo_code_id = Column(Integer, ForeignKey("promo_codes.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    rental_id = Column(Integer, ForeignKey("rentals.id", ondelete="CASCADE"), unique=True, nullable=False)
+
+    original_amount = Column(Float, nullable=False)   # Subtotal sebelum diskon
+    discount_amount = Column(Float, nullable=False)   # Nominal potongan
+    final_amount = Column(Float, nullable=False)      # Yang dibayar user
+
+    redeemed_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # Relationships
+    promo_code = relationship("PromoCode", back_populates="redemptions")
+    user = relationship("User", foreign_keys=[user_id])
+    rental = relationship("Rental", back_populates="promo_redemption", foreign_keys=[rental_id])
+
+    def __repr__(self):
+        return f"<PromoRedemption(id={self.id}, promo_code_id={self.promo_code_id}, user_id={self.user_id}, discount={self.discount_amount})>"
