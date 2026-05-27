@@ -280,5 +280,13 @@ def create_core_charge(
         finish_url = os.getenv("MIDTRANS_FINISH_REDIRECT_URL", "http://localhost:5173/payment/finish")
         payload["shopeepay"] = {"callback_url": finish_url}
 
+    # Set expiry: 30 menit dari sekarang
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+    payload["custom_expiry"] = {
+        "expiry_duration": 30,
+        "unit": "minute",
+    }
+
     response = core.charge(payload)
     return response

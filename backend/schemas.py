@@ -434,6 +434,7 @@ class RentalResponse(BaseModel):
     diambil_at: Optional[datetime] = None
     due_at: Optional[datetime] = None
     return_requested_at: Optional[datetime] = None
+    payment_deadline: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
     item: Optional[ItemResponse]
@@ -500,6 +501,8 @@ class PaymentResponse(BaseModel):
     snap_token: Optional[str] = None
     snap_redirect_url: Optional[str] = None
     payment_channel: Optional[str] = None
+    charge_response: Optional[str] = None
+    expires_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
 
@@ -756,8 +759,8 @@ class ShopResponse(BaseModel):
 class PromoCodeCreate(BaseModel):
     """Schema super admin membuat kupon promo baru."""
     code: str = Field(..., min_length=2, max_length=50, examples=["WELCOME50"])
-    nama: str = Field(..., min_length=2, max_length=100, examples=["Promo Pengguna Baru"])
-    deskripsi: Optional[str] = Field(None, examples=["Diskon 50% untuk transaksi pertama"])
+    nama: str = Field(..., min_length=2, max_length=40, examples=["Promo Pengguna Baru"])
+    deskripsi: Optional[str] = Field(None, max_length=100, examples=["Diskon 50% untuk transaksi pertama"])
 
     discount_type: DiscountTypeEnum = Field(DiscountTypeEnum.percentage)
     discount_value: float = Field(..., gt=0, examples=[50])

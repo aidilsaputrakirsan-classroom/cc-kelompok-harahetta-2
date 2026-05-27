@@ -59,6 +59,35 @@ const PAYMENT_STATUS_META = {
   cancelled: { label: "Dibatalkan", cls: "bg-muted text-muted-foreground" },
 }
 
+/* ─── Payment countdown mini ──────────────────────────────── */
+function MyRentalsPaymentCountdown({ expiresAt }) {
+  const [timeLeft, setTimeLeft] = useState(() => {
+    const diff = new Date(expiresAt).getTime() - Date.now()
+    return Math.max(0, Math.floor(diff / 1000))
+  })
+
+  useEffect(() => {
+    if (timeLeft <= 0) return
+    const timer = setInterval(() => {
+      const diff = new Date(expiresAt).getTime() - Date.now()
+      setTimeLeft(Math.max(0, Math.floor(diff / 1000)))
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [expiresAt])
+
+  if (timeLeft <= 0) return <span className="text-[10px] text-red-600 font-semibold">⏰ Expired</span>
+
+  const mins = Math.floor(timeLeft / 60)
+  const secs = timeLeft % 60
+  const isUrgent = timeLeft < 300
+
+  return (
+    <span className={`text-[10px] font-mono font-bold ${isUrgent ? "text-red-600" : "text-amber-600"}`}>
+      ⏱ {String(mins).padStart(2, "0")}:{String(secs).padStart(2, "0")}
+    </span>
+  )
+}
+
 /* ─── RentalCountdown ─────────────────────────────────────── */
 function RentalCountdown({ rental }) {
   const [t, setT] = useState({ d: 0, h: 0, m: 0, s: 0 })
@@ -239,7 +268,16 @@ function RentalCard({ rental, review, payment, onReview, onPickup }) {
           {rental.status === "disetujui" && payment?.status !== "completed" && (
             <div className="mt-4 flex items-center gap-2">
               <CreditCard className="w-4 h-4 text-amber-600" />
-              <span className="text-xs font-semibold text-amber-700">Menunggu pembayaran</span>
+              <span className="text-xs font-semibold text-amber-700">
+                {payment?.payment_channel
+                  ? `Menunggu pembayaran — ${payment.payment_channel.replace(/_/g, " ").toUpperCase()}`
+                  : "Menunggu pembayaran"}
+              </span>
+              {payment?.expires_at ? (
+                <MyRentalsPaymentCountdown expiresAt={payment.expires_at} />
+              ) : rental.payment_deadline && (
+                <MyRentalsPaymentCountdown expiresAt={rental.payment_deadline} />
+              )}
             </div>
           )}
 

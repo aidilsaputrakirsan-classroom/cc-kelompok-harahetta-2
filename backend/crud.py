@@ -380,14 +380,32 @@ def get_or_create_user_profile(db: Session, user_id: int) -> UserProfile:
 
 
 def update_user_profile(db: Session, user_id: int, data: UserProfileUpdate) -> UserProfile:
-    """Update data diri penyewa."""
+    """Update data diri penyewa. Auto-verify jika profil lengkap."""
     profile = get_or_create_user_profile(db, user_id)
     update_fields = data.model_dump(exclude_unset=True)
     for field, value in update_fields.items():
         setattr(profile, field, value)
+
+    # Auto-verify: jika data penting sudah lengkap, langsung set verified
+    if _is_profile_complete(profile):
+        profile.status_verifikasi = VerificationStatus.disetujui
+        user = db.query(User).filter(User.id == user_id).first()
+        if user:
+            user.is_verified = True
+
     db.commit()
     db.refresh(profile)
     return profile
+
+
+def _is_profile_complete(profile: UserProfile) -> bool:
+    """Cek apakah profil user sudah lengkap untuk bisa menyewa."""
+    return all([
+        profile.alamat and profile.alamat.strip(),
+        profile.nomor_telepon and profile.nomor_telepon.strip(),
+        profile.foto_ktp and profile.foto_ktp.strip(),
+        profile.foto_selfie_ktp and profile.foto_selfie_ktp.strip(),
+    ])
 
 
 def update_verification_status(
@@ -1007,6 +1025,10 @@ def update_rental_status(
         if data.status == RentalStatus.disetujui and old_status == RentalStatus.pending:
             # Stok sudah dikurangi saat rental dibuat (pending), tidak perlu kurangi lagi.
 
+            # Set batas waktu pembayaran: 24 jam dari sekarang
+            from datetime import datetime, timezone, timedelta
+            rental.payment_deadline = datetime.now(timezone.utc) + timedelta(hours=24)
+
             # Auto-create payment saat rental disetujui
             create_payment_auto(db=db, rental_id=rental_id)
             
@@ -1381,6 +1403,24 @@ def create_or_get_snap_charge(
             "code": 400,
         }
 
+    # Cek apakah batas waktu pembayaran 24 jam sudah lewat
+    from datetime import datetime, timezone
+    if rental.payment_deadline and datetime.now(timezone.utc) > rental.payment_deadline:
+        # Auto-cancel: batas waktu pembayaran terlampaui
+        rental.status = RentalStatus.ditolak
+        item = db.query(Item).filter(Item.id == rental.item_id).first()
+        if item:
+            item.stok += 1
+            _recalculate_item_status(db, item)
+        pending_pay = db.query(Payment).filter(
+            Payment.rental_id == rental_id, Payment.status == PaymentStatus.pending
+        ).first()
+        if pending_pay:
+            pending_pay.status = PaymentStatus.failed
+            pending_pay.catatan = "Expired — batas waktu pembayaran 24 jam terlampaui"
+        db.commit()
+        return {"error": "Batas waktu pembayaran (24 jam) telah terlampaui. Silakan buat pesanan baru.", "code": 400}
+
     # Ambil/buat payment
     payment = db.query(Payment).filter(Payment.rental_id == rental_id).first()
     if not payment:
@@ -1511,14 +1551,36 @@ def sync_payment_from_midtrans(db: Session, payment_id: int) -> Payment | None |
     """
     Fallback kalau webhook tidak sampai: tarik status dari Midtrans lalu
     reuse logic apply_midtrans_notification.
+    Juga cek apakah payment sudah expired.
     """
     import midtrans_service
+    from datetime import datetime, timezone
 
     payment = db.query(Payment).filter(Payment.id == payment_id).first()
     if not payment:
         return None
     if not payment.midtrans_order_id:
         return {"error": "Payment ini belum punya order_id Midtrans", "code": 400}
+
+    # Cek apakah sudah expired (lokal)
+    if (
+        payment.status == PaymentStatus.pending
+        and payment.expires_at
+        and datetime.now(timezone.utc) > payment.expires_at
+    ):
+        payment.status = PaymentStatus.failed
+        payment.catatan = "Pembayaran expired — batas waktu 30 menit terlampaui"
+        # Kembalikan stok item
+        rental = db.query(Rental).filter(Rental.id == payment.rental_id).first()
+        if rental:
+            rental.status = RentalStatus.ditolak
+            item = db.query(Item).filter(Item.id == rental.item_id).first()
+            if item:
+                item.stok += 1
+                _recalculate_item_status(db, item)
+        db.commit()
+        db.refresh(payment)
+        return payment
 
     try:
         status_resp = midtrans_service.fetch_transaction_status(payment.midtrans_order_id)
@@ -2142,6 +2204,14 @@ def create_promo_code(
     if existing:
         return {"error": "Kode promo sudah terdaftar", "code": 400}
 
+    # Cek max 3 promo featured
+    if data.is_featured:
+        featured_count = db.query(func.count(PromoCode.id)).filter(
+            PromoCode.is_featured == True, PromoCode.is_active == True
+        ).scalar()
+        if featured_count >= 3:
+            return {"error": "Maksimal 3 promo yang bisa ditampilkan di landing page. Nonaktifkan salah satu promo featured terlebih dahulu.", "code": 400}
+
     promo = PromoCode(
         code=data.code,
         nama=data.nama,
@@ -2167,13 +2237,22 @@ def create_promo_code(
 
 def update_promo_code(
     db: Session, promo_id: int, data: PromoCodeUpdate
-) -> PromoCode | None:
+) -> PromoCode | None | dict:
     """Update kupon (semua field opsional)."""
     promo = db.query(PromoCode).filter(PromoCode.id == promo_id).first()
     if not promo:
         return None
 
     update_fields = data.model_dump(exclude_unset=True)
+
+    # Cek max 3 featured jika mau set is_featured = True
+    if update_fields.get("is_featured") is True and not promo.is_featured:
+        featured_count = db.query(func.count(PromoCode.id)).filter(
+            PromoCode.is_featured == True, PromoCode.is_active == True, PromoCode.id != promo_id
+        ).scalar()
+        if featured_count >= 3:
+            return {"error": "Maksimal 3 promo yang bisa ditampilkan di landing page. Nonaktifkan salah satu promo featured terlebih dahulu.", "code": 400}
+
     for field, value in update_fields.items():
         # Map enum values jika ada
         if field == "discount_type" and value is not None:

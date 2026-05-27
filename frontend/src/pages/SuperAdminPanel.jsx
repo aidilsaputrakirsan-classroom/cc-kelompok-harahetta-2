@@ -1,14 +1,13 @@
 /**
  * SuperAdminPanel — Sewain
  * Modern minimalist · base hijau pekat + putih.
- * Fitur: stats, users, categories, verifications, all rentals.
+ * Fitur: stats, users, categories, all rentals, promos.
  */
 import { useState, useEffect, useCallback } from "react"
 import { formatPrice } from "../lib/utils"
 import {
   fetchPlatformStats, fetchAllUsers, updateUser, deleteUser,
   fetchCategories, createCategory, deleteCategory,
-  fetchPendingVerifications, verifyUser,
   fetchAllRentals,
   fetchPromoCodes, createPromoCode, updatePromoCode, deletePromoCode, fetchPromoRedemptions,
 } from "../services/api"
@@ -24,9 +23,9 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from "../components/ui/Dialog"
 import {
-  Users, Package, ClipboardList, FolderOpen, ShieldCheck, Crown,
+  Users, Package, ClipboardList, FolderOpen, Crown,
   BarChart3, Plus, Trash2, UserCheck, UserX, CheckCircle, XCircle,
-  Calendar, DollarSign, Eye, ImageOff, RefreshCw, Pencil,
+  Calendar, DollarSign, Eye, RefreshCw, Pencil,
   Tag, Gift, TrendingDown, History,
 } from "lucide-react"
 
@@ -52,7 +51,6 @@ export default function SuperAdminPanel({ addToast }) {
   const [stats, setStats] = useState(null)
   const [users, setUsers] = useState([])
   const [categories, setCategories] = useState([])
-  const [verifications, setVerifications] = useState([])
   const [rentals, setRentals] = useState([])
   const [loading, setLoading] = useState(true)
   const [catModalOpen, setCatModalOpen] = useState(false)
@@ -61,8 +59,6 @@ export default function SuperAdminPanel({ addToast }) {
   const [userRoleFilter, setUserRoleFilter] = useState("")
   const [rentalStatusFilter, setRentalStatusFilter] = useState("")
   const [imgPreview, setImgPreview] = useState(null)
-  const [verifLoading, setVerifLoading] = useState(false)
-  const [verifLastUpdated, setVerifLastUpdated] = useState(null)
   const [editUser, setEditUser] = useState(null)
   const [editForm, setEditForm] = useState({ nama: "", role: "user", is_active: true })
   const [savingEdit, setSavingEdit] = useState(false)
@@ -94,25 +90,16 @@ export default function SuperAdminPanel({ addToast }) {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [s, u, c, v] = await Promise.all([
+      const [s, u, c] = await Promise.all([
         fetchPlatformStats(), fetchAllUsers({ role: userRoleFilter || undefined }),
-        fetchCategories(), fetchPendingVerifications(),
+        fetchCategories(),
       ])
       setStats(s)
       setUsers(Array.isArray(u) ? u : (u?.users || []))
       setCategories(Array.isArray(c) ? c : (c?.categories || []))
-      setVerifications(v?.profiles || [])
-      setVerifLastUpdated(new Date())
     } catch (err) { addToast?.(err.message, "error") }
     finally { setLoading(false) }
   }, [userRoleFilter, addToast])
-
-  const loadVerifications = useCallback(async () => {
-    setVerifLoading(true)
-    try { const v = await fetchPendingVerifications(); setVerifications(v?.profiles || []); setVerifLastUpdated(new Date()) }
-    catch (err) { addToast?.(err.message, "error") }
-    finally { setVerifLoading(false) }
-  }, [addToast])
 
   const loadRentals = useCallback(async () => {
     try { const data = await fetchAllRentals({ status: rentalStatusFilter || undefined }); setRentals(Array.isArray(data) ? data : (data?.rentals || [])) } catch {}
@@ -243,15 +230,10 @@ export default function SuperAdminPanel({ addToast }) {
   const openEditUser = (u) => { setEditUser(u); setEditForm({ nama: u.nama, role: u.role, is_active: u.is_active }) }
   const handleSaveEditUser = async (e) => {
     e.preventDefault()
-    if (editForm.role === "admin" && !editUser.is_verified) { addToast?.("User harus terverifikasi dulu", "error"); return }
     setSavingEdit(true)
     try { await updateUser(editUser.id, editForm); addToast?.("User diupdate", "success"); setEditUser(null); load() }
     catch (err) { addToast?.(err.message, "error") }
     finally { setSavingEdit(false) }
-  }
-  const handleVerify = async (userId, status) => {
-    try { await verifyUser(userId, { status }); addToast?.(`Verifikasi ${status}`, "success"); load() }
-    catch (err) { addToast?.(err.message, "error") }
   }
   const handleAddCategory = async (e) => {
     e.preventDefault(); setSavingCat(true)
@@ -290,7 +272,6 @@ export default function SuperAdminPanel({ addToast }) {
           <TabsTrigger value="stats" className="rounded-full"><BarChart3 className="w-4 h-4 mr-1.5" /> Statistik</TabsTrigger>
           <TabsTrigger value="users" className="rounded-full"><Users className="w-4 h-4 mr-1.5" /> Pengguna</TabsTrigger>
           <TabsTrigger value="categories" className="rounded-full"><FolderOpen className="w-4 h-4 mr-1.5" /> Kategori</TabsTrigger>
-          <TabsTrigger value="verifications" className="rounded-full" onClick={loadVerifications}><ShieldCheck className="w-4 h-4 mr-1.5" /> Verifikasi</TabsTrigger>
           <TabsTrigger value="rentals" className="rounded-full" onClick={loadRentals}><ClipboardList className="w-4 h-4 mr-1.5" /> Transaksi</TabsTrigger>
           <TabsTrigger value="promos" className="rounded-full" onClick={loadPromos}><Tag className="w-4 h-4 mr-1.5" /> Promo</TabsTrigger>
         </TabsList>
@@ -309,7 +290,6 @@ export default function SuperAdminPanel({ addToast }) {
                 <StatCard icon={CheckCircle} label="Barang tersedia" value={stats.items_available || 0} />
                 <StatCard icon={Package} label="Sedang disewa" value={stats.items_rented || 0} />
                 <StatCard icon={ClipboardList} label="Sewa pending" value={stats.rentals_pending || 0} />
-                <StatCard icon={ShieldCheck} label="KTP menunggu" value={stats.users_pending_verification || 0} />
               </div>
               {stats.revenue_total !== undefined && (
                 <StatCard icon={DollarSign} label="Total revenue platform" value={formatPrice(stats.revenue_total || 0)} />
@@ -378,74 +358,6 @@ export default function SuperAdminPanel({ addToast }) {
               </div>
             ))}
           </div>
-        </TabsContent>
-
-        {/* ═══ VERIFICATIONS ═══ */}
-        <TabsContent value="verifications" className="space-y-5 mt-6">
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <h2 className="text-lg font-bold tracking-tight">Verifikasi KTP pengguna</h2>
-            <div className="flex items-center gap-3">
-              {verifLastUpdated && <span className="text-xs text-muted-foreground">Dimuat: {verifLastUpdated.toLocaleTimeString("id-ID")}</span>}
-              <Button size="sm" variant="outline" className="rounded-full" onClick={loadVerifications} disabled={verifLoading}>
-                <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${verifLoading ? "animate-spin" : ""}`} />{verifLoading ? "Memuat..." : "Refresh"}
-              </Button>
-            </div>
-          </div>
-          {verifications.length === 0 ? (
-            <div className="text-center py-16">
-              <div className="w-16 h-16 rounded-3xl bg-secondary flex items-center justify-center mx-auto mb-4"><CheckCircle className="w-7 h-7 text-muted-foreground" /></div>
-              <h3 className="text-lg font-semibold">Tidak ada yang menunggu verifikasi</h3>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {verifications.map(p => (
-                <div key={p.id} className="rounded-2xl border border-border bg-card p-5">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="font-semibold tracking-tight">User #{p.user_id}</h3>
-                        <StatusBadge status={p.status_verifikasi} />
-                      </div>
-                      <div className="text-sm text-muted-foreground mt-1 space-y-0.5">
-                        {p.alamat && <div>📍 {p.alamat}</div>}
-                        {p.nama_orang_tua && <div>👤 Orang tua: {p.nama_orang_tua}</div>}
-                        {p.nomor_telepon && <div>📞 {p.nomor_telepon}</div>}
-                      </div>
-                    </div>
-                    <div className="flex gap-2 flex-shrink-0">
-                      <Button size="sm" variant="success" className="rounded-full" onClick={() => handleVerify(p.user_id, "disetujui")}><CheckCircle className="w-3.5 h-3.5 mr-1" /> Setujui</Button>
-                      <Button size="sm" variant="destructive" className="rounded-full" onClick={() => handleVerify(p.user_id, "ditolak")}><XCircle className="w-3.5 h-3.5 mr-1" /> Tolak</Button>
-                    </div>
-                  </div>
-                  {/* KTP photos */}
-                  <div className="mt-4 grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Foto KTP</p>
-                      {p.foto_ktp ? (
-                        <button type="button" onClick={() => setImgPreview({ src: p.foto_ktp, label: `Foto KTP — User #${p.user_id}` })} className="group relative w-full overflow-hidden rounded-xl border border-border bg-muted hover:ring-2 hover:ring-primary transition" style={{ aspectRatio: "16/9" }}>
-                          <img src={p.foto_ktp} alt="KTP" className="w-full h-full object-cover" />
-                          <div className="absolute inset-0 bg-foreground/50 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-1 transition"><Eye className="w-5 h-5 text-white" /><span className="text-white text-xs font-medium">Lihat</span></div>
-                        </button>
-                      ) : (
-                        <div className="w-full rounded-xl border-2 border-dashed border-border bg-muted/50 flex flex-col items-center justify-center gap-1.5 text-muted-foreground" style={{ aspectRatio: "16/9" }}><ImageOff className="w-6 h-6" /><span className="text-xs">Belum diupload</span></div>
-                      )}
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Selfie + KTP</p>
-                      {p.foto_selfie_ktp ? (
-                        <button type="button" onClick={() => setImgPreview({ src: p.foto_selfie_ktp, label: `Selfie + KTP — User #${p.user_id}` })} className="group relative w-full overflow-hidden rounded-xl border border-border bg-muted hover:ring-2 hover:ring-primary transition" style={{ aspectRatio: "16/9" }}>
-                          <img src={p.foto_selfie_ktp} alt="Selfie KTP" className="w-full h-full object-cover" />
-                          <div className="absolute inset-0 bg-foreground/50 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-1 transition"><Eye className="w-5 h-5 text-white" /><span className="text-white text-xs font-medium">Lihat</span></div>
-                        </button>
-                      ) : (
-                        <div className="w-full rounded-xl border-2 border-dashed border-border bg-muted/50 flex flex-col items-center justify-center gap-1.5 text-muted-foreground" style={{ aspectRatio: "16/9" }}><ImageOff className="w-6 h-6" /><span className="text-xs">Belum diupload</span></div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
         </TabsContent>
 
         {/* ═══ RENTALS ═══ */}
@@ -648,23 +560,25 @@ export default function SuperAdminPanel({ addToast }) {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Nama *</Label>
+                <Label>Nama * <span className="text-muted-foreground text-[10px]">(maks 40 karakter)</span></Label>
                 <Input
                   placeholder="Promo Pengguna Baru"
                   value={promoForm.nama}
                   onChange={(e) => setPromoForm(p => ({ ...p, nama: e.target.value }))}
+                  maxLength={40}
                   required
                 />
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label>Deskripsi (tampil di landing page)</Label>
+              <Label>Deskripsi (tampil di landing page) <span className="text-muted-foreground text-[10px]">(maks 100 karakter)</span></Label>
               <textarea
                 className="flex min-h-[60px] w-full rounded-xl border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 placeholder="Diskon 50% untuk transaksi pertama..."
                 value={promoForm.deskripsi}
                 onChange={(e) => setPromoForm(p => ({ ...p, deskripsi: e.target.value }))}
+                maxLength={100}
               />
             </div>
 

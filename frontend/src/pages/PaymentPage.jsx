@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import {
   fetchMyRentals, fetchMyPayments,
@@ -99,7 +99,91 @@ const PAYMENT_METHODS = [
 ]
 
 
-export default function PaymentPage({ addToast }) {
+/* ─── Countdown Timer Component ─── */
+function PaymentDeadlineCountdown({ deadline }) {
+  const [timeLeft, setTimeLeft] = useState(() => {
+    const diff = new Date(deadline).getTime() - Date.now()
+    return Math.max(0, Math.floor(diff / 1000))
+  })
+
+  useEffect(() => {
+    if (timeLeft <= 0) return
+    const timer = setInterval(() => {
+      const diff = new Date(deadline).getTime() - Date.now()
+      setTimeLeft(Math.max(0, Math.floor(diff / 1000)))
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [deadline])
+
+  if (timeLeft <= 0) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-2xl p-3 text-center">
+        <p className="text-sm font-bold text-red-700">⏰ Batas waktu pembayaran habis</p>
+      </div>
+    )
+  }
+
+  const hours = Math.floor(timeLeft / 3600)
+  const mins = Math.floor((timeLeft % 3600) / 60)
+  const secs = timeLeft % 60
+
+  return (
+    <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 text-center">
+      <p className="text-xs text-amber-600 font-semibold">Batas waktu pembayaran</p>
+      <p className="text-lg font-mono font-black text-amber-700 mt-0.5">
+        {String(hours).padStart(2, "0")}:{String(mins).padStart(2, "0")}:{String(secs).padStart(2, "0")}
+      </p>
+    </div>
+  )
+}
+
+function PaymentCountdown({ expiresAt, onExpired }) {
+  const [timeLeft, setTimeLeft] = useState(() => {
+    const diff = new Date(expiresAt).getTime() - Date.now()
+    return Math.max(0, Math.floor(diff / 1000))
+  })
+  const firedRef = useRef(false)
+
+  useEffect(() => {
+    if (timeLeft <= 0) {
+      if (!firedRef.current) { firedRef.current = true; onExpired?.() }
+      return
+    }
+    const timer = setInterval(() => {
+      const diff = new Date(expiresAt).getTime() - Date.now()
+      const secs = Math.max(0, Math.floor(diff / 1000))
+      setTimeLeft(secs)
+      if (secs <= 0) {
+        clearInterval(timer)
+        if (!firedRef.current) { firedRef.current = true; onExpired?.() }
+      }
+    }, 1000)
+    return () => clearInterval(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expiresAt])
+
+  const mins = Math.floor(timeLeft / 60)
+  const secs = timeLeft % 60
+  const isUrgent = timeLeft < 300 // kurang dari 5 menit
+
+  if (timeLeft <= 0) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-2xl p-3 text-center">
+        <p className="text-sm font-bold text-red-700">⏰ Waktu pembayaran habis</p>
+        <p className="text-xs text-red-600 mt-0.5">Silakan buat pesanan baru.</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className={`rounded-2xl p-3 text-center border ${isUrgent ? "bg-red-50 border-red-200" : "bg-amber-50 border-amber-200"}`}>
+      <p className={`text-xs font-semibold ${isUrgent ? "text-red-600" : "text-amber-600"}`}>Batas waktu pembayaran</p>
+      <p className={`text-2xl font-mono font-black mt-1 ${isUrgent ? "text-red-700" : "text-amber-700"}`}>
+        {String(mins).padStart(2, "0")}:{String(secs).padStart(2, "0")}
+      </p>
+    </div>
+  )
+}export default function PaymentPage({ addToast }) {
   const { rentalId } = useParams()
   const navigate     = useNavigate()
 
@@ -129,6 +213,14 @@ export default function PaymentPage({ addToast }) {
     const pays = Array.isArray(paymentsData) ? paymentsData : (paymentsData?.payments || [])
     const pay = pays.find(x => x.rental_id === id) || null
     setPayment(pay)
+
+    // Restore charge result dari backend jika sudah pernah charge dan masih pending
+    if (pay?.status === "pending" && pay?.charge_response && !chargeResult) {
+      try {
+        const savedResponse = JSON.parse(pay.charge_response)
+        setChargeResult({ midtrans_response: savedResponse, payment_id: pay.id, order_id: pay.midtrans_order_id })
+      } catch { /* ignore parse error */ }
+    }
 
     if (pay?.status === "completed" || ["sedang_disewa", "selesai"].includes(r.status)) {
       fetchRentalPickupInfo(id).then(setPickupInfo).catch(() => {})
@@ -167,10 +259,15 @@ export default function PaymentPage({ addToast }) {
     if (!payment?.id) return
     setSyncing(true)
     try {
-      await syncMidtransPayment(payment.id)
+      const syncResult = await syncMidtransPayment(payment.id)
       await loadAll()
-      setChargeResult(null)
-      addToast?.("Status pembayaran berhasil diperbarui", "success")
+      // Reset instruksi hanya jika payment sudah selesai
+      if (syncResult?.status === "completed" || syncResult?.status === "failed") {
+        setChargeResult(null)
+        addToast?.("Pembayaran berhasil dikonfirmasi!", "success")
+      } else {
+        addToast?.("Pembayaran belum terdeteksi. Coba lagi dalam beberapa saat.", "info")
+      }
     } catch (err) {
       addToast?.(err.message || "Gagal sync status", "error")
     } finally {
@@ -218,7 +315,7 @@ export default function PaymentPage({ addToast }) {
         <h1 className="text-2xl font-black text-slate-800">Pembayaran Sewa</h1>
         <div className="flex items-center gap-2 flex-wrap">
           <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${rs.cls}`}>{rs.label}</span>
-          {payMeta && (
+          {payMeta && rental.status !== "pending" && (
             <span className={`flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full ${payMeta.cls}`}>
               <PayIcon className="w-3.5 h-3.5" /> {payMeta.label}
             </span>
@@ -244,8 +341,23 @@ export default function PaymentPage({ addToast }) {
         <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-sm text-red-800 flex items-start gap-3">
           <XCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
           <div>
-            <p className="font-bold">Permintaan Sewa Ditolak</p>
-            {rental.catatan && <p className="text-xs text-red-700 mt-0.5">Catatan admin: {rental.catatan}</p>}
+            <p className="font-bold">{payment?.catatan?.includes("expired") ? "Pembayaran Kedaluwarsa" : "Permintaan Sewa Ditolak"}</p>
+            <p className="text-xs text-red-700 mt-0.5">
+              {payment?.catatan?.includes("expired")
+                ? "Batas waktu pembayaran 30 menit telah terlampaui. Silakan buat pesanan baru."
+                : rental.catatan ? `Catatan admin: ${rental.catatan}` : ""}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Banner: payment failed/expired */}
+      {payment?.status === "failed" && rental.status !== "ditolak" && (
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-sm text-red-800 flex items-start gap-3">
+          <XCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="font-bold">Pembayaran Gagal</p>
+            <p className="text-xs text-red-700 mt-0.5">{payment.catatan || "Pembayaran tidak berhasil. Silakan coba lagi atau buat pesanan baru."}</p>
           </div>
         </div>
       )}
@@ -289,6 +401,11 @@ export default function PaymentPage({ addToast }) {
               </p>
             </div>
           </div>
+
+          {/* Countdown 24 jam batas waktu pembayaran */}
+          {rental.payment_deadline && (
+            <PaymentDeadlineCountdown deadline={rental.payment_deadline} />
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {PAYMENT_METHODS.map(method => {
@@ -337,6 +454,11 @@ export default function PaymentPage({ addToast }) {
               </p>
             </div>
           </div>
+
+          {/* Countdown Timer */}
+          {payment?.expires_at && (
+            <PaymentCountdown expiresAt={payment.expires_at} onExpired={() => { loadAll(); setChargeResult(null) }} />
+          )}
 
           {/* VA Numbers */}
           {vaNumbers.length > 0 && (
@@ -411,13 +533,6 @@ export default function PaymentPage({ addToast }) {
             }
           </button>
 
-          {/* Pilih metode lain */}
-          <button
-            onClick={() => setChargeResult(null)}
-            className="w-full text-xs font-semibold text-slate-500 hover:text-primary py-1"
-          >
-            ← Pilih metode pembayaran lain
-          </button>
         </div>
       )}
 

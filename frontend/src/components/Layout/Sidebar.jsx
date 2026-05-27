@@ -32,7 +32,6 @@ const NAV_ADMIN = [
 const NAV_SUPER = [
   { path: "/dashboard",  label: "Katalog",     icon: LayoutDashboard },
   { path: "/superadmin", label: "Super admin", icon: Crown },
-  { path: "/chat",       label: "Pesan",       icon: MessageCircle },
   { path: "/profile",    label: "Profil",      icon: User },
 ]
 

@@ -275,6 +275,7 @@ class Rental(Base):
     diambil_at = Column(DateTime(timezone=True), nullable=True)  # Timestamp konfirmasi pengambilan
     due_at = Column(DateTime(timezone=True), nullable=True)  # Deadline 24h × durasi sejak pickup
     return_requested_at = Column(DateTime(timezone=True), nullable=True)  # User request pengembalian
+    payment_deadline = Column(DateTime(timezone=True), nullable=True)  # Batas waktu bayar (24 jam sejak disetujui)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
 
@@ -319,6 +320,8 @@ class Payment(Base):
     payment_channel = Column(String(50), nullable=True)   # e.g. gopay, bca_va, qris
     fraud_status = Column(String(20), nullable=True)
     raw_notification = Column(Text, nullable=True)        # payload webhook terakhir (audit)
+    charge_response = Column(Text, nullable=True)         # JSON response dari Midtrans charge (VA, QR, dll)
+    expires_at = Column(DateTime(timezone=True), nullable=True)  # Batas waktu pembayaran
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())
