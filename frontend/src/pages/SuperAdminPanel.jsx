@@ -157,7 +157,7 @@ export default function SuperAdminPanel({ addToast }) {
       code: p.code,
       nama: p.nama,
       deskripsi: p.deskripsi || "",
-      discount_type: p.discount_type,
+      discount_type: "percentage",
       discount_value: p.discount_value,
       max_discount: p.max_discount ?? "",
       min_order: p.min_order ?? 0,
@@ -178,6 +178,7 @@ export default function SuperAdminPanel({ addToast }) {
     try {
       const payload = {
         ...promoForm,
+        discount_type: "percentage", // sistem promo hanya pakai persentase
         discount_value: parseFloat(promoForm.discount_value),
         max_discount: promoForm.max_discount === "" || promoForm.max_discount === null ? null : parseFloat(promoForm.max_discount),
         min_order: parseFloat(promoForm.min_order || 0),
@@ -672,24 +673,23 @@ export default function SuperAdminPanel({ addToast }) {
               <div className="space-y-2">
                 <Label>Tipe</Label>
                 <select
-                  className="flex h-9 w-full rounded-xl border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  value={promoForm.discount_type}
-                  onChange={(e) => setPromoForm(p => ({ ...p, discount_type: e.target.value }))}
+                  className="flex h-9 w-full rounded-xl border border-input bg-muted/40 px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring cursor-not-allowed"
+                  value="percentage"
+                  disabled
                 >
                   <option value="percentage">Persentase</option>
-                  <option value="fixed">Nominal tetap</option>
                 </select>
               </div>
               <div className="space-y-2">
                 <Label>Nilai *</Label>
                 <Input
-                  type="number" step="0.01" min={0.01}
-                  placeholder={promoForm.discount_type === "percentage" ? "50" : "50000"}
+                  type="number" step="0.01" min={0.01} max={100}
+                  placeholder="50"
                   value={promoForm.discount_value}
                   onChange={(e) => setPromoForm(p => ({ ...p, discount_value: e.target.value }))}
                   required
                 />
-                <p className="text-[10px] text-muted-foreground">{promoForm.discount_type === "percentage" ? "1-100 %" : "Nominal Rp"}</p>
+                <p className="text-[10px] text-muted-foreground">1-100 %</p>
               </div>
               <div className="space-y-2">
                 <Label>Max diskon</Label>
