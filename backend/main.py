@@ -2591,9 +2591,9 @@ def list_featured_promos(
 ):
     """
     List promo yang sedang aktif & flagged sebagai featured.
-    Dipakai banner di LandingPage.
+    Dipakai banner/slider di LandingPage.
     """
-    return crud.get_featured_promos(db=db, limit=3)
+    return crud.get_featured_promos(db=db, limit=10)
 
 
 # ── User: Validasi/preview diskon di halaman checkout
