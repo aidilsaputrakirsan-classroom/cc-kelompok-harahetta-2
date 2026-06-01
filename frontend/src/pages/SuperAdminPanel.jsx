@@ -642,31 +642,25 @@ export default function SuperAdminPanel({ addToast }) {
                 <Input
                   placeholder="WELCOME50"
                   value={promoForm.code}
-                  onChange={(e) => setPromoForm(p => ({ ...p, code: e.target.value.toUpperCase() }))}
+                  onChange={(e) => setPromoForm(p => ({ ...p, code: e.target.value.toUpperCase().slice(0, 20) }))}
                   required
                   disabled={!!editPromo}
+                  maxLength={20}
                   className="font-mono uppercase"
                 />
+                <p className="text-[10px] text-muted-foreground text-right">{(promoForm.code || "").length}/20</p>
               </div>
               <div className="space-y-2">
                 <Label>Nama *</Label>
                 <Input
                   placeholder="Promo Pengguna Baru"
                   value={promoForm.nama}
-                  onChange={(e) => setPromoForm(p => ({ ...p, nama: e.target.value }))}
+                  onChange={(e) => setPromoForm(p => ({ ...p, nama: e.target.value.slice(0, 28) }))}
                   required
+                  maxLength={28}
                 />
+                <p className="text-[10px] text-muted-foreground text-right">{(promoForm.nama || "").length}/28</p>
               </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Deskripsi (tampil di landing page)</Label>
-              <textarea
-                className="flex min-h-[60px] w-full rounded-xl border border-input bg-transparent px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                placeholder="Diskon 50% untuk transaksi pertama..."
-                value={promoForm.deskripsi}
-                onChange={(e) => setPromoForm(p => ({ ...p, deskripsi: e.target.value }))}
-              />
             </div>
 
             <div className="grid grid-cols-3 gap-3">
