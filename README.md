@@ -889,12 +889,3 @@ make pr-check          # 🔎 Full pre-PR check (build + test)
 
 Proyek ini dibuat untuk keperluan akademis mata kuliah **Komputasi Awan** — Program Studi Sistem Informasi, Institut Teknologi Kalimantan (ITK).
 
----
-
-<div align="center">
-
-**Dibuat dengan ❤️ oleh Kelompok Harahetta-2**
-
-Institut Teknologi Kalimantan — 2026
-
-</div>
