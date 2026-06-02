@@ -1,417 +1,900 @@
-# 🛵 SEWAIN — Platform Sewa Barang Online
+<div align="center">
+
+# 🛵 SEWAIN
+
+### Platform Sewa Barang Online Berbasis Microservices
 
 ![CI Pipeline](https://github.com/aidilsaputrakirsan-classroom/cc-kelompok-harahetta-2/actions/workflows/ci.yml/badge.svg)
+![CD Pipeline](https://github.com/aidilsaputrakirsan-classroom/cc-kelompok-harahetta-2/actions/workflows/cd.yml/badge.svg)
+![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)
+![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
+![Nginx](https://img.shields.io/badge/Nginx-Gateway-009639?logo=nginx&logoColor=white)
 
-> Aplikasi web penyewaan barang multi-role berbasis FastAPI, React, dan PostgreSQL, dengan pengelolaan Docker serta pengujian melalui GitHub Actions, Pytest, dan Vitest untuk memastikan keandalan sistem.
->
-> **Mata Kuliah:** Komputasi Awan — Sistem Informasi, Institut Teknologi Kalimantan (ITK)
-> **Tim:** Kelompok Harahetta-2
+**Sewain** adalah platform berbasis web yang memfasilitasi penyewaan barang secara online dengan arsitektur **microservices**, dikelola melalui **Docker Compose**, dan dideploy secara otomatis melalui **CI/CD pipeline** GitHub Actions.
 
----
+**Mata Kuliah:** Komputasi Awan — Sistem Informasi, Institut Teknologi Kalimantan (ITK)
+**Tim:** Kelompok Harahetta-2
 
-## Live Demo Aplikasi 
+[🌐 Live Demo](https://cc-kelompok-harahetta-2.akhzafachrozy.my.id/) · [📖 API Docs](https://cc-kelompok-harahetta-2.akhzafachrozy.my.id/api/docs) · [📋 Arsitektur Detail](./docs/architecture.md)
 
-production dapat diakses melalui URL berikut: 
-| Layanan | URL | 
-|---|---| 
-| Live Demo Application | `https://cc-kelompok-harahetta-2.akhzafachrozy.my.id/` | 
-
----
-
-
-## Daftar Isi
-
-1. [Deskripsi Aplikasi](#1-deskripsi-aplikasi)
-2. [Tim](#2-tim)
-3. [Fitur Utama](#3-fitur-utama)
-4. [Tech Stack](#4-tech-stack)
-5. [Arsitektur Sistem](#5-arsitektur-sistem)
-6. [Getting Started](#6-getting-started)
-7. [Makefile Workflow Commands](#7-makefile-workflow-commands)
-8. [Roadmap](#8-roadmap)
-9. [Project Structure](#9-project-structure)
-10. [API Documentation Testing](#10-api-documentation-testing)
-11. [UI and API Integration Testing](#11-ui-and-api-integration-testing)
-12. [Authentication and CRUD Testing](#12-authentication-and-crud-testing)
+</div>
 
 ---
 
-## 1. Deskripsi Aplikasi
+## 📑 Daftar Isi
 
-SEWAIN adalah platform berbasis web yang memfasilitasi proses penyewaan barang secara online secara lebih mudah, aman, dan terstruktur. Melalui sistem ini, penyedia dapat menampilkan dan mengelola barang yang disewakan, sementara pengguna dapat mencari barang, melihat detail, menentukan periode sewa, serta mengajukan permintaan penyewaan secara langsung. Platform ini juga dilengkapi dengan pengelolaan status transaksi secara real-time dan fitur verifikasi identitas penyewa untuk meningkatkan keamanan selama proses penyewaan.
-
-SEWAIN ditujukan bagi pelaku usaha penyewaan khususnya UMKM, serta masyarakat yang membutuhkan suatu barang tanpa harus membelinya melainkan cukup dengan menyewanya. Platform ini membantu mengatasi berbagai kendala dalam sistem penyewaan manual, seperti pencatatan yang tidak rapi, jangkauan pelanggan yang terbatas, serta risiko penyalahgunaan barang. Dengan digitalisasi melalui Sewain, proses pengelolaan menjadi lebih efisien, transparan, dan dapat menjangkau lebih banyak pengguna.
-
----
-
-## 2. Tim
-
-| Nama | NIM | Peran |
-|------|-----|-------|
-| Djaky Abbyyu Fauzan Timumum | 10231032 | Lead Backend |
-| Achmad Zaki Zaidan | 10231002 | Lead Frontend |
-| Muhammad Alif Setiawan | 10231056 | Lead DevOps |
-| Riqqah Khalda Karina | 10231082 | Lead QA & Docs |
-
----
-
-## 3. Fitur Utama Sistem
-
-SEWAIN memiliki tiga peran utama dalam sistem:
-
-- Super Admin  
-- Admin (Penyedia Barang)  
-- User (Penyewa)
-
-| Peran | Kategori | Fitur Utama | Detail / Deskripsi |
-|-------|----------|-------------|--------------------|
-| Super Admin | Manajemen Admin | Pengelolaan Penyedia | Login sebagai Super Admin, melihat daftar seluruh admin (penyedia), menambahkan admin baru, mengedit data admin, dan menghapus admin. |
-|  | Manajemen Konten | Pengelolaan Kategori Barang | Mengelola kategori barang yang tersedia di dalam platform. |
-|  | Monitoring | Pengawasan Platform | Melihat seluruh aktivitas penyewaan dan melakukan monitoring keseluruhan platform secara menyeluruh. |
-|  | AI Assistant | Monitoring & Bantuan Sistem | Menggunakan chatbot AI untuk membantu monitoring aktivitas platform, memberikan ringkasan data penyewaan, serta membantu menjawab pertanyaan terkait penggunaan sistem. |
-| Admin (Penyedia Barang) | Profil & Usaha | Pengelolaan Profil Usaha | Login sebagai admin dan mengelola profil usaha penyewaan. |
-|  | Manajemen Produk | Pengelolaan Barang | Menambahkan barang yang disewakan, mengedit data barang, menghapus barang, mengatur harga sewa, dan mengatur jumlah atau stok barang. |
-|  | Manajemen Order | Kontrol Permintaan Sewa | Melihat daftar permintaan sewa dari user, menyetujui atau menolak permintaan sewa. |
-|  | Monitoring Transaksi | Status Penyewaan | Mengubah status penyewaan menjadi Pending, Disetujui, Sedang Disewa, atau Selesai. |
-|  | AI Assistant | Rekomendasi & Bantuan Penyedia | Chatbot AI membantu admin dalam memberikan rekomendasi pengelolaan barang, menjawab pertanyaan penggunaan sistem, serta membantu memberikan respon otomatis kepada user terkait penyewaan. |
-| User (Penyewa) | Akun & Profil | Registrasi & Data Diri | Registrasi akun, login, melengkapi data diri berupa nama lengkap, nama orang tua, alamat tempat tinggal, dan share location melalui peta atau koordinat. |
-|  | Verifikasi Identitas | Validasi Legalitas | Upload foto KTP, upload foto selfie dengan KTP, dan melihat status verifikasi berupa Menunggu Verifikasi, Disetujui, atau Ditolak. |
-|  | Aturan Sistem | Validasi Penyewaan | User hanya dapat melakukan penyewaan apabila data diri telah lengkap dan verifikasi identitas telah disetujui oleh admin. |
-|  | Penyewaan | Proses Pemesanan | Melihat katalog barang dari berbagai penyedia, melihat detail barang, mencari barang, serta mengajukan penyewaan dengan memilih tanggal mulai dan tanggal selesai. |
-|  | Monitoring | Status & Riwayat | Melihat status penyewaan berupa Pending, Disetujui, Sedang Disewa, atau Selesai, serta melihat riwayat penyewaan sebelumnya. |
-|  | AI Assistant | Chatbot Bantuan Penyewaan | User dapat menggunakan chatbot AI untuk mencari rekomendasi barang, menanyakan prosedur penyewaan, mendapatkan bantuan penggunaan aplikasi, serta memperoleh jawaban otomatis terkait status penyewaan dan informasi barang. |
+- [Deskripsi Aplikasi](#-deskripsi-aplikasi)
+- [Tim Pengembang](#-tim-pengembang)
+- [Fitur Utama](#-fitur-utama)
+- [Tech Stack](#-tech-stack)
+- [Arsitektur Microservices](#-arsitektur-microservices)
+- [Database Schema](#-database-schema)
+- [CI/CD Pipeline](#-cicd-pipeline)
+- [Getting Started](#-getting-started)
+- [Struktur Proyek](#-struktur-proyek)
+- [API Documentation](#-api-documentation)
+- [Testing](#-testing)
+- [Makefile Commands](#-makefile-commands)
+- [Roadmap](#-roadmap)
 
 ---
 
-## 4. Tech Stack
+## 📝 Deskripsi Aplikasi
 
-Bagian ini menjelaskan teknologi yang digunakan untuk membangun dan menjalankan aplikasi SEWAIN.
+**SEWAIN** adalah platform penyewaan barang online yang menghubungkan **penyedia barang (Admin)** dengan **penyewa (User)** secara aman dan terstruktur. Platform ini dirancang untuk membantu pelaku usaha penyewaan — khususnya UMKM — dalam mendigitalisasi proses penyewaan yang selama ini dilakukan secara manual.
 
+### Masalah yang Diselesaikan
+
+| Masalah Konvensional | Solusi Sewain |
+|---|---|
+| Pencatatan manual rawan error | Sistem database terintegrasi dan otomatis |
+| Jangkauan pelanggan terbatas | Platform online accessible 24/7 |
+| Risiko penyalahgunaan barang | Verifikasi identitas KTP + selfie |
+| Tidak ada transparansi status | Real-time tracking status penyewaan |
+| Pembayaran tidak terstruktur | Integrasi payment gateway Midtrans |
+
+---
+
+## 👥 Tim Pengembang
+
+| Nama | NIM | Peran | Tanggung Jawab |
+|------|-----|-------|----------------|
+| Djaky Abbyyu Fauzan Timumum | 10231032 | **Lead Backend** | Arsitektur API, database schema, business logic |
+| Achmad Zaki Zaidan | 10231002 | **Lead Frontend** | UI/UX, React components, API integration |
+| Muhammad Alif Setiawan | 10231056 | **Lead DevOps** | Docker, CI/CD, deployment, infrastructure |
+| Riqqah Khalda Karina | 10231082 | **Lead QA & Docs** | Testing strategy, dokumentasi, quality assurance |
+
+---
+
+## ✨ Fitur Utama
+
+SEWAIN memiliki **tiga peran pengguna** dengan hak akses yang berbeda:
+
+### 👑 Super Admin
+| Kategori | Fitur | Deskripsi |
+|----------|-------|-----------|
+| Manajemen Admin | Pengelolaan Penyedia | CRUD admin penyedia barang, aktivasi/nonaktifasi akun |
+| Manajemen Konten | Pengelolaan Kategori | CRUD kategori barang (Elektronik, Outdoor, dll.) |
+| Monitoring | Dashboard Statistik | Statistik platform, semua transaksi, verifikasi user |
+| Promo | Pengelolaan Kupon | CRUD kode promo, diskon persentase/fixed, eligibility control |
+| AI Assistant | Chatbot Monitoring | Monitoring aktivitas, ringkasan data, bantuan sistem |
+
+### 🏪 Admin (Penyedia Barang)
+| Kategori | Fitur | Deskripsi |
+|----------|-------|-----------|
+| Profil Usaha | Kelola Toko | Nama usaha, alamat, telepon, koordinat lokasi |
+| Manajemen Produk | CRUD Barang | Tambah/edit/hapus barang, atur harga & stok, upload foto |
+| Manajemen Order | Kontrol Sewa | Setujui/tolak permintaan, ubah status penyewaan |
+| Pembayaran | Verifikasi Bayar | Konfirmasi pembayaran, wallet & withdrawal saldo |
+| Chat | Live Chat | Komunikasi real-time dengan penyewa per item |
+| AI Assistant | Chatbot Penyedia | Rekomendasi pengelolaan, respon otomatis |
+
+### 👤 User (Penyewa)
+| Kategori | Fitur | Deskripsi |
+|----------|-------|-----------|
+| Akun & Verifikasi | Registrasi + KYC | Registrasi, verifikasi email, upload KTP & selfie |
+| Penyewaan | Proses Sewa | Katalog, detail barang, pilih tanggal, ajukan sewa |
+| Pembayaran | Bayar Sewa | Pembayaran via Midtrans (QRIS, VA, e-wallet) |
+| Monitoring | Status & Riwayat | Tracking status real-time, riwayat penyewaan |
+| Review | Ulasan & Rating | Beri rating 1-5 dan komentar setelah sewa selesai |
+| Promo | Kupon Diskon | Validasi & redeem kode promo saat checkout |
+| Chat | Live Chat | Komunikasi langsung dengan penyedia barang |
+| AI Assistant | Chatbot Bantuan | Rekomendasi barang, bantuan penggunaan |
+
+---
+
+## 🛠 Tech Stack
+
+### Backend
+| Teknologi | Versi | Fungsi |
+|-----------|-------|--------|
+| Python | 3.12 | Bahasa pemrograman utama |
+| FastAPI | 0.115 | Framework REST API high-performance |
+| Uvicorn | 0.30 | ASGI server untuk production |
+| SQLAlchemy | 2.0 | ORM untuk database operations |
+| PostgreSQL | 16 | Database relasional utama |
+| Pydantic | 2.9 | Validasi data & schema API |
+| python-jose | 3.3 | JWT token management |
+| bcrypt | 4.0 | Password hashing |
+| OpenAI SDK | ≥1.30 | AI chatbot integration |
+| Midtrans Client | 1.4 | Payment gateway integration |
+| WebSockets | 13.1 | Real-time chat communication |
+
+### Frontend
+| Teknologi | Versi | Fungsi |
+|-----------|-------|--------|
+| React | 19 | UI library utama |
+| Vite | 7.3 | Build tool & dev server |
+| React Router DOM | 7.14 | Client-side routing |
+| Tailwind CSS | 3.4 | Utility-first styling |
+| Radix UI | Latest | Accessible UI components |
+| Framer Motion | 12.38 | Animasi & transisi |
+| Lucide React | 1.8 | Icon library |
+| Sonner | 2.0 | Toast notifications |
+| Leaflet | 1.9 | Interactive maps (pickup location) |
+
+### Infrastructure & DevOps
 | Teknologi | Fungsi |
 |-----------|--------|
-| Python | Bahasa pemrograman utama untuk backend |
-| FastAPI | Framework untuk membangun REST API |
-| Uvicorn | Server untuk menjalankan aplikasi FastAPI |
-| SQLAlchemy | ORM untuk menghubungkan aplikasi dengan database |
-| PostgreSQL | Sistem database untuk menyimpan data |
-| python-jose | Mengelola autentikasi berbasis JWT |
-| passlib + bcrypt | Mengamankan password dengan hashing |
-| Pydantic | Validasi data dan schema API |
-| React | Library untuk membangun antarmuka pengguna |
-| Vite | Tools untuk build dan pengembangan frontend |
-| React Router DOM | Mengatur navigasi antar halaman |
-| Tailwind CSS | Framework styling antarmuka |
-| Radix UI | Komponen UI yang mudah diakses |
-| Lucide React | Library ikon pada antarmuka |
-| Sonner | Menampilkan notifikasi pada sistem |
-| Docker | Containerisasi seluruh aplikasi |
-| Docker Compose | Mengelola beberapa container sekaligus |
-| Nginx | Web server untuk frontend |
-| Docker Hub | Penyimpanan image aplikasi |
-| Pytest | Framework pengujian otomatis untuk logika Backend |
-| Vitest | Test runner modern untuk pengujian komponen Frontend |
-| GitHub Actions | Platform CI/CD untuk otomatisasi build dan testing secara cloud |
-| Pytest-cov | Alat untuk mengukur persentase cakupan kode (test coverage) Backend |
-| Testing Library | Library untuk menguji interaksi user pada komponen React |
+| Docker & Docker Compose | Containerisasi & orkestrasi service |
+| Nginx | API Gateway & reverse proxy |
+| GitHub Actions | CI/CD automation |
+| DeployCC | Production deployment platform |
+| Pytest + pytest-cov | Backend testing & coverage |
+| Vitest + Testing Library | Frontend testing |
+| ESLint + Flake8 | Code linting |
 
 ---
 
-## 5. Arsitektur Sistem
+## 🏗 Arsitektur Microservices
 
-Bagian ini menunjukkan hubungan antar komponen utama dalam aplikasi Sewain, mulai dari pengguna, frontend, backend, hingga database dalam menjalankan sistem.
+Sewain menggunakan arsitektur **microservices** dengan pola **Database per Service** dan **API Gateway** menggunakan Nginx sebagai reverse proxy tunggal.
+
+### Diagram Arsitektur Docker Compose
 
 ```mermaid
-graph TD
-    User([User Browser])
+graph TB
+    subgraph CLIENT["🌐 Client Tier"]
+        User([👤 User Browser])
+    end
 
-    FE[Frontend]
-    BE[Backend FastAPI]
-    DB[(PostgreSQL Database)]
+    subgraph GATEWAY_TIER["🔀 API Gateway — Port 80"]
+        Gateway["🔀 Nginx\nReverse Proxy\n(Port 80)"]
+    end
 
-    User --> FE
-    FE --> BE
-    BE --> DB
+    subgraph FRONTEND_TIER["🎨 Frontend Tier"]
+        Frontend["⚛️ React App\nVite + Tailwind CSS\n(Port 3000)"]
+    end
+
+    subgraph BACKEND_TIER["⚙️ Backend Services"]
+        AuthService["🔐 Auth Service\nFastAPI\n(Port 8001)"]
+        ItemService["📦 Item Service\nFastAPI\n(Port 8002)"]
+    end
+
+    subgraph DATA_TIER["🗄️ Data Tier — Database per Service"]
+        AuthDB[("🗄️ Auth DB\nPostgreSQL 16\n(Port 5433→5432)")]
+        ItemDB[("🗄️ Item DB\nPostgreSQL 16\n(Port 5434→5432)")]
+    end
+
+    User -->|"HTTP Request"| Gateway
+    Gateway -->|"/ → Frontend"| Frontend
+    Gateway -->|"/auth/* → :8001"| AuthService
+    Gateway -->|"/items/* → :8002"| ItemService
+
+    AuthService -->|"SQL"| AuthDB
+    ItemService -->|"SQL"| ItemDB
+
+    ItemService -.->|"HTTP GET /verify\n(Token Verification)"| AuthService
+
+    classDef client fill:#e1f5fe,stroke:#0288d1,stroke-width:2px,color:#01579b
+    classDef gateway fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,color:#4a148c
+    classDef frontend fill:#e8f5e9,stroke:#388e3c,stroke-width:2px,color:#1b5e20
+    classDef service fill:#fff3e0,stroke:#f57c00,stroke-width:2px,color:#e65100
+    classDef db fill:#fce4ec,stroke:#c62828,stroke-width:2px,color:#b71c1c
+
+    class User client
+    class Gateway gateway
+    class Frontend frontend
+    class AuthService,ItemService service
+    class AuthDB,ItemDB db
 ```
 
-Diagram di atas menunjukkan alur kerja utama dalam sistem Sewain secara sederhana. Setiap komponen memiliki peran masing-masing dalam menjalankan aplikasi, yaitu sebagai berikut:
+### Pemetaan Service & Port
 
-- User Browser
+| Service | Port Host | Port Container | Image | Deskripsi |
+|---------|-----------|----------------|-------|-----------|
+| `gateway` | **80** | 80 | `nginx:alpine` | API Gateway — reverse proxy untuk semua request |
+| `frontend` | — | 3000 | Custom build | React SPA — UI aplikasi |
+| `auth-service` | — | 8001 | `python:3.12-slim` | Registrasi, login, JWT token verification |
+| `item-service` | — | 8002 | `python:3.12-slim` | CRUD items, statistik inventaris |
+| `auth-db` | — | 5432 | `postgres:16-alpine` | Database khusus kredensial pengguna |
+| `item-db` | — | 5432 | `postgres:16-alpine` | Database khusus data barang |
 
-  Pengguna mengakses aplikasi melalui browser untuk melihat tampilan sistem dan melakukan berbagai aktivitas seperti login, mencari barang, maupun melakukan penyewaan.
+### Pola Komunikasi Antar Service
 
-- Frontend
+```mermaid
+sequenceDiagram
+    participant U as 👤 User Browser
+    participant GW as 🔀 Nginx Gateway
+    participant FE as ⚛️ Frontend
+    participant Auth as 🔐 Auth Service
+    participant Item as 📦 Item Service
+    participant ADB as 🗄️ Auth DB
+    participant IDB as 🗄️ Item DB
 
-  Frontend berfungsi sebagai antarmuka pengguna yang menampilkan halaman aplikasi serta menerima input dari pengguna sebelum diteruskan ke backend.
+    Note over U,IDB: 1️⃣ Login Flow
+    U->>GW: POST /auth/login
+    GW->>Auth: Proxy → :8001/login
+    Auth->>ADB: Query user credentials
+    ADB-->>Auth: User data
+    Auth-->>GW: JWT Token
+    GW-->>U: { access_token }
 
-- Backend FastAPI
+    Note over U,IDB: 2️⃣ Create Item Flow (Authenticated)
+    U->>GW: POST /items (+ Bearer Token)
+    GW->>Item: Proxy → :8002/items
+    Item->>Auth: GET /verify (Token Verification)
+    Auth->>ADB: Decode & validate JWT
+    ADB-->>Auth: User info
+    Auth-->>Item: { user_id, email, name }
+    Item->>IDB: INSERT item
+    IDB-->>Item: Item created
+    Item-->>GW: 201 Created
+    GW-->>U: Item response
+```
 
-  Backend bertugas memproses permintaan dari frontend, menjalankan logika sistem, dan mengatur komunikasi dengan database.
+### Routing Table (Nginx Gateway)
 
-- PostgreSQL Database
-
-  Database digunakan untuk menyimpan, mengambil, dan memperbarui seluruh data yang dibutuhkan oleh sistem.
+| Path Pattern | Target Service | Keterangan |
+|---|---|---|
+| `/auth/*` | `auth-service:8001` | Semua endpoint autentikasi |
+| `/items/*` | `item-service:8002` | Semua endpoint items & statistik |
+| `/health` | Gateway langsung | Health check aggregator |
+| `/*` (default) | `frontend:3000` | Static files & SPA fallback |
 
 ---
 
-## 6. Getting Started
+## 🗄 Database Schema
+
+Sewain menggunakan **12 tabel** dalam database utama (monolith backend) dengan relasi yang terstruktur:
+
+```mermaid
+erDiagram
+    users ||--o| admin_profiles : "1:1 (role=admin)"
+    users ||--o| user_profiles : "1:1 (role=user)"
+    users ||--o{ rentals : "has many"
+    admin_profiles ||--o{ items : "owns"
+    categories ||--o{ items : "has many"
+    items ||--o{ rentals : "rented via"
+    rentals ||--o| payments : "1:1"
+    rentals ||--o| reviews : "1:1"
+    rentals ||--o| promo_redemptions : "1:1"
+    admin_profiles ||--o| wallets : "1:1"
+    wallets ||--o{ withdrawals : "has many"
+    users ||--o{ chat_rooms : "participates"
+    chat_rooms ||--o{ chat_messages : "contains"
+    promo_codes ||--o{ promo_redemptions : "redeemed via"
+
+    users {
+        int id PK
+        string email UK
+        string nama
+        string hashed_password
+        enum role "super_admin | admin | user"
+        bool is_active
+        bool is_verified
+        datetime email_verified_at
+        text foto_profil
+    }
+
+    admin_profiles {
+        int id PK
+        int user_id FK
+        string nama_usaha
+        text alamat_usaha
+        string nomor_telepon
+        float latitude
+        float longitude
+    }
+
+    user_profiles {
+        int id PK
+        int user_id FK
+        string nama_orang_tua
+        text alamat
+        text foto_ktp
+        text foto_selfie_ktp
+        enum status_verifikasi "menunggu | disetujui | ditolak"
+    }
+
+    categories {
+        int id PK
+        string nama UK
+        text deskripsi
+    }
+
+    items {
+        int id PK
+        int admin_id FK
+        int category_id FK
+        string nama
+        float harga_per_hari
+        int stok
+        enum status "available | rented | unavailable"
+        text foto_url
+    }
+
+    rentals {
+        int id PK
+        int user_id FK
+        int item_id FK
+        date tanggal_mulai
+        date tanggal_selesai
+        float total_harga
+        enum status "pending | disetujui | sedang_disewa | selesai | ditolak"
+        int promo_code_id FK
+        float discount_amount
+    }
+
+    payments {
+        int id PK
+        int rental_id FK
+        float jumlah
+        enum metode_pembayaran "transfer | cash | e_wallet | midtrans"
+        enum status "pending | completed | failed | cancelled"
+        string midtrans_order_id
+        string snap_token
+    }
+
+    wallets {
+        int id PK
+        int admin_id FK
+        float saldo
+        float total_pendapatan
+        float total_withdrawn
+    }
+
+    withdrawals {
+        int id PK
+        int wallet_id FK
+        float jumlah
+        string bank_name
+        string account_number
+        enum status "pending | processing | completed | rejected"
+    }
+
+    reviews {
+        int id PK
+        int rental_id FK
+        int rating "1-5"
+        text komentar
+    }
+
+    promo_codes {
+        int id PK
+        string code UK
+        enum discount_type "percentage | fixed"
+        float discount_value
+        float max_discount
+        enum eligibility "new_user | all"
+        bool is_active
+    }
+
+    promo_redemptions {
+        int id PK
+        int promo_code_id FK
+        int rental_id FK
+        float discount_amount
+        float final_amount
+    }
+
+    chat_rooms {
+        int id PK
+        int user_id FK
+        int admin_id FK
+        int item_id FK
+    }
+
+    chat_messages {
+        int id PK
+        int room_id FK
+        int sender_id FK
+        text body
+        bool is_read
+    }
+```
+
+---
+
+## 🔄 CI/CD Pipeline
+
+Sewain menggunakan **GitHub Actions** untuk otomatisasi build, testing, dan deployment secara end-to-end.
+
+### Pipeline Overview
+
+```mermaid
+graph LR
+    subgraph TRIGGER["🔔 Trigger"]
+        Push["Push ke main"]
+        PR["Pull Request"]
+        Manual["Manual Dispatch"]
+    end
+
+    subgraph CI["🧪 CI Pipeline"]
+        direction TB
+        TestBE["🐍 Test Backend\n(pytest + coverage ≥50%)"]
+        TestFE["⚛️ Test Frontend\n(vitest + build)"]
+        BuildDocker["🐳 Build Docker\n(backend + frontend images)"]
+        Notify["💬 PR Comment\n(jika gagal)"]
+
+        TestBE --> BuildDocker
+        TestFE --> BuildDocker
+        BuildDocker -.->|"failure"| Notify
+    end
+
+    subgraph CD["🚀 CD Pipeline"]
+        direction TB
+        Detect["📋 Detect Changes\n(path-based filtering)"]
+        Deploy["📦 Deploy to DeployCC\n(smart build/skip)"]
+        Health["🏥 Health Check\n(5 retries × 10s)"]
+
+        Detect --> Deploy
+        Deploy --> Health
+    end
+
+    Push --> CI
+    PR --> CI
+    Manual --> CD
+    CI -->|"✅ CI Success"| CD
+```
+
+### CI Jobs Detail
+
+| Job | Runner | Timeout | Deskripsi |
+|-----|--------|---------|-----------|
+| `test-backend` | Ubuntu Latest | 10 min | Python 3.12, pip cache, `pytest --cov-fail-under=50` |
+| `test-frontend` | Ubuntu Latest | 10 min | Node.js 20, `vitest run` + `npm run build` |
+| `build-docker` | Ubuntu Latest | 10 min | Build Docker image backend & frontend (needs test pass) |
+| `notify-failure` | Ubuntu Latest | 5 min | Auto-comment di PR jika CI gagal |
+
+### CD Smart Deploy
+
+Pipeline CD melakukan **deteksi perubahan** untuk optimasi deployment:
+
+| Perubahan Terdeteksi | Aksi |
+|---|---|
+| `frontend/**` (signifikan) | 🔨 Build ulang frontend |
+| `frontend/README*`, `docs/**` | ⏭ Skip build (kosmetik) |
+| `backend/requirements.txt` | 📦 Re-install dependencies |
+| `backend/**` | 🔄 Restart Uvicorn |
+| Tidak ada perubahan | ✋ Zero downtime |
+
+---
+
+## 🚀 Getting Started
 
 ### Prasyarat
-- Python 3.10+
-- Node.js 18+
-- Git
-- Docker (Opsional, jika ingin menjalankan via Docker)
 
-### Menjalankan Manual 
-1. **Database**
+| Requirement | Minimum | Keterangan |
+|---|---|---|
+| Docker | 24.0+ | Containerisasi seluruh stack |
+| Docker Compose | 2.20+ | Orkestrasi multi-container |
+| Git | 2.40+ | Version control |
+| Python | 3.12+ | Development lokal backend (opsional) |
+| Node.js | 20+ | Development lokal frontend (opsional) |
 
-    - Buat database bernama data_sewain di PostgreSQL lokal Anda.
-    - Import initial data: `psql -U postgres -d data_sewain -f docs/seed-data.sql`
+### 🐳 Menjalankan via Docker (Recommended)
 
-2. **Backend**
+```bash
+# 1. Clone repositori
+git clone https://github.com/aidilsaputrakirsan-classroom/cc-kelompok-harahetta-2.git
+
+# 2. Masuk ke direktori proyek
+cd cc-kelompok-harahetta-2
+
+# 3. Build & jalankan semua service (microservices)
+docker compose up -d --build
+
+# 4. Cek status semua container
+docker compose ps
+
+# 5. Akses aplikasi
+#    → http://localhost (melalui Nginx Gateway)
+```
+
+### 💻 Menjalankan Manual (Development)
+
+**1. Database**
+```bash
+# Buat database di PostgreSQL lokal
+createdb -U postgres data_sewain
+
+# Import seed data (opsional)
+psql -U postgres -d data_sewain -f docs/seed-data.sql
+```
+
+**2. Backend**
 ```bash
 cd backend
+cp .env.example .env          # Sesuaikan konfigurasi
 pip install -r requirements.txt
 uvicorn main:app --reload --port 8000
 ```
 
-3. **Frontend**
+**3. Frontend**
 ```bash
 cd frontend
+cp .env.example .env.local    # Sesuaikan VITE_API_URL
 npm install
-npm run dev -- --port 3000
+npm run dev
 ```
 
-### Menjalankan via Docker
-```bash
-# Clone repositori
-git clone <url-repo>
+### 🔗 Akses Service
 
-# Masuk ke Direktori 
-cd cc-kelompok-harahetta-2
+| Service | URL | Keterangan |
+|---------|-----|------------|
+| 🌐 Aplikasi (Gateway) | `http://localhost` | Entry point utama via Nginx |
+| ⚛️ Frontend (direct) | `http://localhost:3000` | Akses langsung React dev server |
+| 📖 Swagger UI (via Gateway) | `http://localhost/api/docs` | **API Documentation** (monolith via /api/) |
+| 📘 ReDoc (via Gateway) | `http://localhost/api/redoc` | API Documentation alternative |
+| 🔐 Auth Service | `http://localhost:8001` | Microservice autentikasi |
+| 📦 Item Service | `http://localhost:8002` | Microservice inventaris |
 
-# Siapkan environment file
-cp backend/.env.docker.example backend/.env.docker 
+### 🔑 Akun Default (Seed Data)
 
-# Jalankan semua service
-docker compose up -d --build
-
-# Seed data awal (opsional)
-docker compose exec db psql -U postgres -d data_sewain -f /dev/stdin < docs/seed-data.sql
-
-# Jalankan aplikasi di
-http://localhost:3000
-```
-
-### Akses Aplikasi
-
-| Service | URL |
-|---------|-----|
-| Frontend | http://localhost:3000 |
-| Backend API | http://localhost:8000 |
-| Swagger UI | http://localhost:8000/docs |
+| Role | Email | Password |
+|------|-------|----------|
+| Super Admin | `superadmin@sewain.id` | `superadmin123` |
+| Admin | `admin@sewain.id` | `admin123` |
+| User | `user@sewain.id` | `user123` |
 
 ---
 
-## 7. Makefile Workflow Commands
-
-Berikut adalah daftar target `make` yang tersedia untuk mendukung workflow pengembangan dan CI/CD.
-Jalankan perintah ini dari **root direktori** proyek.
-
-### 🔧 CI/CD Targets (Baru)
-
-| Target | Perintah | Deskripsi |
-|--------|----------|-----------|
-| `lint` | `make lint` | Menjalankan linter pada seluruh codebase: **flake8** untuk backend Python dan **eslint** untuk frontend React. Berguna untuk menjaga konsistensi kode sebelum commit. |
-| `test` | `make test` | Placeholder untuk test runner. Saat ini hanya mencetak instruksi konfigurasi. Akan diisi dengan **pytest** (backend) dan **vitest/jest** (frontend) di sprint berikutnya. |
-| `pr-check` | `make pr-check` | Menjalankan full pre-PR check: build Docker image backend → build Docker image frontend → jalankan test. **Wajib dijalankan sebelum membuat Pull Request.** |
-
-### 📦 Cara Penggunaan
-
-```bash
-# Jalankan linter sebelum commit
-make lint
-
-# Jalankan test (placeholder)
-make test
-
-# Full check sebelum membuat PR (build Docker + test)
-make pr-check
-```
-
-> **Catatan DevOps:** Target `pr-check` adalah gatekeeper utama sebelum kode masuk ke branch `main`.
-> Pastikan semua langkah berhasil (exit 0) sebelum membuka Pull Request.
-
-### 🗂️ Semua Target Makefile
-
-| Kategori | Target | Deskripsi |
-|----------|--------|-----------|
-| Backend | `build` | Build Docker image backend |
-| Backend | `run` | Jalankan container backend |
-| Backend | `run-fg` | Jalankan container foreground (debug) |
-| Backend | `push` | Push image backend ke Docker Hub |
-| Backend | `stop` | Stop & hapus container backend |
-| Backend | `clean` | Stop container + hapus image lokal |
-| Backend | `logs` | Lihat log real-time |
-| Backend | `health` | Health check endpoint `/health` |
-| Backend | `shell` | Masuk ke shell container |
-| Backend | `ps` | Status container |
-| Backend | `restart` | Rebuild + rerun |
-| Frontend | `fe-build` | Build Docker image frontend |
-| Frontend | `fe-push` | Push image frontend ke Docker Hub |
-| Frontend | `fe-run` | Jalankan container frontend |
-| Frontend | `fe-stop` | Stop container frontend |
-| Frontend | `fe-restart` | Rebuild + rerun frontend |
-| Compose | `compose-up` | Jalankan semua services |
-| Compose | `compose-down` | Stop semua services |
-| Compose | `compose-build` | Rebuild + jalankan |
-| Compose | `compose-logs` | Log realtime semua services |
-| Compose | `compose-ps` | Status semua services |
-| Compose | `compose-restart` | Restart semua services |
-| Compose | `compose-clean` | Hapus containers, networks, volumes |
-| Push | `push-all` | Push backend + frontend |
-| **CI/CD** | **`lint`** | **Jalankan flake8 + eslint** |
-| **CI/CD** | **`test`** | **Jalankan test (placeholder)** |
-| **CI/CD** | **`pr-check`** | **Build Docker + test (pre-PR gate)** |
-
----
-
-## 8. Roadmap
-
-| Minggu | Target | Status |
-|--------|--------|--------|
-| 1 | Setup & Hello World | ✅ |
-| 2 | REST API + Database | ✅ |
-| 3 | React Frontend | ✅ |
-| 4 | Full-Stack Integration | ✅ |
-| 5-7 | Docker & Compose | ✅ |
-| 8 | UTS Demo | ✅ |
-| 9-11 | CI/CD Pipeline | ✅ |
-| 12-14 | Microservices | ⬜ |
-| 15-16 | Final & UAS | ⬜ |
-
----
-
-## 9. Project Structure
+## 📂 Struktur Proyek
 
 ```
 cc-kelompok-harahetta-2/
-├── backend/
-│   ├── main.py                 # Entry point & semua endpoint API
-│   ├── models.py               # Database models (SQLAlchemy)
-│   ├── schemas.py              # Request/Response schemas (Pydantic)
-│   ├── crud.py                 # Operasi database (CRUD)
-│   ├── auth.py                 # JWT authentication & role guards
-│   ├── database.py             # Koneksi database
-│   ├── requirements.txt        # Dependensi Python
-│   ├── Dockerfile              # Docker image backend
-│   ├── setup.sh                # Script setup manual
-│   ├── .env.example            # Template .env (local)
-│   └── .env.docker.example     # Template .env (Docker)
 │
-├── frontend/
+├── 🔐 services/                    # Microservices (Docker Compose)
+│   ├── auth-service/                # Authentication microservice
+│   │   ├── main.py                  #   FastAPI app — register, login, verify
+│   │   ├── models.py                #   SQLAlchemy User model
+│   │   ├── schemas.py               #   Pydantic request/response schemas
+│   │   ├── database.py              #   PostgreSQL connection (auth_db)
+│   │   ├── Dockerfile               #   Python 3.12-slim, port 8001
+│   │   ├── requirements.txt         #   Dependencies: fastapi, bcrypt, jwt
+│   │   └── tests/                   #   Unit tests
+│   │
+│   ├── item-service/                # Inventory microservice
+│   │   ├── main.py                  #   FastAPI app — CRUD items, stats
+│   │   ├── auth_client.py           #   HTTP client → Auth Service /verify
+│   │   ├── models.py                #   SQLAlchemy Item model
+│   │   ├── schemas.py               #   Pydantic schemas
+│   │   ├── database.py              #   PostgreSQL connection (item_db)
+│   │   ├── Dockerfile               #   Python 3.12-slim, port 8002
+│   │   ├── requirements.txt         #   Dependencies: fastapi, httpx
+│   │   └── tests/                   #   Unit tests
+│   │
+│   └── gateway/                     # API Gateway
+│       └── nginx.conf               #   Routing: /auth→8001, /items→8002, /→FE
+│
+├── ⚙️ backend/                      # Monolith Backend (full-featured)
+│   ├── main.py                      #   FastAPI app — semua endpoint (2700+ lines)
+│   ├── models.py                    #   12 tabel SQLAlchemy (users, items, rentals, dll.)
+│   ├── schemas.py                   #   Request/Response Pydantic schemas
+│   ├── crud.py                      #   Database operations layer
+│   ├── auth.py                      #   JWT authentication & role guards
+│   ├── config.py                    #   Environment-based configuration
+│   ├── chat.py                      #   WebSocket chat (User ↔ Admin)
+│   ├── chatbot.py                   #   AI chatbot integration (OpenAI)
+│   ├── email_service.py             #   Email verification & password reset
+│   ├── midtrans_service.py          #   Payment gateway integration
+│   ├── database.py                  #   Database connection manager
+│   ├── Dockerfile                   #   Multi-stage build
+│   ├── requirements.txt             #   Python dependencies
+│   └── tests/                       #   10 test files (pytest)
+│       ├── conftest.py              #     Test fixtures & setup
+│       ├── test_auth.py             #     Authentication tests
+│       ├── test_admin.py            #     Admin endpoint tests
+│       ├── test_items.py            #     Item CRUD tests
+│       ├── test_categories.py       #     Category tests
+│       ├── test_chat.py             #     Chat functionality tests
+│       ├── test_reviews.py          #     Review system tests
+│       ├── test_wallet.py           #     Wallet & withdrawal tests
+│       ├── test_rental_due_at.py    #     Rental deadline tests
+│       └── test_health.py           #     Health check tests
+│
+├── 🎨 frontend/                     # React SPA
 │   ├── src/
-│   │   ├── pages/              # Halaman utama (Dashboard, Login, dll.)
-│   │   ├── components/         # Komponen UI reusable
-│   │   ├── context/            # AuthContext (state global)
-│   │   ├── services/api.js     # HTTP client ke backend
-│   │   ├── App.jsx             # Router & layout utama
-│   │   └── main.jsx            # Entry point React
-│   ├── public/                 # Aset statis
-│   ├── nginx.conf              # Konfigurasi Nginx
-│   ├── Dockerfile              # Docker image frontend
-│   ├── package.json            # Dependensi Node.js
-│   └── vite.config.js          # Konfigurasi Vite
+│   │   ├── pages/                   #   21 halaman (Landing, Login, Dashboard, dll.)
+│   │   ├── components/              #   20+ komponen reusable
+│   │   │   ├── ui/                  #     Radix UI primitives
+│   │   │   ├── __tests__/           #     Component tests
+│   │   │   ├── ChatbotWidget.jsx    #     AI chatbot widget
+│   │   │   ├── MapPicker.jsx        #     Leaflet map component
+│   │   │   ├── PromoBanner.jsx      #     Promo display
+│   │   │   └── ...
+│   │   ├── context/                 #   AuthContext (global state)
+│   │   ├── services/
+│   │   │   ├── api.js               #     HTTP client (Axios-like)
+│   │   │   └── chat.js              #     WebSocket chat client
+│   │   ├── App.jsx                  #   Router & layout
+│   │   └── main.jsx                 #   Entry point
+│   ├── Dockerfile                   #   Multi-stage: build → nginx serve
+│   ├── nginx.conf                   #   SPA fallback config
+│   ├── package.json                 #   Node.js dependencies
+│   └── vite.config.js               #   Vite build configuration
 │
-├── docs/
-│   └── seed-data.sql           # Data awal untuk database
+├── 📋 docs/                         #   Dokumentasi proyek
+│   ├── architecture.md              #     Arsitektur microservices detail
+│   ├── deployment-guide.md          #     Panduan deployment
+│   ├── setup-guide.md               #     Panduan setup lengkap
+│   ├── testing-guide.md             #     Strategi & panduan testing
+│   ├── testing/                     #     Hasil testing (API, UI, Auth)
+│   ├── seed-data.sql                #     Data awal database
+│   └── img/                         #     Screenshots & gambar
 │
-├── docker-compose.yml          # Orkestrasi semua service
-└── README.md
+├── 🔧 .github/
+│   ├── workflows/
+│   │   ├── ci.yml                   #   CI: test → build → notify
+│   │   └── cd.yml                   #   CD: detect changes → deploy → health check
+│   └── CODEOWNERS                   #   Auto-assign reviewers
+│
+├── docker-compose.yml               #   Microservices orchestration (6 containers)
+├── docker-compose.prod.yml          #   Production overrides
+├── Makefile                         #   Developer workflow shortcuts
+└── README.md                        #   ← You are here
 ```
----
-
-## 10. API Documentation Testing
-
-Berikut adalah ringkasan hasil pengujian endpoint utama pada platform **SEWAIN** berdasarkan integrasi antara Frontend dan Backend. Untuk melihat hasil dan pembahasan lebih detail, silakan buka file berikut ini:
-[Hasil dan Pembahasan API Testing](./docs/testing/api-documentation.md/)
-
-| No | Endpoint | Metode | Skenario Pengujian | Hasil | Status |
-|----|----------|--------|--------------------|-------|--------|
-| 1 | `/health` | GET | Memastikan backend dan database aktif | API mengembalikan status `healthy` | 🟢 Sesuai |
-| 2 | `/auth/register` | POST | Registrasi akun baru | Data user berhasil tersimpan | 🟢 Sesuai |
-| 3 | `/auth/login` | POST | Login dengan akun valid | Token JWT berhasil dibuat | 🟢 Sesuai |
-| 4 | `/auth/me` | GET | Ambil data user login | Profil user tampil sesuai token | 🟢 Sesuai |
-| 5 | `/categories` | GET | Menampilkan daftar kategori | Data kategori tampil | 🟢 Sesuai |
-| 6 | `/items` | GET | Menampilkan katalog barang | Data barang berhasil dimuat | 🟢 Sesuai |
-| 7 | `/items` | POST | Menambah barang baru | Barang berhasil ditambahkan | 🟢 Sesuai |
-| 8 | `/items/{id}` | PUT | Memperbarui data barang | Perubahan tersimpan | 🟢 Sesuai |
-| 9 | `/items/{id}` | DELETE | Menghapus barang | Barang berhasil dihapus | 🟢 Sesuai |
-| 10 | `/rentals` | POST | Membuat transaksi sewa | Data rental berhasil dibuat | 🟢 Sesuai |
 
 ---
 
-## 11. UI & API Integration Testing
+## 📖 API Documentation
 
-Berdasarkan hasil pengujian yang telah dilakukan, seluruh fitur CRUD dan interaktivitas aplikasi berjalan dengan baik dan sesuai dengan yang diharapkan. Setiap aksi yang dilakukan pada antarmuka pengguna telah terhubung dengan backend dan database secara sinkron. Untuk melihat hasil dan pembahasan lebih detail, silakan buka file berikut ini:
-[Hasil dan Pembahasan UI Testing](./docs/testing/ui-test-result.md/)
+### Endpoint Overview (Monolith Backend)
 
-Berikut adalah ringkasan hasil pengujian yang telah dilakukan:
-| No | Skenario Pengujian | Langkah Pengerjaan | Hasil Sebenarnya | Status |
-|----|--------------------|--------------------|------------------|--------|
-| 1 | Cek Status Koneksi | Membuka aplikasi di localhost:3000 | Sidebar dan konten dashboard dimuat tanpa error (API Connected) | ✅ Sesuai |
-| 2 | Read Data (Katalog) | Membuka menu "Katalog" pada sidebar | Item "kamera sony" dari database Modul 2 tampil dengan harga Rp 15.000 | ✅ Sesuai |
-| 3 | Tambah Item Baru | Menekan tombol "+ Tambah Barang Baru" di Admin Panel | Modal form muncul dengan input Nama, Deskripsi, Harga, Stok, dan Foto | ✅ Sesuai |
-| 4 | Create & Upload | Mengisi data  dan mengunggah gambar | Data tersimpan dan thumbnail foto muncul di pratinjau sebelum submit | ✅ Sesuai |
-| 5 | Sync UI (Post-Create) | Melihat daftar barang setelah submit | Item baru muncul secara otomatis di "Daftar Barang Saya" | ✅ Sesuai |
-| 6 | Edit Mode | Klik tombol icon ✏️ (Edit) pada kartu barang | Form modal terbuka dan otomatis terisi data lama item tersebut | ✅ Sesuai |
-| 7 | Update Data | Mengubah harga/stok dan klik "Simpan" | Perubahan data langsung terupdate pada kartu barang di UI | ✅ Sesuai |
-| 8 | Search Feature | Mengetik nama barang di Search Bar menu Katalog | Daftar barang menyusut (terfilter) sesuai kata kunci yang diketik | ✅ Sesuai |
-| 9 | Delete Item | Klik icon 🗑️ (Hapus) pada salah satu item | Item terhapus dari UI dan database setelah konfirmasi | ✅ Sesuai |
-| 10 | Empty State | Menghapus semua barang yang ada | Muncul pesan/tampilan "Data tidak ditemukan" atau daftar kosong | ✅ Sesuai |
+Sewain API memiliki **50+ endpoints** yang terorganisir dalam 10 kategori:
+
+| Kategori | Prefix | Auth | Jumlah Endpoint |
+|----------|--------|------|-----------------|
+| 🔐 Auth | `/auth/*` | Public/Login | 7 (register, login, verify-email, forgot-password, dll.) |
+| 👑 Super Admin | `/superadmin/*` | Super Admin | 8 (users CRUD, stats, verifications, rentals) |
+| 🏪 Admin Profile | `/admin/profile` | Admin | 4 (CRUD profil usaha) |
+| 📂 Kategori | `/categories` | Public/SA | 4 (GET public, CRUD super admin) |
+| 📦 Items | `/items/*` | Login | 5 (katalog, detail, CRUD admin) |
+| 📋 Rentals | `/rentals/*` | Verified User/Admin | 6 (ajukan sewa, status update, riwayat) |
+| 💳 Payments | `/payments/*` | Login | 5 (create, verify, Midtrans webhook) |
+| 💰 Wallet | `/admin/wallet/*` | Admin/SA | 4 (saldo, withdrawal, approval) |
+| ⭐ Reviews | `/reviews/*` | User/Public | 4 (create, list, shop reviews) |
+| 🎟️ Promo | `/promo/*` | User/SA | 5 (validate, redeem, CRUD codes) |
+| 🤖 Chatbot | `/chatbot/*` | Login | 2 (send message, history) |
+| 💬 Chat | `/chat/*` | Login | 5 (rooms, messages, WebSocket) |
+
+### Microservices API Contract
+
+| Method | Endpoint | Service | Deskripsi |
+|--------|----------|---------|-----------|
+| `POST` | `/auth/register` | Auth Service | Registrasi user baru |
+| `POST` | `/auth/login` | Auth Service | Login, dapatkan JWT token |
+| `GET` | `/auth/verify` | Auth Service | Internal — verifikasi token (inter-service) |
+| `GET` | `/items` | Item Service | Daftar items milik user |
+| `POST` | `/items` | Item Service | Tambah item baru (authenticated) |
+| `GET` | `/items/{id}` | Item Service | Detail item |
+| `PUT` | `/items/{id}` | Item Service | Update item |
+| `DELETE` | `/items/{id}` | Item Service | Hapus item |
+| `GET` | `/items/stats` | Item Service | Statistik items |
+
+> 📖 Dokumentasi API lengkap tersedia di [Swagger UI](https://cc-kelompok-harahetta-2.akhzafachrozy.my.id/api/docs) dan file [docs/testing/api-documentation.md](./docs/testing/api-documentation.md)
+
+---
+
+## 🧪 Testing
+
+### Testing Stack
+
+| Layer | Tool | Runner | Coverage |
+|-------|------|--------|----------|
+| Backend Unit Tests | **Pytest** | GitHub Actions | ≥ 50% (enforced) |
+| Backend Coverage | **pytest-cov** | GitHub Actions | `--cov-fail-under=50` |
+| Frontend Unit Tests | **Vitest** | GitHub Actions | Component testing |
+| Frontend Components | **Testing Library** | Vitest | React component testing |
+| API Testing | Manual + Automated | Swagger UI / HTTPx | 10 endpoint scenarios |
+| UI Integration | Manual | Browser | 10 UI scenarios |
+| E2E | Manual | Browser | 9 end-to-end scenarios |
+
+### Backend Test Suite (10 files)
+
+```bash
+# Jalankan semua test dengan coverage
+cd backend
+pytest --cov=. --cov-report=term-missing
+
+# Test file yang tersedia:
+# tests/test_auth.py          — Auth register, login, token
+# tests/test_admin.py         — Admin profile CRUD
+# tests/test_items.py         — Item CRUD operations
+# tests/test_categories.py    — Category management
+# tests/test_chat.py          — Chat rooms & messages
+# tests/test_reviews.py       — Review & rating system
+# tests/test_wallet.py        — Wallet & withdrawal
+# tests/test_rental_due_at.py — Rental deadline logic
+# tests/test_health.py        — Health check endpoint
+```
+
+### Frontend Test Suite
+
+```bash
+# Jalankan test
+cd frontend
+npm test
+
+# Watch mode
+npm run test:watch
+
+# Dengan coverage
+npm run test:coverage
+```
+
+### Hasil Testing Ringkasan
+
+<details>
+<summary><strong>📋 API Documentation Testing (10 Skenario)</strong></summary>
+
+| No | Endpoint | Metode | Skenario | Status |
+|----|----------|--------|----------|--------|
+| 1 | `/health` | GET | Backend & database aktif | 🟢 Pass |
+| 2 | `/auth/register` | POST | Registrasi akun baru | 🟢 Pass |
+| 3 | `/auth/login` | POST | Login dengan akun valid | 🟢 Pass |
+| 4 | `/auth/me` | GET | Ambil data user login | 🟢 Pass |
+| 5 | `/categories` | GET | Menampilkan kategori | 🟢 Pass |
+| 6 | `/items` | GET | Menampilkan katalog | 🟢 Pass |
+| 7 | `/items` | POST | Menambah barang baru | 🟢 Pass |
+| 8 | `/items/{id}` | PUT | Memperbarui barang | 🟢 Pass |
+| 9 | `/items/{id}` | DELETE | Menghapus barang | 🟢 Pass |
+| 10 | `/rentals` | POST | Membuat transaksi sewa | 🟢 Pass |
+
+> Detail lengkap: [docs/testing/api-documentation.md](./docs/testing/api-documentation.md)
+
+</details>
+
+<details>
+<summary><strong>🖥️ UI & API Integration Testing (10 Skenario)</strong></summary>
+
+| No | Skenario | Hasil | Status |
+|----|----------|-------|--------|
+| 1 | Cek Status Koneksi | Dashboard dimuat, API Connected | ✅ Pass |
+| 2 | Read Data Katalog | Item dari database tampil | ✅ Pass |
+| 3 | Tambah Item Baru | Modal form muncul | ✅ Pass |
+| 4 | Create & Upload | Data tersimpan, thumbnail muncul | ✅ Pass |
+| 5 | Sync UI Post-Create | Item baru muncul otomatis | ✅ Pass |
+| 6 | Edit Mode | Form terisi data lama | ✅ Pass |
+| 7 | Update Data | Perubahan terupdate di UI | ✅ Pass |
+| 8 | Search Feature | Filter sesuai kata kunci | ✅ Pass |
+| 9 | Delete Item | Item terhapus dari UI & DB | ✅ Pass |
+| 10 | Empty State | Pesan "Data tidak ditemukan" | ✅ Pass |
+
+> Detail lengkap: [docs/testing/ui-test-result.md](./docs/testing/ui-test-result.md)
+
+</details>
+
+<details>
+<summary><strong>🔐 Authentication & CRUD Testing (14 Skenario)</strong></summary>
+
+**Authentication (5 skenario)**
+
+| Kode | Skenario | Status |
+|------|----------|--------|
+| auth1 | Register User | ✅ Pass |
+| auth2 | Validasi Register (field kosong) | ✅ Pass |
+| auth3 | Login Berhasil | ✅ Pass |
+| auth4 | Login Gagal (password salah) | ✅ Pass |
+| auth5 | Logout | ✅ Pass |
+
+**CRUD (5 skenario)**
+
+| Kode | Skenario | Status |
+|------|----------|--------|
+| crud1 | Create Item | ✅ Pass |
+| crud2 | Validasi Form (field wajib) | ✅ Pass |
+| crud3 | Read Data | ✅ Pass |
+| crud4 | Update Item | ✅ Pass |
+| crud5 | Delete Item | ✅ Pass |
+
+**End-to-End (9 skenario)**
+
+| Kode | Skenario | Status |
+|------|----------|--------|
+| ee1 | Buka aplikasi → halaman login | ✅ Pass |
+| ee2 | Register user | ✅ Pass |
+| ee3 | Auto login setelah register | ✅ Pass |
+| ee4 | Dashboard tampil | ✅ Pass |
+| ee5 | Nama user di header | ✅ Pass |
+| ee6 | CRUD berjalan | ✅ Pass |
+| ee7 | Logout | ✅ Pass |
+| ee8 | Login ulang | ✅ Pass |
+| ee9 | Data tetap ada setelah re-login | ✅ Pass |
+
+> Detail & screenshots: [docs/testing/auth-test-result/](./docs/testing/auth-test-result/)
+
+</details>
 
 ---
 
-## 12. Authentication & CRUD Testing
+## ⚡ Makefile Commands
 
-Pengujian sistem dilakukan untuk memastikan seluruh fitur aplikasi berjalan dengan baik sesuai dengan kebutuhan yang telah dirancang. Proses pengujian mencakup fitur autentikasi (authentication), pengelolaan data (CRUD), serta pengujian alur penggunaan secara menyeluruh (end-to-end). Untuk melihat hasil pengujian berupa screenshot, silakan buka folder berikut:
-[Hasil dan Pembahasan Auth Testing](./docs/testing/auth-test-result/)
+Semua command dijalankan dari **root directory** proyek.
 
-Pengujian dilakukan dengan mensimulasikan interaksi langsung pengguna terhadap aplikasi, mulai dari proses registrasi, login, pengelolaan data barang, hingga logout. Setiap skenario diuji untuk memastikan bahwa sistem dapat memberikan respon yang sesuai, data tersimpan dengan benar di database, serta tampilan antarmuka tetap sinkron dengan kondisi sistem.
+### Quick Reference
 
-Berikut adalah hasil pengujian yang telah dilakukan:
+```bash
+make help              # Tampilkan semua perintah tersedia
+make compose-up        # 🚀 Jalankan semua services
+make compose-down      # ⏹️ Stop semua services
+make compose-build     # 🔨 Rebuild & jalankan
+make compose-logs      # 📋 Log real-time semua services
+make compose-ps        # 📊 Status semua services
+make lint              # 🔍 Lint backend (flake8) + frontend (eslint)
+make pr-check          # 🔎 Full pre-PR check (build + test)
+```
 
-### Authentication Testing
+### Daftar Lengkap
 
-| Kode | Skenario Pengujian | Langkah Pengerjaan | Hasil Sebenarnya | Status |
-|----|-------------------|------------------|----------------------|--------|
-| auth1 | Register User | Mengisi semua field dan klik register | User berhasil dibuat dan masuk ke dashboard | ✅ Sesuai |
-| auth2 | Validasi Register | Mengosongkan field | Muncul pesan error dan data tidak dikirim | ✅ Sesuai |
-| auth3 | Login Berhasil | Login dengan email & password yang benar | User berhasil masuk ke dashboard | ✅ Sesuai |
-| auth4 | Login Gagal | Input email/password salah | Muncul error login gagal | ✅ Sesuai |
-| auth5 | Logout | Klik tombol logout | Kembali ke halaman login | ✅ Sesuai |
-
-### CRUD Testing 
-
-| No | Skenario Pengujian | Langkah Pengerjaan | Hasil Sebenarnya | Status |
-|----|-------------------|------------------|----------------------|--------|
-| crud1 | Create Item | Mengisi form dan klik tambah | Item baru muncul di dashboard | ✅ Sesuai |
-| crud2 | Validasi Form | Mengosongkan field wajib | Muncul error dan data tidak dikirim | ✅ Sesuai |
-| crud3 | Read Data | Membuka dashboard | Semua item tampil dengan data lengkap | ✅ Sesuai |
-| crud4 | Update Item | Klik edit, ubah data, simpan | Data berubah di UI dan database | ✅ Sesuai |
-| crud5 | Delete Item | Klik hapus dan konfirmasi | Item terhapus dari UI dan database | ✅ Sesuai |
-
-### End-to-End Testing (Modul 4)
-
-| No | Skenario Pengujian | Langkah Pengerjaan | Hasil Sebenarnya | Status |
-|----|-------------------|------------------|----------------------|--------|
-| ee1 | Buka aplikasi | Membuka localhost:3000 di browser | Halaman login muncul | ✅ Sesuai |
-| ee2 | Register user | Mengisi form register dan submit | User berhasil terdaftar | ✅ Sesuai |
-| ee3 | Auto login | Setelah register selesai | User otomatis masuk ke dashboard | ✅ Sesuai |
-| ee4 | Dashboard tampil | Setelah login berhasil | Halaman dashboard dan data item muncul | ✅ Sesuai |
-| ee5 | Nama user muncul | Melihat bagian header | Nama user tampil di header | ✅ Sesuai |
-| ee6 | CRUD berjalan | Menambah, edit, dan hapus item | Semua fitur CRUD berjalan dengan baik | ✅ Sesuai |
-| ee7 | Logout | Klik tombol logout | User keluar dari sistem | ✅ Sesuai |
-| ee8 | Login ulang | Login dengan akun yang sama | User berhasil masuk kembali | ✅ Sesuai |
-| ee9 | Data tetap ada | Setelah login ulang | Data item tetap tersimpan dan tampil | ✅ Sesuai |
+| Kategori | Command | Deskripsi |
+|----------|---------|-----------|
+| **Compose** | `compose-up` | Jalankan semua services (detached) |
+| | `compose-down` | Stop semua services |
+| | `compose-build` | Rebuild + jalankan semua |
+| | `compose-logs` | Log real-time semua services |
+| | `compose-ps` | Status semua services |
+| | `compose-restart` | Restart semua services |
+| | `compose-clean` | Hapus containers, networks, volumes |
+| **Backend** | `build` | Build Docker image backend |
+| | `run` | Jalankan container backend |
+| | `push` | Push image ke Docker Hub |
+| | `stop` | Stop & hapus container |
+| | `logs` | Log real-time backend |
+| | `health` | Health check `/health` |
+| | `shell` | Masuk ke shell container |
+| **Frontend** | `fe-build` | Build Docker image frontend |
+| | `fe-push` | Push image ke Docker Hub |
+| | `fe-run` | Jalankan container frontend |
+| | `fe-stop` | Stop container frontend |
+| | `fe-restart` | Rebuild + rerun frontend |
+| **CI/CD** | `lint` | Jalankan flake8 + eslint |
+| | `test` | Jalankan test suite |
+| | `pr-check` | Build Docker + test (pre-PR gate) |
+| **Push** | `push-all` | Push backend + frontend ke Docker Hub |
 
 ---
+
+## 🗺 Roadmap
+
+| Minggu | Target | Deliverables | Status |
+|--------|--------|-------------|--------|
+| 1 | Setup & Hello World | Project setup, hello world endpoint | ✅ Selesai |
+| 2 | REST API + Database | CRUD endpoints, PostgreSQL integration | ✅ Selesai |
+| 3 | React Frontend | UI pages, component architecture | ✅ Selesai |
+| 4 | Full-Stack Integration | API integration, auth flow | ✅ Selesai |
+| 5–7 | Docker & Compose | Containerisasi, multi-service | ✅ Selesai |
+| 8 | UTS Demo | Presentasi tengah semester | ✅ Selesai |
+| 9–11 | CI/CD Pipeline | GitHub Actions, automated testing | ✅ Selesai |
+| 12–14 | Microservices | Service decomposition, API Gateway | ✅ Selesai |
+| 15–16 | Final & UAS | Polish, documentation, final demo | 🔄 In Progress |
+
+---
+
+## 📄 Lisensi
+
+Proyek ini dibuat untuk keperluan akademis mata kuliah **Komputasi Awan** — Program Studi Sistem Informasi, Institut Teknologi Kalimantan (ITK).
+
+---
+
+<div align="center">
+
+**Dibuat dengan ❤️ oleh Kelompok Harahetta-2**
+
+Institut Teknologi Kalimantan — 2026
+
+</div>
