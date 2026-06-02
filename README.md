@@ -1,28 +1,35 @@
 <p align="center">
   <img src="docs/img/Logo sewain.png" alt="Logo Sewain" width="180"/>
 </p>
+
 <h1 align="center"><span style="color:#22c55e">Sewain</span> — Platform Sewa Barang Online</h1>
 
 
-### Platform Sewa Barang Online Berbasis Microservices
+<p align="center">
+  <img src="https://github.com/aidilsaputrakirsan-classroom/cc-kelompok-harahetta-2/actions/workflows/ci.yml/badge.svg" alt="CI Pipeline"/>
+  <img src="https://github.com/aidilsaputrakirsan-classroom/cc-kelompok-harahetta-2/actions/workflows/cd.yml/badge.svg" alt="CD Pipeline"/>
+  <img src="https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white" alt="Python"/>
+  <img src="https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white" alt="FastAPI"/>
+  <img src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black" alt="React"/>
+  <img src="https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white" alt="PostgreSQL"/>
+  <img src="https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white" alt="Docker"/>
+  <img src="https://img.shields.io/badge/Nginx-Gateway-009639?logo=nginx&logoColor=white" alt="Nginx"/>
+</p>
 
-![CI Pipeline](https://github.com/aidilsaputrakirsan-classroom/cc-kelompok-harahetta-2/actions/workflows/ci.yml/badge.svg)
-![CD Pipeline](https://github.com/aidilsaputrakirsan-classroom/cc-kelompok-harahetta-2/actions/workflows/cd.yml/badge.svg)
-![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)
-![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
-![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)
-![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
-![Nginx](https://img.shields.io/badge/Nginx-Gateway-009639?logo=nginx&logoColor=white)
+<p align="center">
+  <strong>Sewain</strong> adalah platform berbasis web yang memfasilitasi penyewaan barang secara online dengan arsitektur <strong>microservices</strong>, dikelola melalui Docker Compose, dan dideploy secara otomatis melalui <strong>CI/CD pipeline</strong> GitHub Actions.
+</p>
 
-**Sewain** adalah platform berbasis web yang memfasilitasi penyewaan barang secara online dengan arsitektur **microservices**, dikelola melalui **Docker Compose**, dan dideploy secara otomatis melalui **CI/CD pipeline** GitHub Actions.
+<p align="center">
+  <strong>Mata Kuliah:</strong> Komputasi Awan — Sistem Informasi, Institut Teknologi Kalimantan (ITK) &nbsp;|&nbsp; <strong>Tim:</strong> Kelompok Harahetta-2
+</p>
 
-**Mata Kuliah:** Komputasi Awan — Sistem Informasi, Institut Teknologi Kalimantan (ITK)
-**Tim:** Kelompok Harahetta-2
+<p align="center">
+  🌐 <a href="https://cc-kelompok-harahetta-2.akhzafachrozy.my.id/">Live Demo</a> ·
+  📋 <a href="https://cc-kelompok-harahetta-2.akhzafachrozy.my.id/docs">API Docs</a> ·
+  📐 <a href="#-arsitektur-microservices">Arsitektur Detail</a>
+</p>
 
-[🌐 Live Demo](https://cc-kelompok-harahetta-2.akhzafachrozy.my.id/) · [📖 API Docs](https://cc-kelompok-harahetta-2.akhzafachrozy.my.id/api/docs) · [📋 Arsitektur Detail](./docs/architecture.md)
-
-</div>
 
 ---
 
