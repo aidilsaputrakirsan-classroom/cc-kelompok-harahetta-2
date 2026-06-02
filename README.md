@@ -1,6 +1,8 @@
-<div align="center">
+<p align="center">
+  <img src="docs/img/Logo sewain.png" alt="Logo Sewain" width="180"/>
+</p>
+<h1 align="center"><span style="color:#22c55e">Sewain</span> — Platform Sewa Barang Online</h1>
 
-# 🛵 SEWAIN
 
 ### Platform Sewa Barang Online Berbasis Microservices
 
