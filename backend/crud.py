@@ -2216,7 +2216,8 @@ def create_promo_code(
         code=data.code,
         nama=data.nama,
         deskripsi=data.deskripsi,
-        discount_type=DiscountType(data.discount_type.value),
+        # Sistem promo hanya memakai tipe PERSENTASE.
+        discount_type=DiscountType.percentage,
         discount_value=data.discount_value,
         max_discount=data.max_discount,
         min_order=data.min_order,
@@ -2254,9 +2255,9 @@ def update_promo_code(
             return {"error": "Maksimal 3 promo yang bisa ditampilkan di landing page. Nonaktifkan salah satu promo featured terlebih dahulu.", "code": 400}
 
     for field, value in update_fields.items():
-        # Map enum values jika ada
-        if field == "discount_type" and value is not None:
-            promo.discount_type = DiscountType(value if isinstance(value, str) else value.value)
+        # Sistem promo hanya memakai tipe PERSENTASE → abaikan perubahan tipe.
+        if field == "discount_type":
+            promo.discount_type = DiscountType.percentage
         elif field == "eligibility" and value is not None:
             promo.eligibility = PromoEligibility(value if isinstance(value, str) else value.value)
         else:
@@ -2302,7 +2303,7 @@ def get_promo_code(db: Session, promo_id: int) -> PromoCode | None:
     return db.query(PromoCode).filter(PromoCode.id == promo_id).first()
 
 
-def get_featured_promos(db: Session, limit: int = 3) -> List[PromoCode]:
+def get_featured_promos(db: Session, limit: int = 10) -> List[PromoCode]:
     """
     Promo yang ditampilkan di landing page.
     Filter: is_active=True, is_featured=True, dalam masa berlaku.

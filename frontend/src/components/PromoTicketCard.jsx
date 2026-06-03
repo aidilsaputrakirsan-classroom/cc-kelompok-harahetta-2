@@ -9,9 +9,24 @@ import { fetchFeaturedPromos } from "../services/api"
 import { formatPrice } from "../lib/utils"
 
 const ELIGIBILITY_LABEL = {
-  new_user: "UNTUK\nPENGGUNA\nBARU",
-  all: "UNTUK\nSEMUA",
-  specific_users: "PROMO\nEKSKLUSIF",
+  new_user: "Pengguna baru",
+  all: "Semua pengguna",
+  specific_users: "Eksklusif",
+}
+
+const AUTO_SLIDE_MS = 5000
+
+function formatDate(value) {
+  if (!value) return null
+  try {
+    return new Intl.DateTimeFormat("id-ID", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    }).format(new Date(value))
+  } catch {
+    return null
+  }
 }
 
 const AUTO_ROTATE_MS = 5000 // bergantian setiap 5 detik
@@ -198,6 +213,8 @@ export default function PromoTicketCard() {
           </>
         )}
       </div>
+    )
+  }
 
       {/* ── Footer + dots indicator ────────────────────────── */}
       <div className="flex items-center justify-between mt-2.5 px-1">

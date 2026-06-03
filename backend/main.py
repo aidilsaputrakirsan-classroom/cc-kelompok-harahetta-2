@@ -192,6 +192,7 @@ app = FastAPI(
     title="Sewain API",
     description="Platform Sewa Barang Online. Gunakan POST /auth/login untuk login dan dapatkan token.",
     version="1.0.0",
+    openapi_version="3.0.3",  # Paksa OpenAPI 3.0.3 agar kompatibel dengan Swagger UI lama di server
     openapi_tags=[
         {"name": "🔐 Auth", "description": "Login & Token Management"},
         {"name": "👑 Super Admin", "description": "Super Admin Functions"},
@@ -2614,9 +2615,9 @@ def list_featured_promos(
 ):
     """
     List promo yang sedang aktif & flagged sebagai featured.
-    Dipakai banner di LandingPage.
+    Dipakai banner/slider di LandingPage.
     """
-    return crud.get_featured_promos(db=db, limit=3)
+    return crud.get_featured_promos(db=db, limit=10)
 
 
 # ── User: Validasi/preview diskon di halaman checkout
