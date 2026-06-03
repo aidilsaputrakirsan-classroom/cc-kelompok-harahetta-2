@@ -26,7 +26,7 @@
 
 <p align="center">
   🌐 <a href="https://cc-kelompok-harahetta-2.akhzafachrozy.my.id/">Live Demo</a> ·
-  📋 <a href="https://cc-kelompok-harahetta-2.akhzafachrozy.my.id/docs">API Docs</a> ·
+  📋 <a href="https://cc-kelompok-harahetta-2.akhzafachrozy.my.id/api/docs#/">API Docs</a> ·
   📐 <a href="#-arsitektur-microservices">Arsitektur Detail</a>
 </p>
 
