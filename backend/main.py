@@ -192,6 +192,7 @@ app = FastAPI(
     title="Sewain API",
     description="Platform Sewa Barang Online. Gunakan POST /auth/login untuk login dan dapatkan token.",
     version="1.0.0",
+    root_path="/api",  # Beritahu FastAPI bahwa dia di-deploy di belakang nginx proxy dengan prefix /api
     openapi_tags=[
         {"name": "🔐 Auth", "description": "Login & Token Management"},
         {"name": "👑 Super Admin", "description": "Super Admin Functions"},
