@@ -192,7 +192,6 @@ app = FastAPI(
     title="Sewain API",
     description="Platform Sewa Barang Online. Gunakan POST /auth/login untuk login dan dapatkan token.",
     version="1.0.0",
-    openapi_version="3.0.3",  # Paksa OpenAPI 3.0.3 agar kompatibel dengan Swagger UI lama di server
     openapi_tags=[
         {"name": "🔐 Auth", "description": "Login & Token Management"},
         {"name": "👑 Super Admin", "description": "Super Admin Functions"},
@@ -200,8 +199,8 @@ app = FastAPI(
         {"name": "👤 User", "description": "User/Penyewa Functions"},
         {"name": "📦 Items", "description": "Barang Sewa Management"},
         {"name": "📋 Rentals", "description": "Transaksi Penyewaan"},
-        {"name": "� Payments — Pembayaran", "description": "Pembayaran Penyewaan"},
-        {"name": "�📂 Categories", "description": "Kategori Barang"},
+        {"name": "💳 Payments — Pembayaran", "description": "Pembayaran Penyewaan"},
+        {"name": "📂 Categories", "description": "Kategori Barang"},
         {"name": "🤖 Chatbot AI", "description": "Chatbot AI Sewain"},
         {"name": "💬 Chat", "description": "Chat User ↔ Admin"},
         {"name": "ℹ️ Info", "description": "Platform Information"},
@@ -218,6 +217,28 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# ==================== OPENAPI 3.0.3 OVERRIDE ====================
+# FastAPI 0.100+ default ke OpenAPI 3.1.0 tapi Swagger UI di server
+# hanya support 3.0.x — override schema secara manual.
+from fastapi.openapi.utils import get_openapi
+
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+    schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        description=app.description,
+        routes=app.routes,
+        tags=app.openapi_tags,
+    )
+    schema["openapi"] = "3.0.3"  # Paksa versi 3.0.3
+    app.openapi_schema = schema
+    return app.openapi_schema
+
+app.openapi = custom_openapi
 
 
 # Daftarkan Router Chatbot
