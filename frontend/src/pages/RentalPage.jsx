@@ -93,7 +93,7 @@ export default function RentalPage({ addToast }) {
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!isVerified) {
-      addToast?.("Profil Anda belum terverifikasi", "warning")
+      addToast?.("Lengkapi profil terlebih dahulu untuk bisa menyewa", "warning")
       navigate("/profile")
       return
     }
@@ -177,10 +177,12 @@ export default function RentalPage({ addToast }) {
             <div className="mb-5 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-2">
               <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
               <div className="text-sm">
-                <span className="font-semibold text-amber-600 dark:text-amber-400">Profil belum terverifikasi</span>
+                <span className="font-semibold text-amber-600 dark:text-amber-400">Profil belum lengkap</span>
+                <br />
+                <span className="text-xs text-muted-foreground">Lengkapi data diri, upload KTP & selfie untuk bisa menyewa.</span>
                 <br />
                 <button onClick={() => navigate("/profile")} className="text-amber-600 dark:text-amber-400 underline text-xs mt-0.5">
-                  Verifikasi dulu →
+                  Lengkapi profil →
                 </button>
               </div>
             </div>

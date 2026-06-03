@@ -47,6 +47,35 @@ const RENTAL_TABS = [
 
 const RENTAL_PAGE_SIZE = 6
 
+/* ─── payment countdown (mini) ────────────────────────────── */
+function PaymentMiniCountdown({ expiresAt }) {
+  const [timeLeft, setTimeLeft] = useState(() => {
+    const diff = new Date(expiresAt).getTime() - Date.now()
+    return Math.max(0, Math.floor(diff / 1000))
+  })
+
+  useEffect(() => {
+    if (timeLeft <= 0) return
+    const timer = setInterval(() => {
+      const diff = new Date(expiresAt).getTime() - Date.now()
+      setTimeLeft(Math.max(0, Math.floor(diff / 1000)))
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [expiresAt])
+
+  if (timeLeft <= 0) return <span className="text-[10px] text-red-600 font-semibold">Expired</span>
+
+  const mins = Math.floor(timeLeft / 60)
+  const secs = timeLeft % 60
+  const isUrgent = timeLeft < 300
+
+  return (
+    <span className={`text-[10px] font-mono font-bold ${isUrgent ? "text-red-600" : "text-amber-600"}`}>
+      ⏱ {String(mins).padStart(2, "0")}:{String(secs).padStart(2, "0")}
+    </span>
+  )
+}
+
 /* ─── countdown widget ────────────────────────────────────── */
 function MiniCountdown({ rental, returnRequested, onReturnClick, returnLoading }) {
   const [t, setT] = useState({ d: 0, h: 0, m: 0, s: 0 })
@@ -631,15 +660,21 @@ export default function UserDashboard({ addToast }) {
                             <CreditCard className="w-4 h-4 text-primary flex-shrink-0" />
                             {isPaid ? (
                               <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary">
-                                <CheckCircle className="w-3.5 h-3.5" /> Pembayaran terkonfirmasi
+                                <CheckCircle className="w-3.5 h-3.5" /> Lunas{payment.payment_channel ? ` — ${payment.payment_channel.replace(/_/g, " ").toUpperCase()}` : ""}
                               </span>
-                            ) : hasBukti ? (
-                              <span className="text-xs text-amber-700 font-medium">
-                                Menunggu verifikasi pembayaran
+                            ) : payment?.midtrans_order_id ? (
+                              <span className="text-xs font-semibold text-amber-700">
+                                Menunggu pembayaran — {payment.payment_channel?.replace(/_/g, " ").toUpperCase() || "Midtrans"}
+                                {payment.expires_at && (
+                                  <> · <PaymentMiniCountdown expiresAt={payment.expires_at} /></>
+                                )}
                               </span>
                             ) : (
                               <span className="text-xs text-primary font-semibold">
                                 Siap dibayar
+                                {r.payment_deadline && (
+                                  <> · <PaymentMiniCountdown expiresAt={r.payment_deadline} /></>
+                                )}
                               </span>
                             )}
                           </div>
@@ -649,7 +684,7 @@ export default function UserDashboard({ addToast }) {
                               className="inline-flex items-center gap-1 px-3.5 py-1.5 rounded-full bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition"
                             >
                               <CreditCard className="w-3.5 h-3.5" />
-                              Bayar sekarang
+                              {payment?.midtrans_order_id ? "Lihat instruksi" : "Bayar sekarang"}
                             </button>
                           )}
                         </div>

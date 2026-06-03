@@ -2029,6 +2029,21 @@ def create_direct_charge(
     if rental.status != RentalStatus.disetujui:
         raise HTTPException(status_code=400, detail="Rental belum disetujui admin")
 
+    # Cek batas waktu pembayaran 24 jam
+    from datetime import datetime as dt_cls, timezone as tz_cls
+    if rental.payment_deadline and dt_cls.now(tz_cls.utc) > rental.payment_deadline:
+        # Auto-cancel
+        rental.status = RentalStatus.ditolak
+        item_check = db.query(Item).filter(Item.id == rental.item_id).first()
+        if item_check:
+            item_check.stok += 1
+        pending_pay = db.query(Payment).filter(Payment.rental_id == rental_id, Payment.status == PaymentStatus.pending).first()
+        if pending_pay:
+            pending_pay.status = PaymentStatus.failed
+            pending_pay.catatan = "Expired — batas waktu pembayaran 24 jam terlampaui"
+        db.commit()
+        raise HTTPException(status_code=400, detail="Batas waktu pembayaran (24 jam) telah terlampaui. Silakan buat pesanan baru.")
+
     # Ambil/buat payment
     payment = db.query(Payment).filter(Payment.rental_id == rental_id).first()
     if not payment:
@@ -2076,6 +2091,14 @@ def create_direct_charge(
     payment.midtrans_order_id = order_id
     payment.metode_pembayaran = PaymentMethod.midtrans
     payment.status = PaymentStatus.pending
+
+    # Set expiry 30 menit dari sekarang
+    from datetime import datetime, timezone, timedelta
+    payment.expires_at = datetime.now(timezone.utc) + timedelta(minutes=30)
+
+    # Simpan response Midtrans (VA number, QR URL, dll) untuk ditampilkan ulang
+    import json
+    payment.charge_response = json.dumps(response)
 
     # Simpan payment_channel
     channel = payment_type
@@ -2675,6 +2698,8 @@ def superadmin_update_promo(
     promo = crud.update_promo_code(db=db, promo_id=promo_id, data=data)
     if not promo:
         raise HTTPException(status_code=404, detail=f"Promo ID {promo_id} tidak ditemukan")
+    if isinstance(promo, dict) and "error" in promo:
+        raise HTTPException(status_code=promo["code"], detail=promo["error"])
     return promo
 
 
