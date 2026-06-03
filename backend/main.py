@@ -192,6 +192,7 @@ app = FastAPI(
     title="Sewain API",
     description="Platform Sewa Barang Online. Gunakan POST /auth/login untuk login dan dapatkan token.",
     version="1.0.0",
+    openapi_version="3.0.3",  # Paksa OpenAPI 3.0.3 agar kompatibel dengan Swagger UI lama di server
     openapi_tags=[
         {"name": "🔐 Auth", "description": "Login & Token Management"},
         {"name": "👑 Super Admin", "description": "Super Admin Functions"},
