@@ -88,102 +88,114 @@ def _ensure_user_photo_column() -> None:
         print(f"[startup] Gagal menambah kolom foto_profil: {exc}")
 
 
-def _ensure_rental_due_at_column() -> None:
-    """Idempotent migration: tambah kolom rentals.due_at jika belum ada."""
+def _ensure_schema_migrations() -> None:
+    """
+    Idempotent migration komprehensif — pastikan SEMUA kolom baru ada di DB production.
+    Aman dipanggil setiap startup. Target: PostgreSQL.
+    Mencakup:
+    - rentals: pickup_*, diambil_at, return_requested_at, due_at
+    - payments: semua kolom Midtrans
+    - admins: latitude, longitude
+    """
     try:
         from sqlalchemy import inspect as sa_inspect
         insp = sa_inspect(engine)
-        if not insp.has_table("rentals"):
-            return
-        cols = {c["name"] for c in insp.get_columns("rentals")}
-        if "due_at" in cols:
-            return
-        # PostgreSQL & SQLite sama-sama mengenali TIMESTAMP. Untuk Postgres dengan
-        # timezone-aware (sesuai model), ALTER ini tetap diterima sebagai timestamp.
-        ddl = "ALTER TABLE rentals ADD COLUMN due_at TIMESTAMP WITH TIME ZONE"
-        try:
+        FLOAT = "DOUBLE PRECISION"
+        TS = "TIMESTAMP WITH TIME ZONE"
+
+        def _add_cols(table: str, columns: list) -> None:
+            """Helper: tambah kolom ke tabel jika belum ada."""
+            if not insp.has_table(table):
+                return
+            existing = {c["name"] for c in insp.get_columns(table)}
             with engine.begin() as conn:
-                conn.execute(text(ddl))
-        except Exception:
-            # SQLite tidak mengenal "WITH TIME ZONE" — fallback ke TIMESTAMP biasa.
-            with engine.begin() as conn:
-                conn.execute(text("ALTER TABLE rentals ADD COLUMN due_at TIMESTAMP"))
-        print("[startup] Kolom rentals.due_at berhasil ditambahkan.")
+                for col_name, col_type in columns:
+                    if col_name in existing:
+                        continue
+                    try:
+                        conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col_name} {col_type}"))
+                        print(f"[startup] Kolom {table}.{col_name} ditambahkan.")
+                    except Exception as e:
+                        print(f"[startup] Gagal tambah {table}.{col_name}: {e}")
+
+        # ── rentals: kolom pickup snapshot & waktu
+        _add_cols("rentals", [
+            ("pickup_alamat",       "TEXT"),
+            ("pickup_latitude",     FLOAT),
+            ("pickup_longitude",    FLOAT),
+            ("pickup_nama_usaha",   "VARCHAR(100)"),
+            ("pickup_telepon",      "VARCHAR(20)"),
+            ("diambil_at",          TS),
+            ("due_at",              TS),
+            ("return_requested_at", TS),
+        ])
+
+        # ── payments: kolom Midtrans
+        _add_cols("payments", [
+            ("midtrans_order_id",       "VARCHAR(100)"),
+            ("midtrans_transaction_id", "VARCHAR(100)"),
+            ("snap_token",             "VARCHAR(255)"),
+            ("snap_redirect_url",      "TEXT"),
+            ("payment_channel",        "VARCHAR(50)"),
+            ("fraud_status",           "VARCHAR(20)"),
+            ("raw_notification",       "TEXT"),
+        ])
+
+        # ── admins: kolom koordinat lokasi usaha
+        _add_cols("admins", [
+            ("latitude",  FLOAT),
+            ("longitude", FLOAT),
+        ])
+
+        print("[startup] _ensure_schema_migrations selesai.")
     except Exception as exc:  # noqa: BLE001
-        print(f"[startup] Gagal menambah kolom due_at: {exc}")
+        print(f"[startup] Gagal _ensure_schema_migrations: {exc}")
 
 
 def _ensure_promo_tables_and_columns() -> None:
     """
-    Idempotent migration untuk fitur promo/diskon:
-    - Tambah kolom promo_code_id / discount_amount / original_amount di tabel rentals
-    - Buat tabel promo_codes & promo_redemptions jika belum ada
-    - Seed kupon default WELCOME50 (sekali saja)
+    Idempotent migration untuk fitur promo/diskon. Target: PostgreSQL.
     """
     try:
         from sqlalchemy import inspect as sa_inspect
         from datetime import datetime, timedelta
 
-        is_sqlite = str(engine.url).startswith("sqlite")
-        FLOAT_TYPE = "REAL" if is_sqlite else "DOUBLE PRECISION"
-        TIMESTAMP_TYPE = "TIMESTAMP" if is_sqlite else "TIMESTAMP WITH TIME ZONE"
-        BOOL_TRUE = "1" if is_sqlite else "TRUE"
+        FLOAT_TYPE = "DOUBLE PRECISION"
+        BOOL_TRUE = "TRUE"
 
         insp = sa_inspect(engine)
-
-        # 1. Tambah kolom di tabel rentals
         if insp.has_table("rentals"):
             rcols = {c["name"] for c in insp.get_columns("rentals")}
-            new_cols = [
-                ("promo_code_id", "INTEGER"),
-                ("discount_amount", FLOAT_TYPE),
-                ("original_amount", FLOAT_TYPE),
-            ]
+            new_cols = [("promo_code_id", "INTEGER"), ("discount_amount", FLOAT_TYPE), ("original_amount", FLOAT_TYPE)]
             with engine.begin() as conn:
                 for col_name, col_type in new_cols:
-                    if col_name in rcols:
-                        continue
-                    try:
+                    if col_name not in rcols:
                         conn.execute(text(f"ALTER TABLE rentals ADD COLUMN {col_name} {col_type}"))
-                        print(f"[startup] Kolom rentals.{col_name} ditambahkan.")
-                    except Exception as e:
-                        print(f"[startup] Gagal tambah rentals.{col_name}: {e}")
 
-        # 2. Buat tabel promo_codes & promo_redemptions
-        Base.metadata.create_all(bind=engine)  # SQLAlchemy auto-create yang missing
+        Base.metadata.create_all(bind=engine)
 
-        # 3. Seed default kupon WELCOME50
         with engine.begin() as conn:
-            existing = conn.execute(
-                text("SELECT id FROM promo_codes WHERE UPPER(code) = 'WELCOME50'")
-            ).first()
+            existing = conn.execute(text("SELECT id FROM promo_codes WHERE UPPER(code) = 'WELCOME50'")).first()
             if not existing:
                 valid_until = datetime.utcnow() + timedelta(days=365)
                 conn.execute(
                     text(f"""
                         INSERT INTO promo_codes (
-                            code, nama, deskripsi,
-                            discount_type, discount_value, max_discount, min_order,
-                            eligibility, max_uses_per_user, max_total_uses, used_count,
-                            is_active, is_featured, valid_until
+                            code, nama, deskripsi, discount_type, discount_value, max_discount, min_order,
+                            eligibility, max_uses_per_user, max_total_uses, used_count, is_active, is_featured, valid_until
                         ) VALUES (
-                            'WELCOME50',
-                            'Promo Pengguna Baru',
-                            'Diskon 50% untuk transaksi pertama kamu di Sewain. Maksimal potongan Rp 50.000.',
-                            'percentage', 50, 50000, 0,
-                            'new_user', 1, NULL, 0,
+                            'WELCOME50', 'Promo Pengguna Baru', 'Diskon 50% untuk transaksi pertama.',
+                            'percentage', 50, 50000, 0, 'new_user', 1, NULL, 0,
                             {BOOL_TRUE}, {BOOL_TRUE}, :valid_until
                         )
-                    """),
-                    {"valid_until": valid_until},
+                    """), {"valid_until": valid_until},
                 )
-                print("[startup] Seed kupon WELCOME50 berhasil.")
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         print(f"[startup] Gagal migrate promo: {exc}")
 
 
 _ensure_user_photo_column()
-_ensure_rental_due_at_column()
+_ensure_schema_migrations()
 _ensure_promo_tables_and_columns()
 
 # ==================== APP INSTANCE ====================
