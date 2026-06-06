@@ -2204,13 +2204,7 @@ def create_promo_code(
     if existing:
         return {"error": "Kode promo sudah terdaftar", "code": 400}
 
-    # Cek max 3 promo featured
-    if data.is_featured:
-        featured_count = db.query(func.count(PromoCode.id)).filter(
-            PromoCode.is_featured == True, PromoCode.is_active == True
-        ).scalar()
-        if featured_count >= 3:
-            return {"error": "Maksimal 3 promo yang bisa ditampilkan di landing page. Nonaktifkan salah satu promo featured terlebih dahulu.", "code": 400}
+
 
     promo = PromoCode(
         code=data.code,
@@ -2246,13 +2240,7 @@ def update_promo_code(
 
     update_fields = data.model_dump(exclude_unset=True)
 
-    # Cek max 3 featured jika mau set is_featured = True
-    if update_fields.get("is_featured") is True and not promo.is_featured:
-        featured_count = db.query(func.count(PromoCode.id)).filter(
-            PromoCode.is_featured == True, PromoCode.is_active == True, PromoCode.id != promo_id
-        ).scalar()
-        if featured_count >= 3:
-            return {"error": "Maksimal 3 promo yang bisa ditampilkan di landing page. Nonaktifkan salah satu promo featured terlebih dahulu.", "code": 400}
+
 
     for field, value in update_fields.items():
         # Sistem promo hanya memakai tipe PERSENTASE → abaikan perubahan tipe.
