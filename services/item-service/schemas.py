@@ -39,3 +39,21 @@ class ItemStatsResponse(BaseModel):
     total_value: float
     most_expensive: Optional[float] = None
     cheapest: Optional[float] = None
+    degraded_mode: bool = False
+
+
+class PublicItemResponse(BaseModel):
+    """Response item publik — tanpa owner_id untuk privasi."""
+    id: int
+    name: str
+    description: str
+    price: float
+    quantity: int
+
+    class Config:
+        from_attributes = True
+
+
+class PublicItemListResponse(BaseModel):
+    total: int
+    items: list[PublicItemResponse]
