@@ -28,6 +28,7 @@ import {
   Calendar, DollarSign, Eye, RefreshCw, Pencil,
   Tag, Gift, TrendingDown, History,
 } from "lucide-react"
+import ConfirmDialog from "../components/ConfirmDialog"
 
 /* ─── StatCard ────────────────────────────────────────────── */
 function StatCard({ icon: Icon, label, value, description }) {
@@ -62,6 +63,11 @@ export default function SuperAdminPanel({ addToast }) {
   const [editUser, setEditUser] = useState(null)
   const [editForm, setEditForm] = useState({ nama: "", role: "user", is_active: true })
   const [savingEdit, setSavingEdit] = useState(false)
+
+  // Confirm Dialog states
+  const [confirmDeletePromo, setConfirmDeletePromo] = useState({ open: false, id: null })
+  const [confirmDeleteUser, setConfirmDeleteUser] = useState({ open: false, id: null })
+  const [confirmDeleteCat, setConfirmDeleteCat] = useState({ open: false, id: null })
 
   // ── PROMO state
   const [promos, setPromos] = useState([])
@@ -200,8 +206,14 @@ export default function SuperAdminPanel({ addToast }) {
     } catch (err) { addToast?.(err.message, "error") }
   }
 
-  const handleDeletePromo = async (id) => {
-    if (!confirm("Hapus promo ini? Jika sudah pernah dipakai, akan di-nonaktifkan saja.")) return
+  const handleDeletePromo = (id) => {
+    setConfirmDeletePromo({ open: true, id })
+  }
+
+  const doDeletePromo = async () => {
+    const id = confirmDeletePromo.id
+    setConfirmDeletePromo({ open: false, id: null })
+    if (!id) return
     try {
       await deletePromoCode(id)
       addToast?.("Promo dihapus/dinonaktifkan", "success")
@@ -223,8 +235,13 @@ export default function SuperAdminPanel({ addToast }) {
     try { await updateUser(u.id, { is_active: !u.is_active }); addToast?.(`User ${!u.is_active ? "diaktifkan" : "dinonaktifkan"}`, "success"); load() }
     catch (err) { addToast?.(err.message, "error") }
   }
-  const handleDeleteUser = async (id) => {
-    if (!confirm("Yakin hapus user ini?")) return
+  const handleDeleteUser = (id) => {
+    setConfirmDeleteUser({ open: true, id })
+  }
+  const doDeleteUser = async () => {
+    const id = confirmDeleteUser.id
+    setConfirmDeleteUser({ open: false, id: null })
+    if (!id) return
     try { await deleteUser(id); addToast?.("User dihapus", "success"); load() }
     catch (err) { addToast?.(err.message, "error") }
   }
@@ -242,8 +259,13 @@ export default function SuperAdminPanel({ addToast }) {
     catch (err) { addToast?.(err.message, "error") }
     finally { setSavingCat(false) }
   }
-  const handleDeleteCategory = async (id) => {
-    if (!confirm("Yakin hapus kategori ini?")) return
+  const handleDeleteCategory = (id) => {
+    setConfirmDeleteCat({ open: true, id })
+  }
+  const doDeleteCategory = async () => {
+    const id = confirmDeleteCat.id
+    setConfirmDeleteCat({ open: false, id: null })
+    if (!id) return
     try { await deleteCategory(id); addToast?.("Kategori dihapus", "success"); load() }
     catch (err) { addToast?.(err.message, "error") }
   }
@@ -570,7 +592,6 @@ export default function SuperAdminPanel({ addToast }) {
                   onChange={(e) => setPromoForm(p => ({ ...p, nama: e.target.value }))}
                   maxLength={40}
                   required
-                  maxLength={28}
                 />
                 <p className="text-[10px] text-muted-foreground text-right">{(promoForm.nama || "").length}/28</p>
               </div>
@@ -749,6 +770,36 @@ export default function SuperAdminPanel({ addToast }) {
           )}
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={confirmDeletePromo.open}
+        onConfirm={doDeletePromo}
+        onCancel={() => setConfirmDeletePromo({ open: false, id: null })}
+        title="Hapus promo?"
+        description="Hapus promo ini? Jika sudah pernah dipakai, akan di-nonaktifkan saja."
+        confirmText="Ya, hapus"
+        variant="destructive"
+      />
+
+      <ConfirmDialog
+        open={confirmDeleteUser.open}
+        onConfirm={doDeleteUser}
+        onCancel={() => setConfirmDeleteUser({ open: false, id: null })}
+        title="Hapus user?"
+        description="Apakah Anda yakin ingin menghapus user ini?"
+        confirmText="Ya, hapus"
+        variant="destructive"
+      />
+
+      <ConfirmDialog
+        open={confirmDeleteCat.open}
+        onConfirm={doDeleteCategory}
+        onCancel={() => setConfirmDeleteCat({ open: false, id: null })}
+        title="Hapus kategori?"
+        description="Apakah Anda yakin ingin menghapus kategori ini?"
+        confirmText="Ya, hapus"
+        variant="destructive"
+      />
     </div>
   )
 }

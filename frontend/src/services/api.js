@@ -1,5 +1,5 @@
-// Gateway URL — semua request melalui Nginx API Gateway (http://localhost di production)
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000"
+// Gateway URL — kosong = pakai Vite proxy (dev), set VITE_API_URL untuk prod
+const API_URL = import.meta.env.VITE_API_URL ?? ""
 
 // ==================== TOKEN MANAGEMENT ====================
 let authToken = null
