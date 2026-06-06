@@ -17,25 +17,32 @@ export default defineConfig(({ mode }) => {
       // Ini menghindari CORS issue karena request dari browser ke localhost:5173
       // dianggap same-origin oleh browser, Vite yang forward ke localhost:80
       proxy: {
-        '/auth':        { target: 'http://localhost:8000', changeOrigin: true },
-        '/profile':     { target: 'http://localhost:8000', changeOrigin: true },
-        '/admin':       { target: 'http://localhost:8000', changeOrigin: true },
-        '/admins':      { target: 'http://localhost:8000', changeOrigin: true },
-        '/superadmin':  { target: 'http://localhost:8000', changeOrigin: true },
-        '/items':       { target: 'http://localhost:8000', changeOrigin: true },
-        '/categories':  { target: 'http://localhost:8000', changeOrigin: true },
-        '/rentals':     { target: 'http://localhost:8000', changeOrigin: true },
-        '/payments':    { target: 'http://localhost:8000', changeOrigin: true },
-        '/promos':      { target: 'http://localhost:8000', changeOrigin: true },
-        '/reviews':     { target: 'http://localhost:8000', changeOrigin: true },
-        '/stats':       { target: 'http://localhost:8000', changeOrigin: true },
-        '/health':      { target: 'http://localhost:8000', changeOrigin: true },
-        '/chatbot':     { target: 'http://localhost:8000', changeOrigin: true },
+        '/auth': { target: 'http://localhost:8000', changeOrigin: true },
+        '/profile': { target: 'http://localhost:8000', changeOrigin: true },
+        '/admin': { target: 'http://localhost:8000', changeOrigin: true },
+        '/admins': { target: 'http://localhost:8000', changeOrigin: true },
+        // Proxy hanya untuk path API superadmin yang spesifik
+        // (bukan '/superadmin' saja karena akan menangkap route frontend /superadmin saat refresh)
+        '/superadmin/users': { target: 'http://localhost:8000', changeOrigin: true },
+        '/superadmin/admins': { target: 'http://localhost:8000', changeOrigin: true },
+        '/superadmin/categories': { target: 'http://localhost:8000', changeOrigin: true },
+        '/superadmin/promos': { target: 'http://localhost:8000', changeOrigin: true },
+        '/superadmin/stats': { target: 'http://localhost:8000', changeOrigin: true },
+        '/superadmin/withdrawals': { target: 'http://localhost:8000', changeOrigin: true },
+        '/items': { target: 'http://localhost:8000', changeOrigin: true },
+        '/categories': { target: 'http://localhost:8000', changeOrigin: true },
+        '/rentals': { target: 'http://localhost:8000', changeOrigin: true },
+        '/payments': { target: 'http://localhost:8000', changeOrigin: true },
+        '/promos': { target: 'http://localhost:8000', changeOrigin: true },
+        '/reviews': { target: 'http://localhost:8000', changeOrigin: true },
+        '/stats': { target: 'http://localhost:8000', changeOrigin: true },
+        '/health': { target: 'http://localhost:8000', changeOrigin: true },
+        '/chatbot': { target: 'http://localhost:8000', changeOrigin: true },
         // Chat REST
-        '/chat/rooms':  { target: 'http://localhost:8000', changeOrigin: true },
+        '/chat/rooms': { target: 'http://localhost:8000', changeOrigin: true },
         '/chat/unread': { target: 'http://localhost:8000', changeOrigin: true },
         '/chat/heartbeat': { target: 'http://localhost:8000', changeOrigin: true },
-        '/chat/presence':  { target: 'http://localhost:8000', changeOrigin: true },
+        '/chat/presence': { target: 'http://localhost:8000', changeOrigin: true },
         // Chat WebSocket — harus pakai ws: true
         '/chat/ws': {
           target: 'ws://localhost:8000',
