@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react"
 import { useSearchParams, useNavigate } from "react-router-dom"
 import { useAuth } from "../context/AuthContext"
-import { fetchItem, createRental, createPaymentForRental } from "../services/api"
+import { fetchItem, createRental, createPaymentForRental, validatePromo } from "../services/api"
 import { formatPrice } from "../lib/utils"
 import { Button } from "../components/ui/Button"
 import { Input } from "../components/ui/Input"
@@ -10,7 +10,7 @@ import { Separator } from "../components/ui/Separator"
 import { Skeleton } from "../components/ui/Skeleton"
 import {
   ArrowLeft, AlertTriangle, Calendar,
-  CreditCard, CheckCircle,
+  CreditCard, Tag, X, CheckCircle2,
 } from "lucide-react"
 
 export default function RentalPage({ addToast }) {
@@ -24,6 +24,12 @@ export default function RentalPage({ addToast }) {
   const [submitting, setSubmitting] = useState(false)
   const [form, setForm] = useState({ tanggal_mulai: "", tanggal_selesai: "", catatan: "" })
 
+  // ── Promo state
+  const [promoCodeInput, setPromoCodeInput] = useState("")
+  const [promoData, setPromoData]           = useState(null)   // { code, nama, original_amount, discount_amount, final_amount }
+  const [promoError, setPromoError]         = useState("")
+  const [validatingPromo, setValidatingPromo] = useState(false)
+
   useEffect(() => {
     if (!itemId) { navigate("/catalog"); return }
     fetchItem(itemId)
@@ -35,13 +41,59 @@ export default function RentalPage({ addToast }) {
   const days = form.tanggal_mulai && form.tanggal_selesai
     ? Math.max(0, Math.ceil((new Date(form.tanggal_selesai) - new Date(form.tanggal_mulai)) / 86400000))
     : 0
-  const totalPrice = item ? item.harga_per_hari * days : 0
+  const subtotal = item ? item.harga_per_hari * days : 0
   const today = new Date().toISOString().split("T")[0]
+
+  // Bila tanggal/item berubah, reset promo (harus validate ulang)
+  useEffect(() => {
+    if (promoData) {
+      setPromoData(null)
+      setPromoError("")
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.tanggal_mulai, form.tanggal_selesai])
+
+  const handleApplyPromo = async () => {
+    setPromoError("")
+    const code = promoCodeInput.trim().toUpperCase()
+    if (!code) { setPromoError("Masukkan kode promo"); return }
+    if (days <= 0) { setPromoError("Pilih tanggal sewa terlebih dahulu"); return }
+
+    setValidatingPromo(true)
+    try {
+      const result = await validatePromo({
+        code,
+        item_id: parseInt(itemId),
+        tanggal_mulai: form.tanggal_mulai,
+        tanggal_selesai: form.tanggal_selesai,
+      })
+      if (result.valid) {
+        setPromoData(result)
+        addToast?.(`Promo ${result.code} diterapkan: hemat ${formatPrice(result.discount_amount)}`, "success")
+      } else {
+        setPromoData(null)
+        setPromoError(result.message || "Kode promo tidak valid")
+      }
+    } catch (err) {
+      setPromoError(err.message || "Gagal memvalidasi kode")
+    } finally {
+      setValidatingPromo(false)
+    }
+  }
+
+  const handleRemovePromo = () => {
+    setPromoData(null)
+    setPromoCodeInput("")
+    setPromoError("")
+  }
+
+  const totalFinal = promoData ? promoData.final_amount : subtotal
+  const discountAmt = promoData ? promoData.discount_amount : 0
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!isVerified) {
-      addToast?.("Profil Anda belum terverifikasi", "warning")
+      addToast?.("Lengkapi profil terlebih dahulu untuk bisa menyewa", "warning")
       navigate("/profile")
       return
     }
@@ -53,6 +105,7 @@ export default function RentalPage({ addToast }) {
         tanggal_mulai: form.tanggal_mulai,
         tanggal_selesai: form.tanggal_selesai,
         catatan: form.catatan || undefined,
+        promo_code: promoData ? promoData.code : undefined,
       })
       await createPaymentForRental(rental.id).catch(() => {})
       addToast?.("Permintaan sewa dibuat!", "success")
@@ -91,7 +144,7 @@ export default function RentalPage({ addToast }) {
 
       <div className="grid md:grid-cols-2 gap-6 items-start">
         {/* Left: item info */}
-        <div className="rounded-3xl overflow-hidden border border-border bg-card">
+        <div className="rounded-3xl overflow-hidden border border-border bg-card md:sticky md:top-24">
           <div className="aspect-video overflow-hidden bg-secondary">
             <img
               src={item?.foto_url || imgFallback}
@@ -124,10 +177,12 @@ export default function RentalPage({ addToast }) {
             <div className="mb-5 p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-2">
               <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
               <div className="text-sm">
-                <span className="font-semibold text-amber-600 dark:text-amber-400">Profil belum terverifikasi</span>
+                <span className="font-semibold text-amber-600 dark:text-amber-400">Profil belum lengkap</span>
+                <br />
+                <span className="text-xs text-muted-foreground">Lengkapi data diri, upload KTP & selfie untuk bisa menyewa.</span>
                 <br />
                 <button onClick={() => navigate("/profile")} className="text-amber-600 dark:text-amber-400 underline text-xs mt-0.5">
-                  Verifikasi dulu →
+                  Lengkapi profil →
                 </button>
               </div>
             </div>
@@ -160,6 +215,65 @@ export default function RentalPage({ addToast }) {
               />
             </div>
 
+            {/* ── KODE PROMO */}
+            {days > 0 && (
+              <div className="space-y-2">
+                <Label className="flex items-center gap-1.5">
+                  <Tag className="w-3.5 h-3.5" /> Kode promo (opsional)
+                </Label>
+                {!promoData ? (
+                  <>
+                    <div className="flex gap-2">
+                      <Input
+                        type="text"
+                        placeholder="Mis. WELCOME50"
+                        value={promoCodeInput}
+                        onChange={(e) => setPromoCodeInput(e.target.value.toUpperCase())}
+                        className="uppercase"
+                        disabled={validatingPromo}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleApplyPromo}
+                        loading={validatingPromo}
+                        disabled={!promoCodeInput.trim() || days <= 0}
+                        className="rounded-2xl whitespace-nowrap"
+                      >
+                        Gunakan
+                      </Button>
+                    </div>
+                    {promoError && (
+                      <p className="text-xs text-destructive flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3" /> {promoError}
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <div className="p-3 rounded-2xl bg-primary/10 border border-primary/30 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-primary flex-shrink-0" />
+                      <div className="text-sm">
+                        <div className="font-semibold text-primary">{promoData.code}</div>
+                        <div className="text-xs text-muted-foreground">
+                          Hemat {formatPrice(promoData.discount_amount)}
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleRemovePromo}
+                      className="p-1 rounded-full hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                      title="Hapus promo"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── RINGKASAN HARGA */}
             {days > 0 && (
               <div className="p-4 rounded-2xl bg-primary/5 border border-primary/15 space-y-2">
                 <div className="flex justify-between text-sm text-muted-foreground">
@@ -170,10 +284,22 @@ export default function RentalPage({ addToast }) {
                   <span>Harga/hari</span>
                   <span className="font-semibold text-foreground">{formatPrice(item?.harga_per_hari)}</span>
                 </div>
+                <div className="flex justify-between text-sm text-muted-foreground">
+                  <span>Subtotal</span>
+                  <span className={`font-semibold ${promoData ? "line-through text-muted-foreground/60" : "text-foreground"}`}>
+                    {formatPrice(subtotal)}
+                  </span>
+                </div>
+                {promoData && (
+                  <div className="flex justify-between text-sm text-emerald-600 dark:text-emerald-400">
+                    <span>Diskon ({promoData.code})</span>
+                    <span className="font-semibold">−{formatPrice(discountAmt)}</span>
+                  </div>
+                )}
                 <Separator />
                 <div className="flex justify-between font-bold">
-                  <span>Total</span>
-                  <span className="text-primary text-lg">{formatPrice(totalPrice)}</span>
+                  <span>Total bayar</span>
+                  <span className="text-primary text-lg">{formatPrice(totalFinal)}</span>
                 </div>
               </div>
             )}

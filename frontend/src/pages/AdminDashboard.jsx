@@ -112,6 +112,8 @@ function AdminCountdown({ rental }) {
 function AdminRentalCard({ rental, payment, onUpdateStatus, onViewBukti, onConfirmPayment, onRejectPayment, busy }) {
   const item = rental.item
   const paymentMeta = payment ? PAYMENT_STATUS_LABEL[payment.status] : null
+  // Hanya tampilkan badge payment jika statusnya berbeda dari yang sudah jelas dari rental status
+  const showPaymentBadge = paymentMeta && !(rental.status === "pending" && payment.status === "pending")
   return (
     <div className="rounded-2xl border border-border bg-card p-5 hover:border-primary/30 transition-colors">
       <div className="flex flex-col sm:flex-row gap-4 items-start">
@@ -129,7 +131,7 @@ function AdminRentalCard({ rental, payment, onUpdateStatus, onViewBukti, onConfi
             </div>
             <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
               <StatusBadge status={rental.status} />
-              {paymentMeta && (
+              {showPaymentBadge && (
                 <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${paymentMeta.cls}`}>
                   <CreditCard className="w-3 h-3" /> {paymentMeta.label}
                 </span>
@@ -139,24 +141,11 @@ function AdminRentalCard({ rental, payment, onUpdateStatus, onViewBukti, onConfi
           <p className="text-xl font-bold tracking-tight mt-3">{formatPrice(rental.total_harga)}</p>
           {rental.catatan && <p className="text-xs text-muted-foreground mt-1">{rental.catatan}</p>}
 
-          {payment && (
+          {payment && payment.status === "completed" && (
             <div className="mt-2 flex flex-wrap items-center gap-2">
-              {payment.metode_pembayaran === "midtrans" ? (
-                <span className="text-xs text-muted-foreground italic">
-                  {payment.status === "completed"
-                    ? `Dibayar via Midtrans${payment.payment_channel ? ` (${payment.payment_channel.replace(/_/g, " ")})` : ""}`
-                    : "Menunggu pembayaran via Midtrans"}
-                </span>
-              ) : payment.bukti_pembayaran ? (
-                <button
-                  onClick={() => onViewBukti(payment)}
-                  className="inline-flex items-center gap-1 text-xs text-primary font-medium hover:underline"
-                >
-                  <Eye className="w-3.5 h-3.5" /> Lihat bukti pembayaran
-                </button>
-              ) : (
-                <span className="text-xs text-muted-foreground italic">Bukti belum diupload</span>
-              )}
+              <span className="text-xs text-muted-foreground italic">
+                Dibayar via Midtrans{payment.payment_channel ? ` (${payment.payment_channel.replace(/_/g, " ")})` : ""}
+              </span>
             </div>
           )}
 

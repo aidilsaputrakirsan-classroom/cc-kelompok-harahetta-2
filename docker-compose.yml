@@ -3,12 +3,19 @@
 # Sewain — Kelompok Harahetta-2
 # ==============================================
 # Services:
-# 1. auth-db      : PostgreSQL untuk Auth Service (port 5433)
-# 2. item-db      : PostgreSQL untuk Item Service (port 5434)
-# 3. auth-service : Authentication (port 8001)
-# 4. item-service : Inventory CRUD (port 8002)
-# 5. frontend     : React app (port 3000)
-# 6. gateway      : Nginx reverse proxy (port 80)
+# 1. auth-db       : PostgreSQL untuk Auth Service (port 5433)
+# 2. item-db       : PostgreSQL untuk Item Service (port 5434)
+# 3. rental-db     : PostgreSQL untuk Rental Service (port 5435)
+# 4. payment-db    : PostgreSQL untuk Payment Service (port 5436)
+# 5. chat-db       : PostgreSQL untuk Chat Service (port 5437)
+# 6. auth-service  : Authentication & Profile (port 8001)
+# 7. item-service  : Items Catalog & Categories (port 8002)
+# 8. rental-service: Rentals & Reviews (port 8003)
+# 9. payment-service: Payments, Wallet & Midtrans (port 8004)
+# 10. chat-service  : Chat & WebSocket realtime (port 8005)
+# 11. chatbot-service: AI Chatbot Sewain (port 8006)
+# 12. frontend     : React app (port 3000)
+# 13. gateway      : Nginx reverse proxy (port 80)
 
 services:
   # ================================
@@ -20,6 +27,8 @@ services:
       POSTGRES_DB: auth_db
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
     volumes:
       - auth_db_data:/var/lib/postgresql/data
     healthcheck:
@@ -34,8 +43,42 @@ services:
       POSTGRES_DB: item_db
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
+    ports:
+      - "5434:5432"
     volumes:
       - item_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  rental-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: rental_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5435:5432"
+    volumes:
+      - rental_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  payment-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: payment_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5436:5432"
+    volumes:
+      - payment_db_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
@@ -81,6 +124,103 @@ services:
       start_period: 15s
     restart: unless-stopped
 
+  rental-service:
+    build: ./services/rental-service
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@rental-db:5432/rental_db
+      AUTH_SERVICE_URL: http://auth-service:8001
+      CATALOG_SERVICE_URL: http://item-service:8002
+      PAYMENT_SERVICE_URL: http://payment-service:8004
+      CORS_ORIGINS: "http://localhost,http://localhost:5173"
+    depends_on:
+      rental-db:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+      item-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8003/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+
+  payment-service:
+    build: ./services/payment-service
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@payment-db:5432/payment_db
+      AUTH_SERVICE_URL: http://auth-service:8001
+      RENTAL_SERVICE_URL: http://rental-service:8003
+      MIDTRANS_SERVER_KEY: ${MIDTRANS_SERVER_KEY:-}
+      CORS_ORIGINS: "http://localhost,http://localhost:5173"
+    depends_on:
+      payment-db:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8004/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+
+  chat-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: chat_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5437:5432"
+    volumes:
+      - chat_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  chat-service:
+    build: ./services/chat-service
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@chat-db:5432/chat_db
+      AUTH_SERVICE_URL: http://auth-service:8001
+      ITEM_SERVICE_URL: http://item-service:8002
+      CORS_ORIGINS: "http://localhost,http://localhost:5173"
+    depends_on:
+      chat-db:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+      item-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8005/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+
+  chatbot-service:
+    build: ./services/chatbot-service
+    environment:
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini/gemini-2.5-flash-lite}
+      AI_BASE_URL: ${AI_BASE_URL:-https://ai.sumopod.com/v1}
+      CORS_ORIGINS: "http://localhost,http://localhost:5173"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8006/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: unless-stopped
+
   # ================================
   # FRONTEND
   # ================================
@@ -104,6 +244,14 @@ services:
         condition: service_healthy
       item-service:
         condition: service_healthy
+      rental-service:
+        condition: service_healthy
+      payment-service:
+        condition: service_healthy
+      chat-service:
+        condition: service_healthy
+      chatbot-service:
+        condition: service_started
       frontend:
         condition: service_started
     restart: unless-stopped
@@ -111,3 +259,6 @@ services:
 volumes:
   auth_db_data:
   item_db_data:
+  rental_db_data:
+  payment_db_data:
+  chat_db_data:

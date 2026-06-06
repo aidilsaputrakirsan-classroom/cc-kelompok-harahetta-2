@@ -43,6 +43,11 @@ from schemas import (
     WithdrawalListResponse, WithdrawalActionByAdmin,
     # Review & Shop
     ReviewCreate, ReviewUpdate, ReviewResponse, ReviewListResponse, ShopResponse,
+    # Promo
+    PromoCodeCreate, PromoCodeUpdate, PromoCodeResponse, PromoCodeListResponse,
+    PromoCodePublicResponse,
+    PromoValidateRequest, PromoValidateResponse,
+    PromoRedemptionListResponse,
 )
 from auth import (
     create_access_token, get_current_user,
@@ -83,33 +88,115 @@ def _ensure_user_photo_column() -> None:
         print(f"[startup] Gagal menambah kolom foto_profil: {exc}")
 
 
-def _ensure_rental_due_at_column() -> None:
-    """Idempotent migration: tambah kolom rentals.due_at jika belum ada."""
+def _ensure_schema_migrations() -> None:
+    """
+    Idempotent migration komprehensif — pastikan SEMUA kolom baru ada di DB production.
+    Aman dipanggil setiap startup. Target: PostgreSQL.
+    Mencakup:
+    - rentals: pickup_*, diambil_at, return_requested_at, due_at
+    - payments: semua kolom Midtrans
+    - admins: latitude, longitude
+    """
     try:
         from sqlalchemy import inspect as sa_inspect
         insp = sa_inspect(engine)
-        if not insp.has_table("rentals"):
-            return
-        cols = {c["name"] for c in insp.get_columns("rentals")}
-        if "due_at" in cols:
-            return
-        # PostgreSQL & SQLite sama-sama mengenali TIMESTAMP. Untuk Postgres dengan
-        # timezone-aware (sesuai model), ALTER ini tetap diterima sebagai timestamp.
-        ddl = "ALTER TABLE rentals ADD COLUMN due_at TIMESTAMP WITH TIME ZONE"
-        try:
+        FLOAT = "DOUBLE PRECISION"
+        TS = "TIMESTAMP WITH TIME ZONE"
+
+        def _add_cols(table: str, columns: list) -> None:
+            """Helper: tambah kolom ke tabel jika belum ada."""
+            if not insp.has_table(table):
+                return
+            existing = {c["name"] for c in insp.get_columns(table)}
             with engine.begin() as conn:
-                conn.execute(text(ddl))
-        except Exception:
-            # SQLite tidak mengenal "WITH TIME ZONE" — fallback ke TIMESTAMP biasa.
-            with engine.begin() as conn:
-                conn.execute(text("ALTER TABLE rentals ADD COLUMN due_at TIMESTAMP"))
-        print("[startup] Kolom rentals.due_at berhasil ditambahkan.")
+                for col_name, col_type in columns:
+                    if col_name in existing:
+                        continue
+                    try:
+                        conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col_name} {col_type}"))
+                        print(f"[startup] Kolom {table}.{col_name} ditambahkan.")
+                    except Exception as e:
+                        print(f"[startup] Gagal tambah {table}.{col_name}: {e}")
+
+        # ── rentals: kolom pickup snapshot & waktu
+        _add_cols("rentals", [
+            ("pickup_alamat",       "TEXT"),
+            ("pickup_latitude",     FLOAT),
+            ("pickup_longitude",    FLOAT),
+            ("pickup_nama_usaha",   "VARCHAR(100)"),
+            ("pickup_telepon",      "VARCHAR(20)"),
+            ("diambil_at",          TS),
+            ("due_at",              TS),
+            ("return_requested_at", TS),
+        ])
+
+        # ── payments: kolom Midtrans
+        _add_cols("payments", [
+            ("midtrans_order_id",       "VARCHAR(100)"),
+            ("midtrans_transaction_id", "VARCHAR(100)"),
+            ("snap_token",             "VARCHAR(255)"),
+            ("snap_redirect_url",      "TEXT"),
+            ("payment_channel",        "VARCHAR(50)"),
+            ("fraud_status",           "VARCHAR(20)"),
+            ("raw_notification",       "TEXT"),
+        ])
+
+        # ── admins: kolom koordinat lokasi usaha
+        _add_cols("admins", [
+            ("latitude",  FLOAT),
+            ("longitude", FLOAT),
+        ])
+
+        print("[startup] _ensure_schema_migrations selesai.")
     except Exception as exc:  # noqa: BLE001
-        print(f"[startup] Gagal menambah kolom due_at: {exc}")
+        print(f"[startup] Gagal _ensure_schema_migrations: {exc}")
+
+
+def _ensure_promo_tables_and_columns() -> None:
+    """
+    Idempotent migration untuk fitur promo/diskon. Target: PostgreSQL.
+    """
+    try:
+        from sqlalchemy import inspect as sa_inspect
+        from datetime import datetime, timedelta
+
+        FLOAT_TYPE = "DOUBLE PRECISION"
+        BOOL_TRUE = "TRUE"
+
+        insp = sa_inspect(engine)
+        if insp.has_table("rentals"):
+            rcols = {c["name"] for c in insp.get_columns("rentals")}
+            new_cols = [("promo_code_id", "INTEGER"), ("discount_amount", FLOAT_TYPE), ("original_amount", FLOAT_TYPE)]
+            with engine.begin() as conn:
+                for col_name, col_type in new_cols:
+                    if col_name not in rcols:
+                        conn.execute(text(f"ALTER TABLE rentals ADD COLUMN {col_name} {col_type}"))
+
+        Base.metadata.create_all(bind=engine)
+
+        with engine.begin() as conn:
+            existing = conn.execute(text("SELECT id FROM promo_codes WHERE UPPER(code) = 'WELCOME50'")).first()
+            if not existing:
+                valid_until = datetime.utcnow() + timedelta(days=365)
+                conn.execute(
+                    text(f"""
+                        INSERT INTO promo_codes (
+                            code, nama, deskripsi, discount_type, discount_value, max_discount, min_order,
+                            eligibility, max_uses_per_user, max_total_uses, used_count, is_active, is_featured, valid_until
+                        ) VALUES (
+                            'WELCOME50', 'Promo Pengguna Baru', 'Diskon 50% untuk transaksi pertama.',
+                            'percentage', 50, 50000, 0, 'new_user', 1, NULL, 0,
+                            {BOOL_TRUE}, {BOOL_TRUE}, :valid_until
+                        )
+                    """), {"valid_until": valid_until},
+                )
+    except Exception as exc:
+        print(f"[startup] Gagal migrate promo: {exc}")
 
 
 _ensure_user_photo_column()
-_ensure_rental_due_at_column()
+_ensure_schema_migrations()
+_ensure_promo_tables_and_columns()
 
 # ==================== APP INSTANCE ====================
 
@@ -117,6 +204,7 @@ app = FastAPI(
     title="Sewain API",
     description="Platform Sewa Barang Online. Gunakan POST /auth/login untuk login dan dapatkan token.",
     version="1.0.0",
+    root_path="/api",  # Beritahu FastAPI bahwa dia di-deploy di belakang nginx proxy dengan prefix /api
     openapi_tags=[
         {"name": "🔐 Auth", "description": "Login & Token Management"},
         {"name": "👑 Super Admin", "description": "Super Admin Functions"},
@@ -124,8 +212,8 @@ app = FastAPI(
         {"name": "👤 User", "description": "User/Penyewa Functions"},
         {"name": "📦 Items", "description": "Barang Sewa Management"},
         {"name": "📋 Rentals", "description": "Transaksi Penyewaan"},
-        {"name": "� Payments — Pembayaran", "description": "Pembayaran Penyewaan"},
-        {"name": "�📂 Categories", "description": "Kategori Barang"},
+        {"name": "💳 Payments — Pembayaran", "description": "Pembayaran Penyewaan"},
+        {"name": "📂 Categories", "description": "Kategori Barang"},
         {"name": "🤖 Chatbot AI", "description": "Chatbot AI Sewain"},
         {"name": "💬 Chat", "description": "Chat User ↔ Admin"},
         {"name": "ℹ️ Info", "description": "Platform Information"},
@@ -142,6 +230,28 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# ==================== OPENAPI 3.0.3 OVERRIDE ====================
+# FastAPI 0.100+ default ke OpenAPI 3.1.0 tapi Swagger UI di server
+# hanya support 3.0.x — override schema secara manual.
+from fastapi.openapi.utils import get_openapi
+
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+    schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        description=app.description,
+        routes=app.routes,
+        tags=app.openapi_tags,
+    )
+    schema["openapi"] = "3.0.3"  # Paksa versi 3.0.3
+    app.openapi_schema = schema
+    return app.openapi_schema
+
+app.openapi = custom_openapi
 
 
 # Daftarkan Router Chatbot
@@ -1953,6 +2063,21 @@ def create_direct_charge(
     if rental.status != RentalStatus.disetujui:
         raise HTTPException(status_code=400, detail="Rental belum disetujui admin")
 
+    # Cek batas waktu pembayaran 24 jam
+    from datetime import datetime as dt_cls, timezone as tz_cls
+    if rental.payment_deadline and dt_cls.now(tz_cls.utc) > rental.payment_deadline:
+        # Auto-cancel
+        rental.status = RentalStatus.ditolak
+        item_check = db.query(Item).filter(Item.id == rental.item_id).first()
+        if item_check:
+            item_check.stok += 1
+        pending_pay = db.query(Payment).filter(Payment.rental_id == rental_id, Payment.status == PaymentStatus.pending).first()
+        if pending_pay:
+            pending_pay.status = PaymentStatus.failed
+            pending_pay.catatan = "Expired — batas waktu pembayaran 24 jam terlampaui"
+        db.commit()
+        raise HTTPException(status_code=400, detail="Batas waktu pembayaran (24 jam) telah terlampaui. Silakan buat pesanan baru.")
+
     # Ambil/buat payment
     payment = db.query(Payment).filter(Payment.rental_id == rental_id).first()
     if not payment:
@@ -2000,6 +2125,14 @@ def create_direct_charge(
     payment.midtrans_order_id = order_id
     payment.metode_pembayaran = PaymentMethod.midtrans
     payment.status = PaymentStatus.pending
+
+    # Set expiry 30 menit dari sekarang
+    from datetime import datetime, timezone, timedelta
+    payment.expires_at = datetime.now(timezone.utc) + timedelta(minutes=30)
+
+    # Simpan response Midtrans (VA number, QR URL, dll) untuk ditampilkan ulang
+    import json
+    payment.charge_response = json.dumps(response)
 
     # Simpan payment_channel
     channel = payment_type
@@ -2496,3 +2629,147 @@ def delete_review_endpoint(
             raise HTTPException(status_code=403, detail=err)
         raise HTTPException(status_code=400, detail=err or "Gagal menghapus review")
     return
+
+
+
+# ============================================================
+# PROMO / DISKON — Public, User, Super Admin
+# ============================================================
+
+# ── Public: Banner promo di landing page
+
+@app.get(
+    "/promos/featured",
+    response_model=List[PromoCodePublicResponse],
+    tags=["🎁 Promo — Diskon"],
+    summary="[Public] Promo aktif untuk ditampilkan di landing page",
+)
+def list_featured_promos(
+    db: Session = Depends(get_db),
+):
+    """
+    List promo yang sedang aktif & flagged sebagai featured.
+    Dipakai banner/slider di LandingPage.
+    """
+    return crud.get_featured_promos(db=db, limit=10)
+
+
+# ── User: Validasi/preview diskon di halaman checkout
+
+@app.post(
+    "/promos/validate",
+    response_model=PromoValidateResponse,
+    tags=["🎁 Promo — Diskon"],
+    summary="[User] Cek apakah kode promo bisa dipakai untuk transaksi ini",
+)
+def validate_promo_endpoint(
+    data: PromoValidateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """
+    Preview diskon SEBELUM membuat rental. User submit kode promo
+    + item_id + tanggal sewa, server return breakdown harga.
+    """
+    result = crud.validate_promo_for_user(
+        db=db,
+        user_id=current_user.id,
+        code=data.code,
+        item_id=data.item_id,
+        tanggal_mulai=data.tanggal_mulai,
+        tanggal_selesai=data.tanggal_selesai,
+    )
+    return result
+
+
+# ── Super Admin: CRUD kupon
+
+@app.get(
+    "/superadmin/promos",
+    response_model=PromoCodeListResponse,
+    tags=["👑 Super Admin"],
+    summary="[Super Admin] List semua kupon promo",
+)
+def superadmin_list_promos(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_super_admin),
+):
+    return crud.get_promo_codes(db=db, skip=skip, limit=limit)
+
+
+@app.post(
+    "/superadmin/promos",
+    response_model=PromoCodeResponse,
+    status_code=201,
+    tags=["👑 Super Admin"],
+    summary="[Super Admin] Buat kupon promo baru",
+)
+def superadmin_create_promo(
+    data: PromoCodeCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_super_admin),
+):
+    result = crud.create_promo_code(db=db, super_admin_id=current_user.id, data=data)
+    if isinstance(result, dict) and "error" in result:
+        raise HTTPException(status_code=result.get("code", 400), detail=result["error"])
+    return result
+
+
+@app.put(
+    "/superadmin/promos/{promo_id}",
+    response_model=PromoCodeResponse,
+    tags=["👑 Super Admin"],
+    summary="[Super Admin] Update kupon promo",
+)
+def superadmin_update_promo(
+    promo_id: int,
+    data: PromoCodeUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_super_admin),
+):
+    promo = crud.update_promo_code(db=db, promo_id=promo_id, data=data)
+    if not promo:
+        raise HTTPException(status_code=404, detail=f"Promo ID {promo_id} tidak ditemukan")
+    if isinstance(promo, dict) and "error" in promo:
+        raise HTTPException(status_code=promo["code"], detail=promo["error"])
+    return promo
+
+
+@app.delete(
+    "/superadmin/promos/{promo_id}",
+    status_code=204,
+    tags=["👑 Super Admin"],
+    summary="[Super Admin] Hapus / nonaktifkan kupon",
+)
+def superadmin_delete_promo(
+    promo_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_super_admin),
+):
+    """
+    Hapus kupon. Jika sudah pernah dipakai (ada redemption), akan
+    di-soft-delete (is_active=False) demi menjaga integritas history.
+    """
+    ok = crud.delete_promo_code(db=db, promo_id=promo_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail=f"Promo ID {promo_id} tidak ditemukan")
+    return
+
+
+@app.get(
+    "/superadmin/promos/{promo_id}/redemptions",
+    response_model=PromoRedemptionListResponse,
+    tags=["👑 Super Admin"],
+    summary="[Super Admin] Riwayat pemakaian kupon",
+)
+def superadmin_promo_redemptions(
+    promo_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_super_admin),
+):
+    promo = crud.get_promo_code(db=db, promo_id=promo_id)
+    if not promo:
+        raise HTTPException(status_code=404, detail=f"Promo ID {promo_id} tidak ditemukan")
+    return crud.get_promo_redemptions(db=db, promo_id=promo_id)

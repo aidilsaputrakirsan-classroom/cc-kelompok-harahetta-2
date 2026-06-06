@@ -11,6 +11,7 @@ from sqlalchemy import or_, func
 from models import User, AdminProfile, UserProfile, Category, Item, Rental, Payment, Review
 from models import UserRole, VerificationStatus, ItemStatus, RentalStatus, PaymentStatus, PaymentMethod
 from models import Wallet, Withdrawal, WithdrawalStatus
+from models import PromoCode, PromoRedemption, DiscountType, PromoEligibility
 from schemas import (
     UserCreate, UserUpdateByAdmin,
     AdminProfileCreate, AdminProfileUpdate,
@@ -21,6 +22,7 @@ from schemas import (
     VerificationAction,
     PaymentCreate, PaymentUpdate,
     ReviewCreate, ReviewUpdate,
+    PromoCodeCreate, PromoCodeUpdate,
 )
 from auth import hash_password, verify_password
 
@@ -378,14 +380,32 @@ def get_or_create_user_profile(db: Session, user_id: int) -> UserProfile:
 
 
 def update_user_profile(db: Session, user_id: int, data: UserProfileUpdate) -> UserProfile:
-    """Update data diri penyewa."""
+    """Update data diri penyewa. Auto-verify jika profil lengkap."""
     profile = get_or_create_user_profile(db, user_id)
     update_fields = data.model_dump(exclude_unset=True)
     for field, value in update_fields.items():
         setattr(profile, field, value)
+
+    # Auto-verify: jika data penting sudah lengkap, langsung set verified
+    if _is_profile_complete(profile):
+        profile.status_verifikasi = VerificationStatus.disetujui
+        user = db.query(User).filter(User.id == user_id).first()
+        if user:
+            user.is_verified = True
+
     db.commit()
     db.refresh(profile)
     return profile
+
+
+def _is_profile_complete(profile: UserProfile) -> bool:
+    """Cek apakah profil user sudah lengkap untuk bisa menyewa."""
+    return all([
+        profile.alamat and profile.alamat.strip(),
+        profile.nomor_telepon and profile.nomor_telepon.strip(),
+        profile.foto_ktp and profile.foto_ktp.strip(),
+        profile.foto_selfie_ktp and profile.foto_selfie_ktp.strip(),
+    ])
 
 
 def update_verification_status(
@@ -830,6 +850,7 @@ def create_rental(db: Session, user_id: int, data: RentalCreate) -> dict | None:
     - Barang harus available
     - Stok langsung dikurangi saat rental dibuat (reservasi)
     - Total harga dihitung otomatis
+    - Jika promo_code disertakan: divalidasi & diterapkan (max diskon = max_discount)
     Return dict dengan 'error' jika gagal, atau Rental object jika sukses.
     """
     # Ambil barang
@@ -841,19 +862,39 @@ def create_rental(db: Session, user_id: int, data: RentalCreate) -> dict | None:
     if item.stok <= 0:
         return {"error": "Stok barang habis", "code": 400}
 
-    # Hitung total harga
-    total_harga = _calculate_total_harga(
+    # Hitung subtotal sebelum diskon
+    original_amount = _calculate_total_harga(
         item.harga_per_hari,
         data.tanggal_mulai,
         data.tanggal_selesai
     )
+
+    # ── Validasi promo (jika ada)
+    promo: PromoCode | None = None
+    discount_amount = 0.0
+    if data.promo_code:
+        validation = _validate_promo_logic(
+            db=db,
+            user_id=user_id,
+            code=data.promo_code,
+            original_amount=original_amount,
+        )
+        if not validation["valid"]:
+            return {"error": validation["message"], "code": 400}
+        promo = validation["promo"]
+        discount_amount = validation["discount_amount"]
+
+    final_amount = max(0.0, original_amount - discount_amount)
 
     rental = Rental(
         user_id=user_id,
         item_id=data.item_id,
         tanggal_mulai=data.tanggal_mulai,
         tanggal_selesai=data.tanggal_selesai,
-        total_harga=total_harga,
+        total_harga=final_amount,
+        original_amount=original_amount,
+        discount_amount=discount_amount if promo else 0.0,
+        promo_code_id=promo.id if promo else None,
         catatan=data.catatan,
     )
     db.add(rental)
@@ -862,12 +903,28 @@ def create_rental(db: Session, user_id: int, data: RentalCreate) -> dict | None:
     item.stok = max(0, item.stok - 1)
     _recalculate_item_status(db, item)
 
+    db.flush()  # dapatkan rental.id sebelum commit
+
+    # ── Catat redemption + increment counter promo
+    if promo:
+        redemption = PromoRedemption(
+            promo_code_id=promo.id,
+            user_id=user_id,
+            rental_id=rental.id,
+            original_amount=original_amount,
+            discount_amount=discount_amount,
+            final_amount=final_amount,
+        )
+        db.add(redemption)
+        promo.used_count = (promo.used_count or 0) + 1
+
     db.commit()
     db.refresh(rental)
 
     return db.query(Rental).options(
         joinedload(Rental.item).joinedload(Item.category),
-        joinedload(Rental.user)
+        joinedload(Rental.user),
+        joinedload(Rental.promo_code),
     ).filter(Rental.id == rental.id).first()
 
 
@@ -887,7 +944,8 @@ def get_rentals(
     """
     query = db.query(Rental).options(
         joinedload(Rental.item).joinedload(Item.category),
-        joinedload(Rental.user)
+        joinedload(Rental.user),
+        joinedload(Rental.promo_code),
     )
 
     if user_id:
@@ -916,7 +974,8 @@ def get_rental(db: Session, rental_id: int) -> Rental | None:
         db.query(Rental)
         .options(
             joinedload(Rental.item).joinedload(Item.category),
-            joinedload(Rental.user)
+            joinedload(Rental.user),
+            joinedload(Rental.promo_code),
         )
         .filter(Rental.id == rental_id)
         .first()
@@ -965,6 +1024,10 @@ def update_rental_status(
     if item:
         if data.status == RentalStatus.disetujui and old_status == RentalStatus.pending:
             # Stok sudah dikurangi saat rental dibuat (pending), tidak perlu kurangi lagi.
+
+            # Set batas waktu pembayaran: 24 jam dari sekarang
+            from datetime import datetime, timezone, timedelta
+            rental.payment_deadline = datetime.now(timezone.utc) + timedelta(hours=24)
 
             # Auto-create payment saat rental disetujui
             create_payment_auto(db=db, rental_id=rental_id)
@@ -1340,6 +1403,24 @@ def create_or_get_snap_charge(
             "code": 400,
         }
 
+    # Cek apakah batas waktu pembayaran 24 jam sudah lewat
+    from datetime import datetime, timezone
+    if rental.payment_deadline and datetime.now(timezone.utc) > rental.payment_deadline:
+        # Auto-cancel: batas waktu pembayaran terlampaui
+        rental.status = RentalStatus.ditolak
+        item = db.query(Item).filter(Item.id == rental.item_id).first()
+        if item:
+            item.stok += 1
+            _recalculate_item_status(db, item)
+        pending_pay = db.query(Payment).filter(
+            Payment.rental_id == rental_id, Payment.status == PaymentStatus.pending
+        ).first()
+        if pending_pay:
+            pending_pay.status = PaymentStatus.failed
+            pending_pay.catatan = "Expired — batas waktu pembayaran 24 jam terlampaui"
+        db.commit()
+        return {"error": "Batas waktu pembayaran (24 jam) telah terlampaui. Silakan buat pesanan baru.", "code": 400}
+
     # Ambil/buat payment
     payment = db.query(Payment).filter(Payment.rental_id == rental_id).first()
     if not payment:
@@ -1470,14 +1551,36 @@ def sync_payment_from_midtrans(db: Session, payment_id: int) -> Payment | None |
     """
     Fallback kalau webhook tidak sampai: tarik status dari Midtrans lalu
     reuse logic apply_midtrans_notification.
+    Juga cek apakah payment sudah expired.
     """
     import midtrans_service
+    from datetime import datetime, timezone
 
     payment = db.query(Payment).filter(Payment.id == payment_id).first()
     if not payment:
         return None
     if not payment.midtrans_order_id:
         return {"error": "Payment ini belum punya order_id Midtrans", "code": 400}
+
+    # Cek apakah sudah expired (lokal)
+    if (
+        payment.status == PaymentStatus.pending
+        and payment.expires_at
+        and datetime.now(timezone.utc) > payment.expires_at
+    ):
+        payment.status = PaymentStatus.failed
+        payment.catatan = "Pembayaran expired — batas waktu 30 menit terlampaui"
+        # Kembalikan stok item
+        rental = db.query(Rental).filter(Rental.id == payment.rental_id).first()
+        if rental:
+            rental.status = RentalStatus.ditolak
+            item = db.query(Item).filter(Item.id == rental.item_id).first()
+            if item:
+                item.stok += 1
+                _recalculate_item_status(db, item)
+        db.commit()
+        db.refresh(payment)
+        return payment
 
     try:
         status_resp = midtrans_service.fetch_transaction_status(payment.midtrans_order_id)
@@ -1938,4 +2041,282 @@ def get_shop_profile(db: Session, admin_id: int) -> dict | None:
         "created_at": profile.created_at,
         "total_items": int(total_items),
         "rating": summary,
+    }
+
+
+# ============================================================
+# PROMO CODE CRUD — Diskon / Kupon Platform (Super Admin)
+# ============================================================
+
+def _is_user_eligible_new_user(db: Session, user_id: int) -> bool:
+    """
+    User dianggap "baru" jika belum pernah punya rental dengan status
+    disetujui / sedang_disewa / selesai (rental pending/ditolak diabaikan).
+    """
+    count = db.query(func.count(Rental.id)).filter(
+        Rental.user_id == user_id,
+        Rental.status.in_([
+            RentalStatus.disetujui,
+            RentalStatus.sedang_disewa,
+            RentalStatus.selesai,
+        ]),
+    ).scalar() or 0
+    return count == 0
+
+
+def _calculate_promo_discount(promo: PromoCode, original_amount: float) -> float:
+    """
+    Hitung nominal diskon. Untuk percentage: pct × amount, di-cap di max_discount.
+    Untuk fixed: langsung discount_value, di-cap di original_amount.
+    Hasil dibulatkan ke bawah (floor) ke bilangan bulat karena Rupiah tidak pakai desimal.
+    """
+    if promo.discount_type == DiscountType.percentage:
+        discount = original_amount * (promo.discount_value / 100.0)
+    else:  # fixed
+        discount = promo.discount_value
+
+    if promo.max_discount is not None and discount > promo.max_discount:
+        discount = promo.max_discount
+
+    # Tidak boleh lebih besar dari subtotal
+    if discount > original_amount:
+        discount = original_amount
+
+    # Bulatkan ke bawah — Rupiah tidak ada pecahan sen/perak
+    return int(discount)
+
+
+def _validate_promo_logic(
+    db: Session,
+    user_id: int,
+    code: str,
+    original_amount: float,
+) -> dict:
+    """
+    Inti validasi promo. Return dict:
+      { valid: bool, message: str, promo?: PromoCode, discount_amount?: float }
+
+    Dipakai oleh:
+    - validate_promo_for_user() (preview di checkout)
+    - create_rental() (eksekusi saat submit)
+    """
+    code_norm = (code or "").strip().upper()
+    if not code_norm:
+        return {"valid": False, "message": "Kode promo tidak boleh kosong"}
+
+    promo = db.query(PromoCode).filter(func.upper(PromoCode.code) == code_norm).first()
+    if not promo:
+        return {"valid": False, "message": "Kode promo tidak ditemukan"}
+
+    if not promo.is_active:
+        return {"valid": False, "message": "Promo sedang tidak aktif"}
+
+    now = datetime.now()
+    if promo.valid_from and promo.valid_from.replace(tzinfo=None) > now:
+        return {"valid": False, "message": "Promo belum berlaku"}
+    if promo.valid_until and promo.valid_until.replace(tzinfo=None) < now:
+        return {"valid": False, "message": "Promo sudah kadaluarsa"}
+
+    # Total uses
+    if promo.max_total_uses is not None and (promo.used_count or 0) >= promo.max_total_uses:
+        return {"valid": False, "message": "Kuota promo sudah habis"}
+
+    # Per-user uses
+    user_use_count = db.query(func.count(PromoRedemption.id)).filter(
+        PromoRedemption.promo_code_id == promo.id,
+        PromoRedemption.user_id == user_id,
+    ).scalar() or 0
+    if user_use_count >= (promo.max_uses_per_user or 1):
+        return {"valid": False, "message": "Anda sudah pernah memakai promo ini"}
+
+    # New-user eligibility
+    if promo.eligibility == PromoEligibility.new_user:
+        if not _is_user_eligible_new_user(db, user_id):
+            return {"valid": False, "message": "Promo ini khusus pengguna baru"}
+
+    # Min order
+    if original_amount < (promo.min_order or 0):
+        return {
+            "valid": False,
+            "message": f"Minimum order Rp {int(promo.min_order):,} tidak terpenuhi".replace(",", "."),
+        }
+
+    discount_amount = _calculate_promo_discount(promo, original_amount)
+    return {
+        "valid": True,
+        "message": "Promo dapat digunakan",
+        "promo": promo,
+        "discount_amount": discount_amount,
+    }
+
+
+def validate_promo_for_user(
+    db: Session,
+    user_id: int,
+    code: str,
+    item_id: int,
+    tanggal_mulai: date,
+    tanggal_selesai: date,
+) -> dict:
+    """
+    Preview diskon untuk user di halaman checkout (tanpa membuat rental).
+    Return dict siap di-serialize ke PromoValidateResponse.
+    """
+    item = db.query(Item).filter(Item.id == item_id).first()
+    if not item:
+        return {"valid": False, "message": "Barang tidak ditemukan"}
+
+    original_amount = _calculate_total_harga(item.harga_per_hari, tanggal_mulai, tanggal_selesai)
+    if original_amount <= 0:
+        return {"valid": False, "message": "Durasi sewa tidak valid"}
+
+    result = _validate_promo_logic(
+        db=db, user_id=user_id, code=code, original_amount=original_amount
+    )
+
+    if not result["valid"]:
+        return {"valid": False, "message": result["message"]}
+
+    promo: PromoCode = result["promo"]
+    discount_amount: float = result["discount_amount"]
+    final_amount = max(0.0, original_amount - discount_amount)
+
+    return {
+        "valid": True,
+        "code": promo.code,
+        "nama": promo.nama,
+        "original_amount": original_amount,
+        "discount_amount": discount_amount,
+        "final_amount": final_amount,
+        "message": result["message"],
+    }
+
+
+# ── Super Admin CRUD
+
+def create_promo_code(
+    db: Session, super_admin_id: int, data: PromoCodeCreate
+) -> PromoCode | dict:
+    """Super admin membuat kupon baru. Return dict error jika code sudah ada."""
+    existing = db.query(PromoCode).filter(
+        func.upper(PromoCode.code) == data.code.upper()
+    ).first()
+    if existing:
+        return {"error": "Kode promo sudah terdaftar", "code": 400}
+
+
+
+    promo = PromoCode(
+        code=data.code,
+        nama=data.nama,
+        deskripsi=data.deskripsi,
+        # Sistem promo hanya memakai tipe PERSENTASE.
+        discount_type=DiscountType.percentage,
+        discount_value=data.discount_value,
+        max_discount=data.max_discount,
+        min_order=data.min_order,
+        eligibility=PromoEligibility(data.eligibility.value),
+        max_uses_per_user=data.max_uses_per_user,
+        max_total_uses=data.max_total_uses,
+        is_active=data.is_active,
+        is_featured=data.is_featured,
+        valid_from=data.valid_from,
+        valid_until=data.valid_until,
+        created_by=super_admin_id,
+    )
+    db.add(promo)
+    db.commit()
+    db.refresh(promo)
+    return promo
+
+
+def update_promo_code(
+    db: Session, promo_id: int, data: PromoCodeUpdate
+) -> PromoCode | None | dict:
+    """Update kupon (semua field opsional)."""
+    promo = db.query(PromoCode).filter(PromoCode.id == promo_id).first()
+    if not promo:
+        return None
+
+    update_fields = data.model_dump(exclude_unset=True)
+
+
+
+    for field, value in update_fields.items():
+        # Sistem promo hanya memakai tipe PERSENTASE → abaikan perubahan tipe.
+        if field == "discount_type":
+            promo.discount_type = DiscountType.percentage
+        elif field == "eligibility" and value is not None:
+            promo.eligibility = PromoEligibility(value if isinstance(value, str) else value.value)
+        else:
+            setattr(promo, field, value)
+
+    db.commit()
+    db.refresh(promo)
+    return promo
+
+
+def delete_promo_code(db: Session, promo_id: int) -> bool:
+    """
+    Hapus kupon. Jika sudah pernah dipakai (ada redemption), soft-delete:
+    set is_active=False agar history redemption tetap utuh.
+    """
+    promo = db.query(PromoCode).filter(PromoCode.id == promo_id).first()
+    if not promo:
+        return False
+
+    has_redemption = db.query(PromoRedemption).filter(
+        PromoRedemption.promo_code_id == promo_id
+    ).first() is not None
+
+    if has_redemption:
+        promo.is_active = False
+        promo.is_featured = False
+        db.commit()
+    else:
+        db.delete(promo)
+        db.commit()
+    return True
+
+
+def get_promo_codes(db: Session, skip: int = 0, limit: int = 50) -> dict:
+    """List semua kupon (super admin)."""
+    query = db.query(PromoCode).order_by(PromoCode.created_at.desc())
+    total = query.count()
+    promos = query.offset(skip).limit(limit).all()
+    return {"total": total, "promos": promos}
+
+
+def get_promo_code(db: Session, promo_id: int) -> PromoCode | None:
+    return db.query(PromoCode).filter(PromoCode.id == promo_id).first()
+
+
+def get_featured_promos(db: Session, limit: int = 10) -> List[PromoCode]:
+    """
+    Promo yang ditampilkan di landing page.
+    Filter: is_active=True, is_featured=True, dalam masa berlaku.
+    """
+    now = datetime.now()
+    query = db.query(PromoCode).filter(
+        PromoCode.is_active.is_(True),
+        PromoCode.is_featured.is_(True),
+        or_(PromoCode.valid_from.is_(None), PromoCode.valid_from <= now),
+        or_(PromoCode.valid_until.is_(None), PromoCode.valid_until >= now),
+    ).order_by(PromoCode.created_at.desc())
+
+    return query.limit(limit).all()
+
+
+def get_promo_redemptions(db: Session, promo_id: int) -> dict:
+    """List semua pemakaian kupon untuk audit super admin."""
+    query = db.query(PromoRedemption).filter(PromoRedemption.promo_code_id == promo_id)
+    total = query.count()
+    total_discount = db.query(func.sum(PromoRedemption.discount_amount)).filter(
+        PromoRedemption.promo_code_id == promo_id
+    ).scalar() or 0.0
+    redemptions = query.order_by(PromoRedemption.redeemed_at.desc()).all()
+    return {
+        "total": total,
+        "total_discount_given": float(total_discount),
+        "redemptions": redemptions,
     }

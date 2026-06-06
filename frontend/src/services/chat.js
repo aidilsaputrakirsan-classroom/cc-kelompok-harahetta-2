@@ -1,9 +1,7 @@
-// ============================================================
-// Chat User <-> Admin — REST + WebSocket helpers
-// ============================================================
+// Chat User ↔ Admin — REST + WebSocket helpers
 import { getToken } from "./api"
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000"
+const API_URL = import.meta.env.VITE_API_URL ?? ""
 
 function authOnlyHeaders() {
   const headers = {}

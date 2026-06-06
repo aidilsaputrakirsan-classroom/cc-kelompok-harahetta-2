@@ -9,7 +9,7 @@ import { StatusBadge } from "../components/ui/Badge"
 import { Separator } from "../components/ui/Separator"
 import { Skeleton } from "../components/ui/Skeleton"
 import Avatar from "../components/ui/Avatar"
-import { User, Clock, CheckCircle, XCircle, Save, CreditCard, ImageIcon, X, Camera, Trash2, Loader2 } from "lucide-react"
+import { User, Clock, CheckCircle, Save, CreditCard, ImageIcon, X, Camera, Trash2, Loader2 } from "lucide-react"
 
 export default function ProfilePage({ addToast }) {
   const { user, refreshUser } = useAuth()
@@ -148,7 +148,11 @@ export default function ProfilePage({ addToast }) {
       const updated = await updateProfile(payload)
       setProfile(updated)
       await refreshUser()
-      addToast?.("Profil berhasil disimpan", "success")
+      if (updated.status_verifikasi === "disetujui") {
+        addToast?.("Profil lengkap! Anda sekarang bisa menyewa barang.", "success")
+      } else {
+        addToast?.("Profil berhasil disimpan", "success")
+      }
     } catch (err) {
       addToast?.(err.message, "error")
     } finally {
@@ -169,8 +173,6 @@ export default function ProfilePage({ addToast }) {
   const verifStatus = profile?.status_verifikasi || "menunggu"
   const isVerified = verifStatus === "disetujui"
   const bothPhotosUploaded = !!form.foto_ktp && !!form.foto_selfie_ktp
-  const hasSubmittedVerification = isUserRole && verifStatus === "menunggu" && !!profile?.foto_ktp && !!profile?.foto_selfie_ktp
-  const isPending = hasSubmittedVerification
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -246,30 +248,21 @@ export default function ProfilePage({ addToast }) {
       {/* Verification banners + KTP form khusus role user */}
       {isUserRole && (
         <>
-          {hasSubmittedVerification && (
-            <div className="p-4 rounded-lg bg-warning/10 border border-warning/30 flex items-start gap-3">
-              <Clock className="w-5 h-5 text-warning flex-shrink-0 mt-0.5" />
-              <div>
-                <div className="font-semibold text-warning">Menunggu Verifikasi</div>
-                <div className="text-sm text-muted-foreground">KTP Anda sedang direview oleh admin. Proses biasanya 1×24 jam.</div>
-              </div>
-            </div>
-          )}
-          {verifStatus === "disetujui" && (
+          {isVerified && (
             <div className="p-4 rounded-lg bg-success/10 border border-success/30 flex items-start gap-3">
               <CheckCircle className="w-5 h-5 text-success flex-shrink-0 mt-0.5" />
               <div>
-                <div className="font-semibold text-success">Identitas Terverifikasi</div>
+                <div className="font-semibold text-success">Profil Lengkap & Terverifikasi</div>
                 <div className="text-sm text-muted-foreground">Anda dapat menyewa barang di platform.</div>
               </div>
             </div>
           )}
-          {verifStatus === "ditolak" && (
-            <div className="p-4 rounded-lg bg-destructive/10 border border-destructive/30 flex items-start gap-3">
-              <XCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
+          {!isVerified && (
+            <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-start gap-3">
+              <Clock className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
               <div>
-                <div className="font-semibold text-destructive">Verifikasi Ditolak</div>
-                <div className="text-sm text-muted-foreground">Upload ulang foto KTP yang lebih jelas.</div>
+                <div className="font-semibold text-amber-600 dark:text-amber-400">Lengkapi Profil</div>
+                <div className="text-sm text-muted-foreground">Isi data diri, upload KTP dan selfie untuk bisa menyewa barang.</div>
               </div>
             </div>
           )}
@@ -284,17 +277,17 @@ export default function ProfilePage({ addToast }) {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="profile-parent">Nama Orang Tua</Label>
-                <Input id="profile-parent" name="nama_orang_tua" placeholder="Masukkan nama orang tua" value={form.nama_orang_tua} onChange={handleChange} disabled={isVerified || isPending} />
+                <Input id="profile-parent" name="nama_orang_tua" placeholder="Masukkan nama orang tua" value={form.nama_orang_tua} onChange={handleChange} disabled={isVerified} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="profile-address">Alamat Lengkap</Label>
-                <Input id="profile-address" name="alamat" placeholder="Alamat lengkap" value={form.alamat} onChange={handleChange} disabled={isVerified || isPending} />
+                <Input id="profile-address" name="alamat" placeholder="Alamat lengkap" value={form.alamat} onChange={handleChange} disabled={isVerified} />
               </div>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="profile-phone">Nomor Telepon</Label>
-              <Input id="profile-phone" name="nomor_telepon" type="tel" placeholder="08123456789" value={form.nomor_telepon} onChange={handleChange} maxLength={20} disabled={isVerified || isPending} />
+              <Input id="profile-phone" name="nomor_telepon" type="tel" placeholder="08123456789" value={form.nomor_telepon} onChange={handleChange} maxLength={20} disabled={isVerified} />
             </div>
 
             <Separator />
@@ -314,7 +307,7 @@ export default function ProfilePage({ addToast }) {
               {form.foto_ktp ? (
                 <div className="relative inline-block w-full">
                   <img src={form.foto_ktp} alt="Foto KTP" className="w-full max-h-44 object-contain rounded-lg border bg-muted" />
-                  {!isVerified && !isPending && (
+                  {!isVerified && (
                     <button type="button"
                       onClick={() => setForm(p => ({ ...p, foto_ktp: "" }))}
                       className="absolute top-1 right-1 bg-destructive text-destructive-foreground rounded-full p-1 hover:opacity-80 transition-opacity">
@@ -323,7 +316,7 @@ export default function ProfilePage({ addToast }) {
                   )}
                 </div>
               ) : (
-                <label className={`flex flex-col items-center justify-center w-full h-28 border-2 border-dashed rounded-lg ${isVerified || isPending ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-muted/50"} transition-colors ${uploading.foto_ktp ? "opacity-50 pointer-events-none" : ""}`}>
+                <label className={`flex flex-col items-center justify-center w-full h-28 border-2 border-dashed rounded-lg ${isVerified ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-muted/50"} transition-colors ${uploading.foto_ktp ? "opacity-50 pointer-events-none" : ""}`}>
                   <div className="flex flex-col items-center gap-1 text-muted-foreground">
                     {uploading.foto_ktp ? <span className="text-sm">Memproses...</span> : (
                       <>
@@ -335,7 +328,7 @@ export default function ProfilePage({ addToast }) {
                   </div>
                   <input type="file" className="hidden" accept="image/jpeg,image/png,image/webp,image/gif"
                     onChange={(e) => { const f = e.target.files?.[0]; if (f) compressAndSet(f, "foto_ktp"); e.target.value = "" }}
-                    disabled={uploading.foto_ktp || isVerified || isPending} />
+                    disabled={uploading.foto_ktp || isVerified} />
                 </label>
               )}
             </div>
@@ -346,7 +339,7 @@ export default function ProfilePage({ addToast }) {
               {form.foto_selfie_ktp ? (
                 <div className="relative inline-block w-full">
                   <img src={form.foto_selfie_ktp} alt="Selfie KTP" className="w-full max-h-44 object-contain rounded-lg border bg-muted" />
-                  {!isVerified && !isPending && (
+                  {!isVerified && (
                     <button type="button"
                       onClick={() => setForm(p => ({ ...p, foto_selfie_ktp: "" }))}
                       className="absolute top-1 right-1 bg-destructive text-destructive-foreground rounded-full p-1 hover:opacity-80 transition-opacity">
@@ -355,7 +348,7 @@ export default function ProfilePage({ addToast }) {
                   )}
                 </div>
               ) : (
-                <label className={`flex flex-col items-center justify-center w-full h-28 border-2 border-dashed rounded-lg ${isVerified || isPending ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-muted/50"} transition-colors ${uploading.foto_selfie_ktp ? "opacity-50 pointer-events-none" : ""}`}>
+                <label className={`flex flex-col items-center justify-center w-full h-28 border-2 border-dashed rounded-lg ${isVerified ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-muted/50"} transition-colors ${uploading.foto_selfie_ktp ? "opacity-50 pointer-events-none" : ""}`}>
                   <div className="flex flex-col items-center gap-1 text-muted-foreground">
                     {uploading.foto_selfie_ktp ? <span className="text-sm">Memproses...</span> : (
                       <>
@@ -367,22 +360,22 @@ export default function ProfilePage({ addToast }) {
                   </div>
                   <input type="file" className="hidden" accept="image/jpeg,image/png,image/webp,image/gif"
                     onChange={(e) => { const f = e.target.files?.[0]; if (f) compressAndSet(f, "foto_selfie_ktp"); e.target.value = "" }}
-                    disabled={uploading.foto_selfie_ktp || isVerified || isPending} />
+                    disabled={uploading.foto_selfie_ktp || isVerified} />
                 </label>
               )}
             </div>
 
             {/* Info message jika belum lengkap */}
-            {!bothPhotosUploaded && verifStatus !== "disetujui" && !hasSubmittedVerification && (
+            {!bothPhotosUploaded && !isVerified && (
               <div className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg">
-                📸 Upload kedua foto (KTP dan Selfie dengan KTP) untuk melanjutkan verifikasi
+                📸 Upload kedua foto (KTP dan Selfie dengan KTP) lalu simpan untuk bisa menyewa
               </div>
             )}
 
-            {/* Tombol hanya muncul jika kedua foto sudah diupload dan belum submit/disetujui */}
-            {verifStatus !== "disetujui" && !hasSubmittedVerification && bothPhotosUploaded && (
-              <Button type="submit" size="lg" loading={saving} className="mt-2">
-                <Save className="w-4 h-4 mr-2" /> Simpan & Ajukan Verifikasi
+            {/* Tombol simpan — muncul jika belum verified */}
+            {!isVerified && (
+              <Button type="submit" size="lg" loading={saving} disabled={!bothPhotosUploaded || !form.alamat || !form.nomor_telepon} className="mt-2">
+                <Save className="w-4 h-4 mr-2" /> Simpan Profil
               </Button>
             )}
           </form>
