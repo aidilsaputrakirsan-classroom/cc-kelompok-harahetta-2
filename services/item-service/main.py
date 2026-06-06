@@ -1,28 +1,34 @@
+"""
+Item Service — Handles inventory management.
+Berkomunikasi dengan Auth Service untuk verifikasi token.
+Mendukung graceful degradation saat Auth Service down.
+"""
 import os
-from typing import List, Optional
-from fastapi import FastAPI, Depends, HTTPException, Query, status
+import logging
+from fastapi import FastAPI, Depends, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import or_, func
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session
+from sqlalchemy import text
+from typing import Optional
 
-from database import engine, get_db, Base
-from models import Item, Category, ItemStatus
+from database import engine, get_db, SessionLocal, Base
+from models import Item
 from schemas import (
-    CategoryCreate, CategoryUpdate, CategoryResponse,
-    ItemCreate, ItemUpdate, ItemResponse, ItemListResponse
+    ItemCreate, ItemUpdate, ItemResponse,
+    ItemListResponse, ItemStatsResponse, PublicItemResponse, PublicItemListResponse,
 )
-from auth_client import (
-    verify_token_with_auth_service, get_admin_profile, get_admin_profile_by_user_id,
-    extract_city, auth_circuit
-)
+from auth_client import verify_token_with_auth_service, verify_token_optional, auth_circuit
+
+logger = logging.getLogger(__name__)
 
 # Create tables
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
-    title="Catalog (Item) Service",
-    description="Catalog and Inventory Microservice for Sewain",
-    version="2.0.0",
+    title="Item Service",
+    description="Inventory microservice — CRUD items with auth via Auth Service. "
+                "Supports graceful degradation when Auth Service is down.",
+    version="2.1.0",
 )
 
 # CORS
@@ -36,20 +42,9 @@ app.add_middleware(
 )
 
 
-# Helper: Check Roles
-def check_admin(user: dict):
-    if user.get("role") not in ["admin", "super_admin"]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Akses ditolak. Halaman ini hanya untuk Admin atau Super Admin."
-        )
-
-def check_super_admin(user: dict):
-    if user.get("role") != "super_admin":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Akses ditolak. Halaman ini hanya untuk Super Admin."
-        )
+# =====================
+# HEALTH CHECK (Workshop 13.5)
+# =====================
 
 
 # Helper: Enrich Item with Admin Profile

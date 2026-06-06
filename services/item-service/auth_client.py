@@ -4,11 +4,12 @@ Dilengkapi dengan retry logic dan circuit breaker.
 """
 import os
 import time
-from typing import Optional
 import asyncio
 import logging
 import httpx
 from fastapi import HTTPException, Header
+from typing import Optional
+
 from circuit_breaker import CircuitBreaker
 
 logger = logging.getLogger(__name__)
@@ -35,7 +36,7 @@ auth_circuit = CircuitBreaker(
 
 async def _call_auth_service(authorization: str) -> dict:
     """
-    Internal: Panggil Auth Service dengan retry + exponential backoff.
+    Panggil Auth Service dengan Circuit Breaker + Retry.
     """
     # Circuit breaker check
     if not auth_circuit.can_execute():
@@ -125,98 +126,32 @@ async def verify_token_with_auth_service(
     return await _call_auth_service(authorization)
 
 
-# =====================
-# GRACEFUL DEGRADATION METHODS
-# =====================
-_INDO_PROVINCES = {
-    "aceh", "bali", "banten", "bengkulu", "daerah istimewa yogyakarta",
-    "di yogyakarta", "yogyakarta", "dki jakarta", "jakarta", "gorontalo",
-    "jambi", "jawa barat", "jawa tengah", "jawa timur", "kalimantan barat",
-    "kalimantan selatan", "kalimantan tengah", "kalimantan timur",
-    "kalimantan utara", "kepulauan bangka belitung", "kepulauan riau",
-    "lampung", "maluku", "maluku utara", "nusa tenggara barat",
-    "nusa tenggara timur", "papua", "papua barat", "papua barat daya",
-    "papua pegunungan", "papua selatan", "papua tengah", "riau",
-    "sulawesi barat", "sulawesi selatan", "sulawesi tengah",
-    "sulawesi tenggara", "sulawesi utara", "sumatera barat",
-    "sumatera selatan", "sumatera utara", "indonesia",
-}
-
-
-def extract_city(alamat: Optional[str]) -> Optional[str]:
-    if not alamat:
-        return None
-    parts = [p.strip() for p in alamat.split(",") if p.strip()]
-    if not parts:
-        return None
-
-    cleaned = []
-    for p in parts:
-        low = p.lower()
-        if low.replace(" ", "").isdigit():
-            continue
-        if low in _INDO_PROVINCES:
-            continue
-        for prefix in ("kota ", "kabupaten ", "kab. ", "kab "):
-            if low.startswith(prefix):
-                p = p[len(prefix):].strip()
-                low = p.lower()
-                break
-        cleaned.append(p)
-
-    if not cleaned:
-        return None
-    return cleaned[-1]
-
-
-async def get_admin_profile(admin_id: int) -> dict:
+async def verify_token_optional(
+    authorization: Optional[str] = Header(default=None),
+) -> Optional[dict]:
     """
-    Fetch admin profile details from Auth Service by admin_profile.id.
-    Used when we have an admin_id from an Item record (Item.admin_id = AdminProfile.id).
+    FastAPI Dependency: Verifikasi token secara opsional.
+    Digunakan untuk graceful degradation (Tugas Lead Backend).
+    - Jika ada token dan Auth Service UP → return user dict
+    - Jika Auth Service DOWN (circuit breaker OPEN) → return None (degraded mode)
+    - Jika tidak ada token → return None
     """
+    if not authorization:
+        return None
+
+    if not authorization.startswith("Bearer "):
+        return None
+
+    # Jika circuit breaker OPEN, langsung degraded mode
     if not auth_circuit.can_execute():
-        logger.warning(f"[CircuitBreaker] Skip call to Auth Service for admin {admin_id} (state is OPEN/HALF_OPEN)")
-        return {}
+        logger.info("Auth circuit breaker OPEN — entering degraded mode")
+        return None
 
     try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                f"{AUTH_SERVICE_URL}/admins/{admin_id}/payment-info",
-                timeout=TIMEOUT_SECONDS
-            )
-        if response.status_code == 200:
-            auth_circuit.record_success()
-            return response.json()
-        auth_circuit.record_success()
-    except Exception as e:
-        auth_circuit.record_failure()
-        logger.error(f"Failed to fetch admin profile for admin_id {admin_id}: {e}")
-    return {}
-
-
-async def get_admin_profile_by_user_id(user_id: int) -> dict:
-    """
-    Fetch admin profile details from Auth Service by user_id.
-    Used when we only have the authenticated user's id (user["id"]).
-    Calls /users/{user_id}/admin-profile which looks up AdminProfile.user_id.
-    """
-    if not auth_circuit.can_execute():
-        logger.warning(f"[CircuitBreaker] Skip call to Auth Service for user {user_id} (state is OPEN/HALF_OPEN)")
-        return {}
-
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                f"{AUTH_SERVICE_URL}/users/{user_id}/admin-profile",
-                timeout=TIMEOUT_SECONDS
-            )
-        if response.status_code == 200:
-            auth_circuit.record_success()
-            return response.json()
-        auth_circuit.record_success()
-    except Exception as e:
-        auth_circuit.record_failure()
-        logger.error(f"Failed to fetch admin profile for user {user_id}: {e}")
-    return {}
-
-
+        return await _call_auth_service(authorization)
+    except HTTPException as e:
+        if e.status_code in (503, 504):
+            # Auth Service unavailable → degraded mode
+            logger.warning(f"Auth unavailable ({e.status_code}) — entering degraded mode")
+            return None
+        raise  # Re-raise 401, 400, etc.
