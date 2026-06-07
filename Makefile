@@ -146,6 +146,19 @@ help:
 	@echo "  make dev-logs   → Lihat log realtime dev services"
 	@echo "  make dev-ps     → Status dev services"
 	@echo ""
+	@echo "🚀 Production Mode:"
+	@echo "  make prod       → Jalankan mode production (DB port tertutup)"
+	@echo "  make prod-build → Rebuild + jalankan mode production"
+	@echo "  make prod-down  → Stop semua production services"
+	@echo ""
+	@echo "📝 Logging & Monitoring:"
+	@echo "  make logs           → Log real-time semua backend services"
+	@echo "  make logs-errors    → Filter hanya ERROR/WARNING logs"
+	@echo "  make logs-trace     → Trace correlation ID (ID=<cid>)"
+	@echo "  make logs-export    → Export log ke file di logs/"
+	@echo "  make status         → Quick health check semua services"
+	@echo "  make metrics        → Tampilkan metrics semua services"
+	@echo ""
 	@echo "📤 Push Commands:"
 	@echo "  make push-all  → Push backend + frontend ke Docker Hub"
 	@echo ""
@@ -286,6 +299,63 @@ dev-ps:
 	docker compose -f docker-compose.yml -f docker-compose.dev.yml ps
 
 # ─────────────────────────────────────────────
+# PRODUCTION MODE
+# Menggunakan docker-compose.prod.yml override
+# Port DB tidak di-expose, log rotation aktif, restart: always
+# ─────────────────────────────────────────────
+prod:
+	@echo "🚀 Menjalankan semua services dalam mode PRODUCTION..."
+	docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+	@echo ""
+	@echo "✅ Production services berjalan!"
+	@echo "   🌐 Gateway (Nginx) : http://localhost:80"
+	@echo "   ⚠️  Port DB TIDAK diekspose ke host (mode aman)"
+	@echo "   📝 Log rotation aktif: 10MB / 3 file per service"
+	@echo ""
+	@echo "   Cek status: make status"
+	@echo "   Lihat log : make logs"
+
+prod-build:
+	@echo "🔨 Rebuild production images dan jalankan services..."
+	docker compose -f docker-compose.yml -f docker-compose.prod.yml up --build -d
+	@echo "✅ Production rebuild selesai!"
+
+prod-down:
+	@echo "⏹️  Menghentikan semua production services..."
+	docker compose -f docker-compose.yml -f docker-compose.prod.yml down
+	@echo "✅ Production services dihentikan."
+
+# ─────────────────────────────────────────────
+# LOGS: Shortcut untuk scripts/logs.sh
+# ─────────────────────────────────────────────
+logs:
+	@echo "📋 Log real-time semua services (Ctrl+C untuk berhenti)..."
+	docker compose logs -f auth-service item-service rental-service payment-service chat-service chatbot-service
+
+logs-errors:
+	@echo "❌ Menampilkan ERROR/WARNING logs..."
+	bash scripts/logs.sh errors
+
+logs-trace:
+	@echo "🔗 Trace correlation ID: $(ID)"
+	@bash scripts/logs.sh trace "$(ID)"
+
+logs-export:
+	@echo "📁 Mengexport semua log ke file..."
+	bash scripts/logs.sh export
+
+# ─────────────────────────────────────────────
+# STATUS: Quick health check semua services
+# ─────────────────────────────────────────────
+status:
+	@echo "🩺 Health check semua services..."
+	@bash scripts/logs.sh status
+
+metrics:
+	@echo "📊 Metrics semua services..."
+	@bash scripts/logs.sh metrics
+
+# ─────────────────────────────────────────────
 # LINT: Jalankan linter untuk backend (flake8) dan frontend (eslint)
 # ─────────────────────────────────────────────
 lint:
@@ -323,4 +393,7 @@ pr-check: build fe-build test
         fe-build fe-push fe-run fe-stop fe-restart push-all \
         compose-up compose-down compose-build compose-logs compose-ps compose-restart compose-clean \
         dev dev-build dev-down dev-logs dev-ps \
+        prod prod-build prod-down \
+        logs logs-errors logs-trace logs-export \
+        status metrics \
         lint test pr-check

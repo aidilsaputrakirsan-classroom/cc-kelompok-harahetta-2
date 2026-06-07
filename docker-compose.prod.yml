@@ -1,34 +1,305 @@
 # ============================================================
 # docker-compose.prod.yml — Production Overrides Sewain App
+# Kelompok Harahetta-2
 #
 # File ini TIDAK bisa dijalankan sendiri. Digunakan sebagai
 # override di atas docker-compose.yml untuk environment production.
 #
 # Cara pakai:
-#   docker compose --profile prod \
-#     -f docker-compose.yml \
-#     -f docker-compose.prod.yml \
-#     up -d
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Atau dengan Makefile:
+#   make prod
 #
 # Perbedaan prod vs dev:
-#   - Backend: tanpa --reload, APP_ENV=production
-#   - Database: port TIDAK di-expose ke host (lebih aman)
-#   - Semua service: restart: always
+#   - Database: port TIDAK di-expose ke host (keamanan)
+#   - Backend: APP_ENV=production, DEBUG=false, LOG_LEVEL=INFO
+#   - Semua service: restart: always (bukan unless-stopped)
+#   - Structured logging: json-file driver + log rotation
+#   - Resource limits: lebih ketat sesuai kapasitas server
+#   - Secrets: wajib dari environment file (.env.prod)
 # ============================================================
 
 services:
+  # ================================
+  # DATABASES — TANPA port expose ke host
+  # ================================
+  auth-db:
+    restart: always
+    ports: !reset []    # Hapus semua port expose — DB tidak boleh diakses dari luar
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
+        tag: "auth-db"
 
-  backend:
+  item-db:
+    restart: always
+    ports: !reset []
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
+        tag: "item-db"
+
+  rental-db:
+    restart: always
+    ports: !reset []
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
+        tag: "rental-db"
+
+  payment-db:
+    restart: always
+    ports: !reset []
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
+        tag: "payment-db"
+
+  chat-db:
+    restart: always
+    ports: !reset []
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
+        tag: "chat-db"
+
+  # ================================
+  # BACKEND SERVICES — Production config
+  # ================================
+  auth-service:
+    restart: always
     environment:
       APP_ENV: production
       DEBUG: "false"
-    restart: always
+      LOG_LEVEL: INFO
+      SERVICE_NAME: auth-service
+    # Production: tanpa --reload
     command:
-      ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+      ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001", "--workers", "2"]
+    deploy:
+      resources:
+        limits:
+          cpus: "2.00"
+          memory: 1G
+        reservations:
+          cpus: "0.50"
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+        tag: "auth-service"
 
+  item-service:
+    restart: always
+    environment:
+      APP_ENV: production
+      DEBUG: "false"
+      LOG_LEVEL: INFO
+      SERVICE_NAME: item-service
+    command:
+      ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8002", "--workers", "2"]
+    deploy:
+      resources:
+        limits:
+          cpus: "2.00"
+          memory: 1G
+        reservations:
+          cpus: "0.50"
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+        tag: "item-service"
+
+  rental-service:
+    restart: always
+    environment:
+      APP_ENV: production
+      DEBUG: "false"
+      LOG_LEVEL: INFO
+      SERVICE_NAME: rental-service
+    command:
+      ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8003", "--workers", "2"]
+    deploy:
+      resources:
+        limits:
+          cpus: "2.00"
+          memory: 1G
+        reservations:
+          cpus: "0.50"
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+        tag: "rental-service"
+
+  payment-service:
+    restart: always
+    environment:
+      APP_ENV: production
+      DEBUG: "false"
+      LOG_LEVEL: INFO
+      SERVICE_NAME: payment-service
+    command:
+      ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8004", "--workers", "2"]
+    deploy:
+      resources:
+        limits:
+          cpus: "2.00"
+          memory: 1G
+        reservations:
+          cpus: "0.50"
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+        tag: "payment-service"
+
+  chat-service:
+    restart: always
+    environment:
+      APP_ENV: production
+      DEBUG: "false"
+      LOG_LEVEL: INFO
+      SERVICE_NAME: chat-service
+    command:
+      ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8005", "--workers", "2"]
+    deploy:
+      resources:
+        limits:
+          cpus: "2.00"
+          memory: 1G
+        reservations:
+          cpus: "0.50"
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+        tag: "chat-service"
+
+  chatbot-service:
+    restart: always
+    environment:
+      APP_ENV: production
+      DEBUG: "false"
+      LOG_LEVEL: INFO
+      SERVICE_NAME: chatbot-service
+    command:
+      ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8006", "--workers", "1"]
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        tag: "chatbot-service"
+
+  # ================================
+  # FRONTEND — Production static build
+  # ================================
   frontend:
     restart: always
+    environment:
+      NODE_ENV: production
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+        reservations:
+          cpus: "0.10"
+          memory: 128M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
+        tag: "frontend"
 
-  db:
+  # ================================
+  # GATEWAY — Hanya port 80 yang terbuka ke luar
+  # ================================
+  gateway:
     restart: always
-    ports: !reset []
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 256M
+        reservations:
+          cpus: "0.25"
+          memory: 128M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "5"
+        tag: "gateway"
