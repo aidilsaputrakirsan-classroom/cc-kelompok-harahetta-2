@@ -1,7 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom"
-import { useCallback } from "react"
+import { useCallback, useState } from "react"
 import { AuthProvider, useAuth } from "./context/AuthContext"
 import { ThemeProvider } from "./context/ThemeContext"
+import { ServiceStatusProvider, useServiceStatus } from "./context/ServiceStatusContext"
 import { Toaster, toast } from "sonner"
 import Sidebar from "./components/Layout/Sidebar"
 import UserLayout from "./components/Layout/UserLayout"
@@ -9,6 +10,8 @@ import Navbar from "./components/Layout/Navbar"
 import { Loader2 } from "lucide-react"
 import ChatbotWidget from "./components/ChatbotWidget"
 import PresenceManager from "./components/PresenceManager"
+import AuthDownBanner from "./components/AuthDownBanner"
+import { checkAuthHealth } from "./services/api"
 
 import LandingPage from "./pages/LandingPage"
 import LoginPage from "./pages/LoginPage"
@@ -75,6 +78,38 @@ function LoadingScreen() {
     <div className="min-h-screen flex items-center justify-center bg-background">
       <Loader2 className="w-8 h-8 animate-spin text-primary" />
     </div>
+  )
+}
+
+/**
+ * AppBanner
+ * Membaca status service dan menampilkan AuthDownBanner jika diperlukan.
+ * Dipisah ke komponen sendiri agar tidak re-render AppContent.
+ */
+function AppBanner() {
+  const { isAuthDown, markServiceUp, downServiceList } = useServiceStatus()
+  const [dismissed, setDismissed] = useState(false)
+
+  const handleRetry = async () => {
+    const result = await checkAuthHealth()
+    if (result.healthy) {
+      markServiceUp("auth")
+      setDismissed(false)
+      toast.success("Layanan berhasil terhubung kembali!", { id: "auth-restored" })
+    } else {
+      toast.warning("Layanan masih tidak tersedia, coba lagi nanti.", { id: "auth-still-down" })
+    }
+  }
+
+  const showBanner = isAuthDown && !dismissed
+
+  return (
+    <AuthDownBanner
+      show={showBanner}
+      services={downServiceList}
+      onDismiss={() => setDismissed(true)}
+      onRetry={handleRetry}
+    />
   )
 }
 
@@ -160,6 +195,8 @@ function AppContent() {
   return (
     <>
       <Toaster position="top-right" richColors closeButton />
+      {/* Banner untuk service unavailable — sticky di atas semua konten */}
+      <AppBanner />
       <Routes>
         {/* 
           Public layout: Landing, About, Login
@@ -207,9 +244,12 @@ export default function App() {
   return (
     <BrowserRouter>
       <ThemeProvider>
-        <AuthProvider>
-          <AppContent />
-        </AuthProvider>
+        {/* ServiceStatusProvider harus di luar AuthProvider karena AuthProvider menggunakannya */}
+        <ServiceStatusProvider>
+          <AuthProvider>
+            <AppContent />
+          </AuthProvider>
+        </ServiceStatusProvider>
       </ThemeProvider>
     </BrowserRouter>
   )
