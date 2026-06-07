@@ -36,6 +36,15 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+        reservations:
+          cpus: "0.10"
+          memory: 128M
 
   item-db:
     image: postgres:16-alpine
@@ -52,6 +61,15 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+        reservations:
+          cpus: "0.10"
+          memory: 128M
 
   rental-db:
     image: postgres:16-alpine
@@ -68,6 +86,15 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+        reservations:
+          cpus: "0.10"
+          memory: 128M
 
   payment-db:
     image: postgres:16-alpine
@@ -84,6 +111,15 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+        reservations:
+          cpus: "0.10"
+          memory: 128M
 
   # ================================
   # BACKEND SERVICES
@@ -104,6 +140,14 @@ services:
       retries: 3
       start_period: 15s
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
 
   item-service:
     build: ./services/item-service
@@ -123,6 +167,14 @@ services:
       retries: 3
       start_period: 15s
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
 
   rental-service:
     build: ./services/rental-service
@@ -146,6 +198,14 @@ services:
       retries: 3
       start_period: 15s
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
 
   payment-service:
     build: ./services/payment-service
@@ -167,6 +227,14 @@ services:
       retries: 3
       start_period: 15s
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
 
   chat-db:
     image: postgres:16-alpine
@@ -183,6 +251,15 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+        reservations:
+          cpus: "0.10"
+          memory: 128M
 
   chat-service:
     build: ./services/chat-service
@@ -205,6 +282,14 @@ services:
       retries: 3
       start_period: 15s
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
 
   chatbot-service:
     build: ./services/chatbot-service
@@ -220,6 +305,14 @@ services:
       retries: 3
       start_period: 15s
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
 
   # ================================
   # FRONTEND
@@ -229,6 +322,14 @@ services:
     environment:
       VITE_API_URL: http://localhost
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+        reservations:
+          cpus: "0.10"
+          memory: 128M
 
   # ================================
   # API GATEWAY
@@ -255,6 +356,14 @@ services:
       frontend:
         condition: service_started
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 128M
+        reservations:
+          cpus: "0.10"
+          memory: 64M
 
 volumes:
   auth_db_data:
