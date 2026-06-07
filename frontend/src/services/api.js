@@ -1,5 +1,33 @@
-// Gateway URL — kosong = pakai Vite proxy (dev), set VITE_API_URL untuk prod
-const API_URL = import.meta.env.VITE_API_URL ?? ""
+// Gateway URL — semua request melalui Nginx API Gateway (http://localhost di production)
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000"
+
+// ==================== CUSTOM ERROR TYPES ====================
+/**
+ * ServiceUnavailableError
+ * Dilempar ketika API mengembalikan status 503 atau 504,
+ * atau ketika terjadi network error yang mengindikasikan service down.
+ * Membawa properti tambahan:
+ *  - statusCode  : number  — HTTP status code (503, 504, 0 untuk network error)
+ *  - serviceName : string  — nama service yang diperkirakan down
+ *  - isServiceUnavailable : true — flag untuk deteksi di komponen
+ */
+export class ServiceUnavailableError extends Error {
+  constructor(message, { statusCode = 503, serviceName = "unknown" } = {}) {
+    super(message)
+    this.name = "ServiceUnavailableError"
+    this.statusCode = statusCode
+    this.serviceName = serviceName
+    this.isServiceUnavailable = true
+  }
+}
+
+/**
+ * Helper: apakah sebuah error merupakan ServiceUnavailableError?
+ * Dapat digunakan di catch block komponen.
+ */
+export function isServiceUnavailableError(err) {
+  return err instanceof ServiceUnavailableError || err?.isServiceUnavailable === true
+}
 
 // ==================== TOKEN MANAGEMENT ====================
 let authToken = null
@@ -31,11 +59,14 @@ function extractErrorMessage(error, statusCode) {
   return `Request gagal (${statusCode})`
 }
 
-async function handleResponse(response) {
+async function handleResponse(response, serviceName = "unknown") {
   if (response.status === 401) { clearToken(); throw new Error("Sesi habis, silakan login kembali") }
   // Handle service unavailable (microservice down)
   if (response.status === 503 || response.status === 504) {
-    throw new Error("Service temporarily unavailable. Please try again later.")
+    throw new ServiceUnavailableError(
+      "Layanan sedang tidak tersedia. Silakan coba beberapa saat lagi.",
+      { statusCode: response.status, serviceName }
+    )
   }
   if (!response.ok) {
     const error = await response.json().catch(() => ({}))
@@ -46,13 +77,16 @@ async function handleResponse(response) {
 }
 
 // Wrapper fetch dengan deteksi network/connection error
-async function apiFetch(url, options = {}) {
+async function apiFetch(url, options = {}, serviceName = "unknown") {
   try {
     return await fetch(url, options)
   } catch (err) {
     // Network error atau service down total
-    if (err instanceof TypeError && err.message.includes("fetch")) {
-      throw new Error("Service temporarily unavailable. Please check your connection.")
+    if (err instanceof TypeError && (err.message.includes("fetch") || err.message.includes("Failed"))) {
+      throw new ServiceUnavailableError(
+        "Tidak dapat terhubung ke server. Periksa koneksi internet Anda.",
+        { statusCode: 0, serviceName }
+      )
     }
     throw err
   }
@@ -120,14 +154,14 @@ export async function resetPassword(token, new_password) {
 
 export async function getMe() {
   const res = await fetch(`${API_URL}/auth/me`, { headers: authOnlyHeaders() })
-  return handleResponse(res)
+  return handleResponse(res, "auth")
 }
 
 export async function updateMe(data) {
   const res = await fetch(`${API_URL}/auth/me`, {
     method: "PUT", headers: authHeaders(), body: JSON.stringify(data),
   })
-  return handleResponse(res)
+  return handleResponse(res, "auth")
 }
 
 export async function checkHealth() {
@@ -136,6 +170,24 @@ export async function checkHealth() {
     const data = await res.json()
     return data.status === "healthy"
   } catch { return false }
+}
+
+/**
+ * checkAuthHealth
+ * Cek apakah auth service sedang aktif.
+ * Mengembalikan { healthy: boolean, latencyMs: number }.
+ */
+export async function checkAuthHealth() {
+  const start = Date.now()
+  try {
+    const res = await fetch(`${API_URL}/health`, { signal: AbortSignal.timeout(5000) })
+    const latencyMs = Date.now() - start
+    if (!res.ok) return { healthy: false, latencyMs }
+    const data = await res.json().catch(() => ({}))
+    return { healthy: data.status === "healthy", latencyMs }
+  } catch {
+    return { healthy: false, latencyMs: Date.now() - start }
+  }
 }
 
 export async function fetchPublicStats() {
