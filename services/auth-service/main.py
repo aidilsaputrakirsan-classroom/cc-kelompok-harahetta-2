@@ -1,4 +1,5 @@
 import os
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 from fastapi import FastAPI, Depends, HTTPException, Header, status, BackgroundTasks, Query
@@ -7,6 +8,14 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 import bcrypt
 import jwt
+
+from logging_config import setup_logging
+from logging_middleware import RequestLoggingMiddleware
+from metrics import metrics
+
+# Setup structured logging
+setup_logging()
+logger = logging.getLogger(__name__)
 
 from database import engine, get_db, Base
 from models import User, AdminProfile, UserProfile, UserRole, VerificationStatus
@@ -37,6 +46,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Logging middleware (setelah CORS)
+app.add_middleware(RequestLoggingMiddleware)
+
 
 # Password hashing helper
 def hash_password(password: str) -> str:
@@ -120,6 +133,21 @@ def require_admin(current_user: User = Depends(get_current_user)) -> User:
 @app.get("/health")
 def health():
     return {"status": "healthy", "service": "auth-service"}
+
+@app.get("/metrics")
+def get_metrics():
+    """Return application metrics + alert status."""
+    should_alert, error_rate, alert_info = metrics.check_alert_condition()
+    return {
+        "service": "auth-service",
+        **metrics.get_metrics(),
+        "alert": {
+            "active": should_alert,
+            "recent_error_rate_percent": error_rate,
+            "threshold_percent": 10.0,
+            "window": alert_info,
+        },
+    }
 
 @app.get("/team")
 def team_info():

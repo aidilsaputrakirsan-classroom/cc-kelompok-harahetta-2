@@ -7,8 +7,9 @@ import time
 import asyncio
 import logging
 import httpx
-from fastapi import HTTPException, Header
+from fastapi import HTTPException, Header, Request
 from typing import Optional
+
 
 from circuit_breaker import CircuitBreaker
 
@@ -34,9 +35,12 @@ auth_circuit = CircuitBreaker(
 )
 
 
-async def _call_auth_service(authorization: str) -> dict:
+async def _call_auth_service(
+    authorization: str,
+    correlation_id: str = None,
+) -> dict:
     """
-    Panggil Auth Service dengan Circuit Breaker + Retry.
+    Panggil Auth Service dengan Circuit Breaker + Retry + Correlation ID.
     """
     # Circuit breaker check
     if not auth_circuit.can_execute():
@@ -45,6 +49,10 @@ async def _call_auth_service(authorization: str) -> dict:
             detail="Auth Service circuit breaker OPEN. Try again later."
         )
 
+    headers = {"Authorization": authorization}
+    if correlation_id:
+        headers["X-Correlation-ID"] = correlation_id
+
     last_exception = None
 
     for attempt in range(1, MAX_RETRIES + 1):
@@ -52,14 +60,17 @@ async def _call_auth_service(authorization: str) -> dict:
             async with httpx.AsyncClient() as client:
                 response = await client.get(
                     f"{AUTH_SERVICE_URL}/verify",
-                    headers={"Authorization": authorization},
+                    headers=headers,
                     timeout=TIMEOUT_SECONDS,
                 )
 
             # Success
             if response.status_code == 200:
                 auth_circuit.record_success()
-                logger.info(f"Auth verified (attempt {attempt})")
+                logger.info(
+                    f"Auth verified (attempt {attempt})",
+                    extra={"correlation_id": correlation_id},
+                )
                 return response.json()
 
             # Non-retryable errors — gagalkan langsung
@@ -74,7 +85,8 @@ async def _call_auth_service(authorization: str) -> dict:
             if response.status_code in RETRYABLE_STATUS_CODES:
                 logger.warning(
                     f"Auth service returned {response.status_code} "
-                    f"(attempt {attempt}/{MAX_RETRIES})"
+                    f"(attempt {attempt}/{MAX_RETRIES})",
+                    extra={"correlation_id": correlation_id},
                 )
                 last_exception = HTTPException(
                     status_code=response.status_code,
@@ -88,13 +100,15 @@ async def _call_auth_service(authorization: str) -> dict:
 
         except httpx.ConnectError as e:
             logger.warning(
-                f"Cannot connect to Auth Service (attempt {attempt}/{MAX_RETRIES}): {e}"
+                f"Cannot connect to Auth Service (attempt {attempt}/{MAX_RETRIES}): {e}",
+                extra={"correlation_id": correlation_id},
             )
             last_exception = e
 
         except httpx.TimeoutException as e:
             logger.warning(
-                f"Auth Service timeout (attempt {attempt}/{MAX_RETRIES}): {e}"
+                f"Auth Service timeout (attempt {attempt}/{MAX_RETRIES}): {e}",
+                extra={"correlation_id": correlation_id},
             )
             last_exception = e
 
@@ -114,19 +128,22 @@ async def _call_auth_service(authorization: str) -> dict:
 
 
 async def verify_token_with_auth_service(
-    authorization: str = Header(...)
+    request: Request,
+    authorization: str = Header(...),
 ) -> dict:
     """
     FastAPI Dependency: Verifikasi token via Auth Service.
-    Dengan retry logic dan proper error handling.
+    Dengan retry logic, proper error handling, dan correlation ID.
     """
     if not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Invalid authorization header")
 
-    return await _call_auth_service(authorization)
+    correlation_id = getattr(request.state, "correlation_id", None)
+    return await _call_auth_service(authorization, correlation_id)
 
 
 async def verify_token_optional(
+    request: Request,
     authorization: Optional[str] = Header(default=None),
 ) -> Optional[dict]:
     """
@@ -147,11 +164,13 @@ async def verify_token_optional(
         logger.info("Auth circuit breaker OPEN — entering degraded mode")
         return None
 
+    correlation_id = getattr(request.state, "correlation_id", None)
     try:
-        return await _call_auth_service(authorization)
+        return await _call_auth_service(authorization, correlation_id)
     except HTTPException as e:
         if e.status_code in (503, 504):
             # Auth Service unavailable → degraded mode
             logger.warning(f"Auth unavailable ({e.status_code}) — entering degraded mode")
             return None
         raise  # Re-raise 401, 400, etc.
+
