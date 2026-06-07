@@ -34,6 +34,7 @@ import VerifyEmailPage from "./pages/VerifyEmailPage"
 import ForgotPasswordPage from "./pages/ForgotPasswordPage"
 import ResetPasswordPage from "./pages/ResetPasswordPage"
 import ChatPage from "./pages/ChatPage"
+import StatusPage from "./pages/StatusPage"
 
 function RedirectToStatic404() {
   if (typeof window !== "undefined") {
@@ -117,6 +118,7 @@ function AppBanner() {
 const PUBLIC_NAV_LINKS = [
   { label: "Beranda", to: "/" },
   { label: "Katalog", to: "/catalog" },
+  { label: "Status", to: "/status" },
   { label: "Tentang", to: "/about" },
   { label: "Mulai", to: "/login" },
 ]
@@ -153,6 +155,7 @@ function AdminLayout({ addToast }) {
             <Route path="/catalog" element={<CatalogPage addToast={addToast} />} />
             <Route path="/superadmin" element={<RequireSuperAdmin><SuperAdminPanel addToast={addToast} /></RequireSuperAdmin>} />
             <Route path="/superadmin/*" element={<RequireSuperAdmin><SuperAdminPanel addToast={addToast} /></RequireSuperAdmin>} />
+            <Route path="/status" element={<StatusPage />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </main>
@@ -177,6 +180,7 @@ function UserAppLayout({ addToast }) {
         <Route path="/profile" element={<RequireAuth><ProfilePage addToast={addToast} /></RequireAuth>} />
         <Route path="/chat" element={<RequireAuth><ChatPage addToast={addToast} /></RequireAuth>} />
         <Route path="/chat/:roomId" element={<RequireAuth><ChatPage addToast={addToast} /></RequireAuth>} />
+        <Route path="/status" element={<StatusPage />} />
         <Route path="*" element={<Navigate to="/home" replace />} />
       </Routes>
     </UserLayout>
