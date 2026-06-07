@@ -130,6 +130,8 @@ services:
       DATABASE_URL: postgresql://postgres:postgres@auth-db:5432/auth_db
       SECRET_KEY: ${SECRET_KEY:-dev-secret-key-change-in-production}
       CORS_ORIGINS: "http://localhost,http://localhost:5173"
+      SERVICE_NAME: auth-service
+      LOG_LEVEL: INFO
     depends_on:
       auth-db:
         condition: service_healthy
@@ -139,6 +141,12 @@ services:
       timeout: 5s
       retries: 3
       start_period: 15s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        tag: "auth-service"
     restart: unless-stopped
     deploy:
       resources:
@@ -155,6 +163,8 @@ services:
       DATABASE_URL: postgresql://postgres:postgres@item-db:5432/item_db
       AUTH_SERVICE_URL: http://auth-service:8001
       CORS_ORIGINS: "http://localhost,http://localhost:5173"
+      SERVICE_NAME: item-service
+      LOG_LEVEL: INFO
     depends_on:
       item-db:
         condition: service_healthy
@@ -166,6 +176,12 @@ services:
       timeout: 5s
       retries: 3
       start_period: 15s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        tag: "item-service"
     restart: unless-stopped
     deploy:
       resources:
