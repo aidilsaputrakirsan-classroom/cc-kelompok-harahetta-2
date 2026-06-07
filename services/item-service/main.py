@@ -18,7 +18,12 @@ from schemas import (
     ItemListResponse, ItemStatsResponse, PublicItemResponse, PublicItemListResponse,
 )
 from auth_client import verify_token_with_auth_service, verify_token_optional, auth_circuit
+from logging_config import setup_logging
+from logging_middleware import RequestLoggingMiddleware
+from metrics import metrics
 
+# Setup structured logging
+setup_logging()
 logger = logging.getLogger(__name__)
 
 # Create tables
@@ -40,6 +45,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Logging middleware (setelah CORS)
+app.add_middleware(RequestLoggingMiddleware)
 
 
 # =====================
@@ -93,6 +101,14 @@ def health_check():
         "dependencies": {
             "auth-service": cb_status,
         },
+    }
+
+@app.get("/metrics")
+def get_metrics():
+    """Return application metrics."""
+    return {
+        "service": "item-service",
+        **metrics.get_metrics(),
     }
 
 
