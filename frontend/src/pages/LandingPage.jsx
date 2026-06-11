@@ -309,7 +309,7 @@ export default function LandingPage() {
                   {/* Gradient overlay bawah */}
                   <div className="absolute inset-x-0 bottom-0 h-[30%] bg-gradient-to-t from-black/60 to-transparent rounded-b-3xl pointer-events-none" />
                   <div className="absolute bottom-5 left-5 right-5 flex items-center gap-3 z-10">
-                    <img src="/Logo sewain.png" alt="Sewain" className="h-10 w-auto brightness-0 invert opacity-90" />
+                    <img src="/logo-sewain.png" alt="Sewain" className="h-10 w-auto brightness-0 invert opacity-90" />
                     <span className="text-white/90 text-sm font-medium">Sewa apa saja, kapan saja.</span>
                   </div>
                 </MediaSlot>
