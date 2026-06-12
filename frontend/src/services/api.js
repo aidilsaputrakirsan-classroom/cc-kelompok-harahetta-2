@@ -1,4 +1,33 @@
+// Gateway URL — semua request melalui Nginx API Gateway (http://localhost di production)
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000"
+
+// ==================== CUSTOM ERROR TYPES ====================
+/**
+ * ServiceUnavailableError
+ * Dilempar ketika API mengembalikan status 503 atau 504,
+ * atau ketika terjadi network error yang mengindikasikan service down.
+ * Membawa properti tambahan:
+ *  - statusCode  : number  — HTTP status code (503, 504, 0 untuk network error)
+ *  - serviceName : string  — nama service yang diperkirakan down
+ *  - isServiceUnavailable : true — flag untuk deteksi di komponen
+ */
+export class ServiceUnavailableError extends Error {
+  constructor(message, { statusCode = 503, serviceName = "unknown" } = {}) {
+    super(message)
+    this.name = "ServiceUnavailableError"
+    this.statusCode = statusCode
+    this.serviceName = serviceName
+    this.isServiceUnavailable = true
+  }
+}
+
+/**
+ * Helper: apakah sebuah error merupakan ServiceUnavailableError?
+ * Dapat digunakan di catch block komponen.
+ */
+export function isServiceUnavailableError(err) {
+  return err instanceof ServiceUnavailableError || err?.isServiceUnavailable === true
+}
 
 // ==================== TOKEN MANAGEMENT ====================
 let authToken = null
@@ -30,14 +59,37 @@ function extractErrorMessage(error, statusCode) {
   return `Request gagal (${statusCode})`
 }
 
-async function handleResponse(response) {
-  if (response.status === 401) { clearToken(); throw new Error("UNAUTHORIZED") }
+async function handleResponse(response, serviceName = "unknown") {
+  if (response.status === 401) { clearToken(); throw new Error("Sesi habis, silakan login kembali") }
+  // Handle service unavailable (microservice down)
+  if (response.status === 503 || response.status === 504) {
+    throw new ServiceUnavailableError(
+      "Layanan sedang tidak tersedia. Silakan coba beberapa saat lagi.",
+      { statusCode: response.status, serviceName }
+    )
+  }
   if (!response.ok) {
     const error = await response.json().catch(() => ({}))
     throw new Error(extractErrorMessage(error, response.status))
   }
   if (response.status === 204) return null
   return response.json()
+}
+
+// Wrapper fetch dengan deteksi network/connection error
+async function apiFetch(url, options = {}, serviceName = "unknown") {
+  try {
+    return await fetch(url, options)
+  } catch (err) {
+    // Network error atau service down total
+    if (err instanceof TypeError && (err.message.includes("fetch") || err.message.includes("Failed"))) {
+      throw new ServiceUnavailableError(
+        "Tidak dapat terhubung ke server. Periksa koneksi internet Anda.",
+        { statusCode: 0, serviceName }
+      )
+    }
+    throw err
+  }
 }
 
 // ==================== AUTH API ====================
@@ -64,9 +116,52 @@ export async function login(email, password) {
   return data
 }
 
+export async function verifyEmail(token) {
+  const res = await fetch(`${API_URL}/auth/verify-email`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token }),
+  })
+  return handleResponse(res)
+}
+
+export async function resendVerification(email) {
+  const res = await fetch(`${API_URL}/auth/resend-verification`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  })
+  return handleResponse(res)
+}
+
+export async function forgotPassword(email) {
+  const res = await fetch(`${API_URL}/auth/forgot-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  })
+  return handleResponse(res)
+}
+
+export async function resetPassword(token, new_password) {
+  const res = await fetch(`${API_URL}/auth/reset-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token, new_password }),
+  })
+  return handleResponse(res)
+}
+
 export async function getMe() {
   const res = await fetch(`${API_URL}/auth/me`, { headers: authOnlyHeaders() })
-  return handleResponse(res)
+  return handleResponse(res, "auth")
+}
+
+export async function updateMe(data) {
+  const res = await fetch(`${API_URL}/auth/me`, {
+    method: "PUT", headers: authHeaders(), body: JSON.stringify(data),
+  })
+  return handleResponse(res, "auth")
 }
 
 export async function checkHealth() {
@@ -75,6 +170,29 @@ export async function checkHealth() {
     const data = await res.json()
     return data.status === "healthy"
   } catch { return false }
+}
+
+/**
+ * checkAuthHealth
+ * Cek apakah auth service sedang aktif.
+ * Mengembalikan { healthy: boolean, latencyMs: number }.
+ */
+export async function checkAuthHealth() {
+  const start = Date.now()
+  try {
+    const res = await fetch(`${API_URL}/health`, { signal: AbortSignal.timeout(5000) })
+    const latencyMs = Date.now() - start
+    if (!res.ok) return { healthy: false, latencyMs }
+    const data = await res.json().catch(() => ({}))
+    return { healthy: data.status === "healthy", latencyMs }
+  } catch {
+    return { healthy: false, latencyMs: Date.now() - start }
+  }
+}
+
+export async function fetchPublicStats() {
+  const res = await fetch(`${API_URL}/stats/public`)
+  return handleResponse(res)
 }
 
 // ==================== CATEGORIES API ====================
@@ -110,9 +228,18 @@ export async function fetchItems(params = {}) {
   if (params.search) q.append("search", params.search)
   if (params.category_id) q.append("category_id", params.category_id)
   if (params.status) q.append("status", params.status)
+  if (params.city) q.append("city", params.city)
+  if (params.sort_price) q.append("sort_price", params.sort_price)
+  if (params.price_min) q.append("price_min", params.price_min)
+  if (params.price_max) q.append("price_max", params.price_max)
   q.append("skip", params.skip ?? 0)
   q.append("limit", params.limit ?? 20)
   const res = await fetch(`${API_URL}/items?${q}`, { headers: authOnlyHeaders() })
+  return handleResponse(res)
+}
+
+export async function fetchItemCities() {
+  const res = await fetch(`${API_URL}/items/cities`, { headers: authOnlyHeaders() })
   return handleResponse(res)
 }
 
@@ -223,9 +350,98 @@ export async function updateRentalStatus(id, data) {
   return handleResponse(res)
 }
 
+// Ambil info lokasi pickup untuk rental tertentu (setelah sedang_disewa)
+export async function fetchRentalPickupInfo(rentalId) {
+  const res = await fetch(`${API_URL}/rentals/${rentalId}/pickup`, { headers: authOnlyHeaders() })
+  return handleResponse(res)
+}
+
+// Admin konfirmasi barang sudah diambil penyewa
+export async function confirmPickup(rentalId) {
+  const res = await fetch(`${API_URL}/rentals/${rentalId}/confirm-pickup`, {
+    method: "PUT", headers: authHeaders(),
+  })
+  return handleResponse(res)
+}
+
+// User request pengembalian barang ke admin
+export async function requestReturn(rentalId) {
+  const res = await fetch(`${API_URL}/rentals/${rentalId}/request-return`, {
+    method: "POST", headers: authHeaders(),
+  })
+  return handleResponse(res)
+}
+
 // ==================== ADMIN PAYMENT INFO (public) ====================
 export async function fetchAdminPaymentInfo(adminId) {
   const res = await fetch(`${API_URL}/admins/${adminId}/payment-info`)
+  return handleResponse(res)
+}
+
+// ==================== SHOP / TOKO (public) ====================
+export async function fetchShop(adminId) {
+  const res = await fetch(`${API_URL}/admins/${adminId}/shop`)
+  return handleResponse(res)
+}
+
+export async function fetchShopItems(adminId, params = {}) {
+  const q = new URLSearchParams()
+  if (params.search) q.append("search", params.search)
+  if (params.status) q.append("status", params.status)
+  q.append("skip", params.skip ?? 0)
+  q.append("limit", params.limit ?? 24)
+  const res = await fetch(`${API_URL}/admins/${adminId}/items?${q}`)
+  return handleResponse(res)
+}
+
+export async function fetchShopReviews(adminId, params = {}) {
+  const q = new URLSearchParams()
+  q.append("skip", params.skip ?? 0)
+  q.append("limit", params.limit ?? 20)
+  const res = await fetch(`${API_URL}/admins/${adminId}/reviews?${q}`)
+  return handleResponse(res)
+}
+
+// ==================== REVIEWS (item & rental) ====================
+export async function fetchItemReviews(itemId, params = {}) {
+  const q = new URLSearchParams()
+  q.append("skip", params.skip ?? 0)
+  q.append("limit", params.limit ?? 20)
+  const res = await fetch(`${API_URL}/items/${itemId}/reviews?${q}`)
+  return handleResponse(res)
+}
+
+export async function fetchRentalReview(rentalId) {
+  const res = await fetch(`${API_URL}/rentals/${rentalId}/review`, { headers: authOnlyHeaders() })
+  return handleResponse(res)
+}
+
+export async function createRentalReview(rentalId, { rating, komentar }) {
+  const res = await fetch(`${API_URL}/rentals/${rentalId}/review`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify({ rating, komentar }),
+  })
+  return handleResponse(res)
+}
+
+export async function updateReview(reviewId, { rating, komentar }) {
+  const body = {}
+  if (rating !== undefined) body.rating = rating
+  if (komentar !== undefined) body.komentar = komentar
+  const res = await fetch(`${API_URL}/reviews/${reviewId}`, {
+    method: "PUT",
+    headers: authHeaders(),
+    body: JSON.stringify(body),
+  })
+  return handleResponse(res)
+}
+
+export async function deleteReview(reviewId) {
+  const res = await fetch(`${API_URL}/reviews/${reviewId}`, {
+    method: "DELETE",
+    headers: authOnlyHeaders(),
+  })
   return handleResponse(res)
 }
 
@@ -280,6 +496,38 @@ export async function confirmPayment(paymentId, statusVal) {
   return handleResponse(res)
 }
 
+// ==================== MIDTRANS PAYMENT GATEWAY ====================
+export async function chargeMidtransForRental(rentalId) {
+  const res = await fetch(`${API_URL}/payments/rentals/${rentalId}/charge`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify({}),
+  })
+  return handleResponse(res)
+}
+
+export async function chargeDirectMidtrans(rentalId, { payment_type, bank }) {
+  const res = await fetch(`${API_URL}/payments/rentals/${rentalId}/charge-direct`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify({ payment_type, bank }),
+  })
+  return handleResponse(res)
+}
+
+export async function syncMidtransPayment(paymentId) {
+  const res = await fetch(`${API_URL}/payments/${paymentId}/sync`, {
+    method: "POST",
+    headers: authOnlyHeaders(),
+  })
+  return handleResponse(res)
+}
+
+export async function fetchMidtransConfig() {
+  const res = await fetch(`${API_URL}/payments/config/public`)
+  return handleResponse(res)
+}
+
 // ==================== SUPER ADMIN ====================
 export async function fetchPlatformStats() {
   const res = await fetch(`${API_URL}/superadmin/stats`, { headers: authOnlyHeaders() })
@@ -327,5 +575,109 @@ export async function fetchAllRentals(params = {}) {
   q.append("skip", params.skip ?? 0)
   q.append("limit", params.limit ?? 50)
   const res = await fetch(`${API_URL}/superadmin/rentals?${q}`, { headers: authOnlyHeaders() })
+  return handleResponse(res)
+}
+
+// ==================== CHATBOT AI ====================
+export async function sendChatMessage(message, history = []) {
+  const res = await fetch(`${API_URL}/chatbot`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message, history }),
+  })
+  return handleResponse(res)
+}
+
+// ==================== WALLET & WITHDRAWAL ====================
+export async function fetchWallet() {
+  const res = await fetch(`${API_URL}/admin/wallet`, { headers: authOnlyHeaders() })
+  return handleResponse(res)
+}
+
+export async function fetchWalletTransactions(params = {}) {
+  const q = new URLSearchParams()
+  q.append("skip", params.skip ?? 0)
+  q.append("limit", params.limit ?? 20)
+  const res = await fetch(`${API_URL}/admin/wallet/transactions?${q}`, { headers: authOnlyHeaders() })
+  return handleResponse(res)
+}
+
+export async function requestWithdrawal(data) {
+  const res = await fetch(`${API_URL}/admin/wallet/withdraw`, {
+    method: "POST", headers: authHeaders(), body: JSON.stringify(data),
+  })
+  return handleResponse(res)
+}
+
+export async function fetchMyWithdrawals(params = {}) {
+  const q = new URLSearchParams()
+  if (params.status) q.append("status", params.status)
+  q.append("skip", params.skip ?? 0)
+  q.append("limit", params.limit ?? 20)
+  const res = await fetch(`${API_URL}/admin/wallet/withdrawals?${q}`, { headers: authOnlyHeaders() })
+  return handleResponse(res)
+}
+
+
+// ==================== PROMO / DISKON ====================
+
+// [Public] Promo aktif untuk banner di landing page
+export async function fetchFeaturedPromos() {
+  const res = await fetch(`${API_URL}/promos/featured`)
+  return handleResponse(res)
+}
+
+// [User] Validasi/preview kupon di halaman checkout
+export async function validatePromo({ code, item_id, tanggal_mulai, tanggal_selesai }) {
+  const res = await fetch(`${API_URL}/promos/validate`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify({ code, item_id, tanggal_mulai, tanggal_selesai }),
+  })
+  return handleResponse(res)
+}
+
+// [Super Admin] CRUD kupon
+export async function fetchPromoCodes(params = {}) {
+  const q = new URLSearchParams()
+  q.append("skip", params.skip ?? 0)
+  q.append("limit", params.limit ?? 50)
+  const res = await fetch(`${API_URL}/superadmin/promos?${q.toString()}`, {
+    headers: authOnlyHeaders(),
+  })
+  return handleResponse(res)
+}
+
+export async function createPromoCode(data) {
+  const res = await fetch(`${API_URL}/superadmin/promos`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify(data),
+  })
+  return handleResponse(res)
+}
+
+export async function updatePromoCode(promoId, data) {
+  const res = await fetch(`${API_URL}/superadmin/promos/${promoId}`, {
+    method: "PUT",
+    headers: authHeaders(),
+    body: JSON.stringify(data),
+  })
+  return handleResponse(res)
+}
+
+export async function deletePromoCode(promoId) {
+  const res = await fetch(`${API_URL}/superadmin/promos/${promoId}`, {
+    method: "DELETE",
+    headers: authOnlyHeaders(),
+  })
+  if (!res.ok && res.status !== 204) return handleResponse(res)
+  return true
+}
+
+export async function fetchPromoRedemptions(promoId) {
+  const res = await fetch(`${API_URL}/superadmin/promos/${promoId}/redemptions`, {
+    headers: authOnlyHeaders(),
+  })
   return handleResponse(res)
 }

@@ -1,198 +1,200 @@
+/**
+ * CatalogPage — Sewain
+ * Modern minimalist · search-first dengan filter sticky di kiri (desktop).
+ */
 import { useState, useEffect, useCallback } from "react"
-import { Link, useNavigate } from "react-router-dom"
+import { Link, useNavigate, useSearchParams } from "react-router-dom"
 import { useAuth } from "../context/AuthContext"
-import { fetchItems, fetchCategories } from "../services/api"
+import { fetchItems, fetchCategories, fetchItemCities } from "../services/api"
 import { formatPrice } from "../lib/utils"
 import { Button } from "../components/ui/Button"
 import { motion, AnimatePresence } from "framer-motion"
 import Navbar from "../components/Layout/Navbar"
+import Footer from "../components/Layout/Footer"
 import {
-  Search, Package, ShoppingCart, ArrowLeft, ArrowRight,
-  X, Sparkles, CheckCircle, Clock, Eye, Tag,
+  Search, Package, ShoppingCart, ArrowLeft, ArrowRight, X,
+  Sparkles, Eye, SlidersHorizontal, Filter, Store, MapPin,
 } from "lucide-react"
+import { useTour } from "../hooks/useTour"
+import TourButton from "../components/TourButton"
+import { TOUR_KEYS } from "../lib/tour"
+import { catalogSteps } from "../lib/tourSteps"
 
-/* ─── Navbar breadcrumb config ──────────────────────────── */
+/* ─── motion ──────────────────────────────────────────────── */
+const ease = [0.22, 1, 0.36, 1]
 
-const catalogBreadcrumb = [
+/* ─── nav links ───────────────────────────────────────────── */
+const catalogNavLinks = [
   { label: "Beranda", to: "/" },
-  { label: "Katalog Barang" },
+  { label: "Katalog", to: "/catalog" },
+  { label: "Tentang", to: "/about" },
+  { label: "Mulai",   to: "/login" },
 ]
 
-/* ─── Item status config ────────────────────────────────── */
-
+/* ─── status ──────────────────────────────────────────────── */
 const STATUS_CONFIG = {
-  available:   { label: "Tersedia",        cls: "bg-emerald-100 text-emerald-700" },
-  rented:      { label: "Disewa",          cls: "bg-amber-100 text-amber-700" },
-  unavailable: { label: "Tidak Tersedia",  cls: "bg-slate-100 text-slate-500" },
+  available:   { label: "Tersedia",        cls: "bg-white/90 text-emerald-700 backdrop-blur-sm shadow-sm border border-emerald-200" },
+  rented:      { label: "Disewa",          cls: "bg-white/90 text-amber-700 backdrop-blur-sm shadow-sm border border-amber-200" },
+  unavailable: { label: "Tidak tersedia",  cls: "bg-white/90 text-muted-foreground backdrop-blur-sm shadow-sm border border-border" },
 }
 
-/* ─── Item Card ─────────────────────────────────────────── */
-
+/* ─── ItemCard ────────────────────────────────────────────── */
 function ItemCard({ item, onRent, index }) {
   const navigate = useNavigate()
-  const imgFallback = `https://ui-avatars.com/api/?name=${encodeURIComponent(item.nama)}&background=1b7e6a&color=fff&size=400&bold=true`
+  const fallback = `https://ui-avatars.com/api/?name=${encodeURIComponent(item.nama)}&background=0a6e4a&color=fff&size=400&bold=true`
   const st = STATUS_CONFIG[item.status] || STATUS_CONFIG.unavailable
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 24 }}
+      initial={{ opacity: 0, y: 18 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1], delay: Math.min(index * 0.06, 0.42) }}
-      whileHover={{ y: -6 }}
+      transition={{ duration: 0.45, ease, delay: Math.min(index * 0.05, 0.4) }}
       layout
+      className="group rounded-3xl border border-border bg-card overflow-hidden flex flex-col lift"
     >
-      <div className="group bg-card rounded-3xl overflow-hidden border border-border shadow-sm hover:shadow-xl transition-shadow duration-300 flex flex-col h-full">
-        {/* Image */}
-        <div
-          className="relative aspect-[4/3] overflow-hidden bg-slate-50 cursor-pointer"
+      {/* Image */}
+      <button
+        type="button"
+        onClick={() => navigate(`/items/${item.id}`)}
+        className="relative aspect-[4/3] overflow-hidden bg-secondary"
+      >
+        <img
+          src={item.foto_url || fallback}
+          alt={item.nama}
+          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+          onError={(e) => { e.target.src = fallback }}
+          loading="lazy"
+        />
+
+        {/* Quick view indicator */}
+        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 bg-foreground/10 transition-opacity">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-background/95 backdrop-blur text-xs font-semibold text-foreground shadow-soft">
+            <Eye className="w-3.5 h-3.5" /> Lihat detail
+          </span>
+        </div>
+
+        {/* Badges */}
+        {item.category && (
+          <span className="absolute top-3 left-3 text-[10px] font-semibold px-2 py-1 rounded-full bg-background/90 text-primary backdrop-blur">
+            {item.category.nama}
+          </span>
+        )}
+      </button>
+
+      {/* Body */}
+      <div className="p-5 flex flex-col flex-1">
+        <h3
+          className="font-semibold tracking-tight line-clamp-1 cursor-pointer hover:text-primary transition-colors"
           onClick={() => navigate(`/items/${item.id}`)}
         >
-          <motion.img
-            src={item.foto_url || imgFallback}
-            alt={item.nama}
-            className="w-full h-full object-cover bg-muted"
-            whileHover={{ scale: 1.07 }}
-            transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-            onError={(e) => { e.target.src = imgFallback }}
-          />
-          {/* Overlay */}
-          <motion.div
-            className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent"
-            initial={{ opacity: 0 }}
-            whileHover={{ opacity: 1 }}
-            transition={{ duration: 0.25 }}
-          />
-          <motion.div
-            className="absolute inset-0 flex items-center justify-center"
-            initial={{ opacity: 0, scale: 0.85 }}
-            whileHover={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.25 }}
-          >
-            <span className="flex items-center gap-1.5 text-xs font-bold text-white bg-black/50 px-3 py-1.5 rounded-full backdrop-blur-sm">
-              <Eye className="w-3.5 h-3.5" /> Lihat Detail
-            </span>
-          </motion.div>
+          {item.nama}
+        </h3>
+        {item.admin_nama_usaha && (
+          <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+            <Store className="w-3 h-3" />
+            {item.admin_nama_usaha}
+          </p>
+        )}
+        {item.admin_kota && (
+          <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
+            <MapPin className="w-3 h-3" />
+            {item.admin_kota}
+          </p>
+        )}
+        {item.deskripsi && (
+          <p className="text-sm text-muted-foreground line-clamp-2 mt-1.5 flex-1 leading-relaxed">
+            {item.deskripsi}
+          </p>
+        )}
 
-          {/* Badges */}
-          <span className={`absolute top-3 right-3 text-xs font-bold px-2.5 py-1 rounded-full ${st.cls}`}>
-            {st.label}
-          </span>
-          {item.category && (
-            <span className="absolute top-3 left-3 text-xs font-semibold bg-white/90 text-primary px-2 py-0.5 rounded-full shadow-sm">
-              {item.category.nama}
-            </span>
-          )}
-        </div>
-
-        {/* Info */}
-        <div className="p-4 flex flex-col flex-1">
-          <h3
-            className="font-bold text-foreground line-clamp-1 text-base cursor-pointer hover:text-primary transition-colors"
-            onClick={() => navigate(`/items/${item.id}`)}
-          >
-            {item.nama}
-          </h3>
-          {item.deskripsi && (
-            <p className="text-xs text-muted-foreground line-clamp-2 mt-1 flex-1 leading-relaxed">{item.deskripsi}</p>
-          )}
-          <div className="flex items-end justify-between mt-4">
-            <div>
-              <div className="text-xl font-extrabold text-primary">{formatPrice(item.harga_per_hari)}</div>
-              <div className="text-xs text-muted-foreground">/ hari &middot; Stok {item.stok}</div>
+        <div className="flex items-end justify-between mt-5">
+          <div>
+            <div className="text-xl font-bold text-foreground tracking-tight">
+              {formatPrice(item.harga_per_hari)}
             </div>
-            <div className="flex gap-1.5">
-              <button
-                onClick={() => navigate(`/items/${item.id}`)}
-                className="p-2 rounded-xl border border-slate-200 text-slate-500 hover:border-primary hover:text-primary transition-colors"
-                title="Lihat Detail"
-              >
-                <Eye className="w-3.5 h-3.5" />
-              </button>
-              {item.status === "available" && (
-                <Button
-                  size="sm"
-                  className="rounded-xl text-xs"
-                  onClick={() => onRent(item)}
-                  disabled={item.stok <= 0}
-                >
-                  <ShoppingCart className="w-3.5 h-3.5 mr-1" /> Sewa
-                </Button>
-              )}
-            </div>
+            <div className="text-xs text-muted-foreground">/ hari · stok {item.stok}</div>
           </div>
+          <Button
+            size="sm"
+            className="rounded-full px-4"
+            onClick={() => onRent(item)}
+            disabled={item.stok <= 0}
+          >
+            <ShoppingCart className="w-3.5 h-3.5 mr-1" /> Sewa
+          </Button>
         </div>
       </div>
     </motion.div>
   )
 }
 
-/* ─── Skeleton card ─────────────────────────────────────── */
-
-function SkeletonCard({ index }) {
+/* ─── Skeleton ────────────────────────────────────────────── */
+function SkeletonCard() {
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ delay: index * 0.04 }}
-      className="bg-card rounded-3xl overflow-hidden border border-border shadow-sm"
-    >
-      <div className="aspect-[4/3] bg-slate-100 animate-pulse" />
-      <div className="p-4 space-y-2">
-        <div className="h-4 bg-slate-100 rounded-full w-3/4 animate-pulse" />
-        <div className="h-3 bg-slate-100 rounded-full w-full animate-pulse" />
-        <div className="h-6 bg-slate-100 rounded-full w-1/3 animate-pulse mt-3" />
+    <div className="rounded-3xl border border-border bg-card overflow-hidden">
+      <div className="aspect-[4/3] bg-secondary animate-pulse" />
+      <div className="p-5 space-y-3">
+        <div className="h-4 bg-muted rounded-full w-3/4 animate-pulse" />
+        <div className="h-3 bg-muted rounded-full w-full animate-pulse" />
+        <div className="h-7 bg-muted rounded-full w-1/2 mt-2 animate-pulse" />
       </div>
-    </motion.div>
+    </div>
   )
 }
 
-/* ─── Empty state ───────────────────────────────────────── */
-
+/* ─── Empty state ─────────────────────────────────────────── */
 function EmptyState({ onReset }) {
   return (
-    <motion.div
-      className="text-center py-24"
-      initial={{ opacity: 0, scale: 0.9 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.4, ease: "backOut" }}
-    >
-      <motion.div
-        animate={{ y: [0, -8, 0] }}
-        transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-      >
-        <Package className="w-20 h-20 text-slate-200 mx-auto mb-4" />
-      </motion.div>
-      <h3 className="text-xl font-bold text-slate-600">Barang tidak ditemukan</h3>
-      <p className="text-slate-400 mt-2 text-sm">Coba ubah kata kunci atau filter pencarian</p>
-      <button
-        onClick={onReset}
-        className="mt-5 px-5 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition"
-      >
+    <div className="text-center py-24 col-span-full">
+      <div className="w-20 h-20 rounded-3xl bg-secondary flex items-center justify-center mx-auto mb-5">
+        <Package className="w-9 h-9 text-muted-foreground" />
+      </div>
+      <h3 className="text-xl font-bold tracking-tight">Barang tidak ditemukan</h3>
+      <p className="text-muted-foreground mt-2 text-sm">Coba ubah kata kunci atau filter pencarian.</p>
+      <Button onClick={onReset} className="mt-6 rounded-full px-6">
         Reset filter
-      </button>
-    </motion.div>
+      </Button>
+    </div>
   )
 }
 
-/* ─── Main Page ─────────────────────────────────────────── */
-
+/* ─── Page ────────────────────────────────────────────────── */
 export default function CatalogPage({ addToast }) {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { isAuthenticated } = useAuth()
+
+  const { startTour } = useTour({
+    tourKey:   TOUR_KEYS.catalog,
+    steps:     catalogSteps,
+    autoStart: false,
+  })
+
+  const initialSearch = searchParams.get("search") || ""
 
   const [items, setItems]               = useState([])
   const [total, setTotal]               = useState(0)
   const [categories, setCategories]     = useState([])
+  const [cities, setCities]             = useState([])
   const [loading, setLoading]           = useState(true)
-  const [search, setSearch]             = useState("")
-  const [searchInput, setSearchInput]   = useState("")
+  const [search, setSearch]             = useState(initialSearch)
+  const [searchInput, setSearchInput]   = useState(initialSearch)
   const [categoryId, setCategoryId]     = useState("")
-  const [statusFilter, setStatusFilter] = useState("")
+  const [sortPrice, setSortPrice]       = useState("") // "asc" | "desc" | ""
+  const [priceMin, setPriceMin]         = useState("")
+  const [priceMax, setPriceMax]         = useState("")
+  const [cityFilter, setCityFilter]     = useState("")
   const [page, setPage]                 = useState(0)
+  const [filterOpen, setFilterOpen]     = useState(false)
   const LIMIT = 12
 
   useEffect(() => {
-    fetchCategories().then(c => setCategories(Array.isArray(c) ? c : [])).catch(() => {})
+    fetchCategories()
+      .then(c => setCategories(Array.isArray(c) ? c : []))
+      .catch(() => {})
+    fetchItemCities()
+      .then(c => setCities(Array.isArray(c) ? c : []))
+      .catch(() => {})
   }, [])
 
   const load = useCallback(async () => {
@@ -201,7 +203,10 @@ export default function CatalogPage({ addToast }) {
       const params = { skip: page * LIMIT, limit: LIMIT }
       if (search)       params.search = search
       if (categoryId)   params.category_id = categoryId
-      if (statusFilter) params.status = statusFilter
+      if (cityFilter)   params.city = cityFilter
+      if (sortPrice)    params.sort_price = sortPrice
+      if (priceMin)     params.price_min = priceMin
+      if (priceMax)     params.price_max = priceMax
       const data = await fetchItems(params)
       setItems(Array.isArray(data) ? data : (data?.items || []))
       setTotal(data?.total || 0)
@@ -210,7 +215,7 @@ export default function CatalogPage({ addToast }) {
     } finally {
       setLoading(false)
     }
-  }, [search, categoryId, statusFilter, page, addToast])
+  }, [search, categoryId, sortPrice, priceMin, priceMax, cityFilter, page, addToast])
 
   useEffect(() => { load() }, [load])
 
@@ -221,7 +226,14 @@ export default function CatalogPage({ addToast }) {
   }
 
   const clearFilter = () => {
-    setSearch(""); setSearchInput(""); setCategoryId(""); setStatusFilter(""); setPage(0)
+    setSearch("")
+    setSearchInput("")
+    setCategoryId("")
+    setSortPrice("")
+    setPriceMin("")
+    setPriceMax("")
+    setCityFilter("")
+    setPage(0)
   }
 
   const handleRent = (item) => {
@@ -229,278 +241,385 @@ export default function CatalogPage({ addToast }) {
     navigate(`/rentals/new?item=${item.id}`)
   }
 
-  const hasFilter = search || categoryId || statusFilter
+  const hasFilter = !!(search || categoryId || sortPrice || priceMin || priceMax || cityFilter)
+  const totalPages = Math.max(1, Math.ceil(total / LIMIT))
 
-  return (
-    <div className="min-h-screen bg-page">
-      <Navbar breadcrumb={catalogBreadcrumb} />
+  /* ─── reusable filter section (desktop sidebar / mobile sheet) ── */
+  const FilterPanel = (
+    <div className="space-y-7">
+      {/* Urutkan Harga */}
+      <div>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">
+          Urutkan Harga
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {[
+            { v: "",     label: "Default" },
+            { v: "asc",  label: "Termurah" },
+            { v: "desc", label: "Termahal" },
+          ].map(({ v, label }) => (
+            <button
+              key={v || "default"}
+              onClick={() => { setSortPrice(v); setPage(0); setFilterOpen(false) }}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors border ${
+                sortPrice === v
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-background text-muted-foreground border-border hover:border-primary hover:text-primary"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
 
-      {/* ── HERO SEARCH ─────────────────────────────────── */}
-      <section className="pt-16 relative overflow-hidden bg-gradient-to-br from-[#0d5c4a] via-[#1b7e6a] to-[#2a9d87]">
-        {/* Background decoration */}
-        <div className="absolute inset-0 pointer-events-none">
-          <motion.div
-            className="absolute -top-24 -right-24 w-80 h-80 rounded-full bg-white/5 blur-3xl"
-            animate={{ scale: [1, 1.2, 1] }}
-            transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+      {/* Range Harga */}
+      <div>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">
+          Range Harga
+        </p>
+        <div className="flex items-center gap-2">
+          <input
+            type="number"
+            placeholder="Min"
+            value={priceMin}
+            onChange={(e) => setPriceMin(e.target.value)}
+            className="w-full px-3 py-2 rounded-xl border border-border bg-background text-xs focus:outline-none focus:ring-1 focus:ring-primary"
           />
-          <motion.div
-            className="absolute bottom-0 -left-16 w-64 h-64 rounded-full bg-white/5 blur-3xl"
-            animate={{ scale: [1.1, 1, 1.1] }}
-            transition={{ duration: 10, repeat: Infinity, ease: "easeInOut", delay: 2 }}
-          />
-          <div
-            className="absolute inset-0 opacity-[0.04]"
-            style={{ backgroundImage: "radial-gradient(circle, white 1px, transparent 1px)", backgroundSize: "24px 24px" }}
+          <span className="text-xs text-muted-foreground">—</span>
+          <input
+            type="number"
+            placeholder="Max"
+            value={priceMax}
+            onChange={(e) => setPriceMax(e.target.value)}
+            className="w-full px-3 py-2 rounded-xl border border-border bg-background text-xs focus:outline-none focus:ring-1 focus:ring-primary"
           />
         </div>
-
-        <div className="relative max-w-4xl mx-auto px-4 py-14 md:py-20 text-center">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.85 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.5, ease: "backOut" }}
-            className="mb-4"
+        {(priceMin || priceMax) && (
+          <button
+            onClick={() => { setPriceMin(""); setPriceMax(""); setPage(0) }}
+            className="mt-2 text-[10px] text-destructive hover:underline"
           >
-            <span className="inline-flex items-center gap-2 bg-white/10 text-white/90 text-xs font-semibold px-3 py-1.5 rounded-full">
-              <Sparkles className="w-3.5 h-3.5" /> {total} barang tersedia
-            </span>
-          </motion.div>
+            Reset harga
+          </button>
+        )}
+      </div>
 
-          <motion.h1
-            className="text-3xl md:text-5xl font-extrabold text-white leading-tight"
-            initial={{ opacity: 0, y: 24 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
-          >
-            Katalog Barang Sewa
-          </motion.h1>
-
-          <motion.p
-            className="text-white/70 mt-3 text-base md:text-lg max-w-2xl mx-auto"
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-          >
-            Temukan barang yang kamu butuhkan dari berbagai penyedia terpercaya
-          </motion.p>
-
-          {/* Search bar */}
-          <motion.form
-            onSubmit={handleSearch}
-            className="mt-8 flex gap-2 max-w-xl mx-auto"
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.3 }}
-          >
-            <div className="relative flex-1">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Cari nama barang..."
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                className="w-full pl-11 pr-4 py-3.5 rounded-2xl bg-white shadow-lg text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-white/50"
-              />
-            </div>
+      {cities.length > 0 && (
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3 flex items-center gap-1.5">
+            <MapPin className="w-3 h-3" /> Kota
+          </p>
+          <div className="flex flex-wrap gap-2">
             <button
-              type="submit"
-              className="px-6 py-3.5 bg-white text-primary font-bold rounded-2xl shadow-lg hover:bg-slate-50 active:scale-95 transition whitespace-nowrap text-sm"
-            >
-              Cari
-            </button>
-          </motion.form>
-
-          {/* Category pills */}
-          <motion.div
-            className="flex gap-2 flex-wrap justify-center mt-5"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.4 }}
-          >
-            <button
-              onClick={() => { setCategoryId(""); setPage(0) }}
-              className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
-                !categoryId
-                  ? "bg-white text-primary shadow-md scale-105"
-                  : "bg-white/20 text-white hover:bg-white/30"
+              onClick={() => { setCityFilter(""); setPage(0); setFilterOpen(false) }}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors border ${
+                !cityFilter
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-background text-muted-foreground border-border hover:border-primary hover:text-primary"
               }`}
             >
               Semua
             </button>
-            {categories.map(c => (
+            {cities.map(c => (
               <button
-                key={c.id}
-                onClick={() => { setCategoryId(String(c.id)); setPage(0) }}
-                className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
-                  categoryId === String(c.id)
-                    ? "bg-white text-primary shadow-md scale-105"
-                    : "bg-white/20 text-white hover:bg-white/30"
+                key={c}
+                onClick={() => { setCityFilter(c); setPage(0); setFilterOpen(false) }}
+                className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold transition-colors border ${
+                  cityFilter === c
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-background text-muted-foreground border-border hover:border-primary hover:text-primary"
                 }`}
               >
-                {c.nama}
+                <MapPin className="w-3 h-3" /> {c}
               </button>
             ))}
-          </motion.div>
+          </div>
         </div>
-      </section>
+      )}
 
-      {/* ── FILTER BAR ──────────────────────────────────── */}
-      <div className="sticky top-16 z-30 bg-card/95 backdrop-blur border-b border-border shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
-          <div className="flex gap-2 flex-wrap">
-            {[
-              { v: "",           label: "Semua",    icon: null },
-              { v: "available",  label: "Tersedia", icon: CheckCircle },
-              { v: "rented",     label: "Disewa",   icon: Clock },
-            ].map(({ v, label, icon: Icon }) => (
-              <motion.button
-                key={v}
-                onClick={() => { setStatusFilter(v); setPage(0) }}
-                whileTap={{ scale: 0.95 }}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all border ${
-                  statusFilter === v
-                    ? "bg-primary text-white border-primary shadow-sm"
-                    : "bg-white text-slate-600 border-slate-200 hover:border-primary hover:text-primary"
-                }`}
-              >
-                {Icon && <Icon className="w-3 h-3" />} {label}
-              </motion.button>
-            ))}
-          </div>
-          <div className="flex items-center gap-3 text-sm text-slate-500">
-            <AnimatePresence>
-              {hasFilter && (
-                <motion.button
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.8 }}
-                  onClick={clearFilter}
-                  className="flex items-center gap-1 text-xs text-destructive hover:underline font-medium"
-                >
-                  <X className="w-3.5 h-3.5" /> Reset
-                </motion.button>
-              )}
-            </AnimatePresence>
-            <span className="hidden sm:block font-semibold text-slate-700">{total} barang</span>
-          </div>
+      <div>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">
+          Kategori
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => { setCategoryId(""); setPage(0); setFilterOpen(false) }}
+            className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors border ${
+              !categoryId
+                ? "bg-primary text-primary-foreground border-primary"
+                : "bg-background text-muted-foreground border-border hover:border-primary hover:text-primary"
+            }`}
+          >
+            Semua
+          </button>
+          {categories.map(c => (
+            <button
+              key={c.id}
+              onClick={() => { setCategoryId(String(c.id)); setPage(0); setFilterOpen(false) }}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors border ${
+                categoryId === String(c.id)
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-background text-muted-foreground border-border hover:border-primary hover:text-primary"
+              }`}
+            >
+              {c.nama}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* ── GRID ────────────────────────────────────────── */}
-      <main className="max-w-7xl mx-auto px-4 py-8">
+      {hasFilter && (
+        <button
+          onClick={() => { clearFilter(); setFilterOpen(false) }}
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-destructive hover:underline"
+        >
+          <X className="w-3.5 h-3.5" /> Reset semua filter
+        </button>
+      )}
+    </div>
+  )
 
-        {/* Active filter chips */}
-        <AnimatePresence>
-          {hasFilter && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              className="mb-5 flex items-center gap-2 text-sm text-slate-600 flex-wrap overflow-hidden"
-            >
-              <Tag className="w-4 h-4 text-primary flex-shrink-0" />
-              <span className="text-slate-500">Filter aktif:</span>
-              {search && (
-                <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium text-xs">
-                  "{search}"
-                </span>
-              )}
-              {categoryId && (
-                <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium text-xs">
-                  {categories.find(c => String(c.id) === categoryId)?.nama}
-                </span>
-              )}
-              {statusFilter && (
-                <span className="bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium text-xs capitalize">
-                  {statusFilter}
-                </span>
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>
+  return (
+    <div className="min-h-screen bg-background text-foreground flex flex-col">
 
-        {loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
-            {Array.from({ length: 8 }).map((_, i) => <SkeletonCard key={i} index={i} />)}
-          </div>
-        ) : items.length === 0 ? (
-          <EmptyState onReset={clearFilter} />
-        ) : (
-          <>
-            <motion.div
-              className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5"
-              layout
-            >
-              <AnimatePresence mode="popLayout">
-                {items.map((item, i) => (
-                  <ItemCard
-                    key={item.id}
-                    item={item}
-                    onRent={handleRent}
-                    index={i}
-                  />
-                ))}
-              </AnimatePresence>
-            </motion.div>
+      {/* ══ HERO SEARCH ════════════════════════════════════ */}
+      <section className={`relative pb-12 md:pb-16 bg-section-alt overflow-hidden ${isAuthenticated ? "pt-4 md:pt-6" : "pt-24 md:pt-28"}`}>
+        <div className="absolute inset-0 bg-dot-grid opacity-30 [mask-image:radial-gradient(ellipse_at_center,black_20%,transparent_75%)] pointer-events-none" />
 
-            {/* Pagination */}
-            {total > LIMIT && (
-              <motion.div
-                className="flex justify-center items-center gap-3 mt-12"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.3 }}
+        <div className="relative max-w-4xl mx-auto px-4 sm:px-6 text-center">
+          <motion.div
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="chip mb-5"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-primary" /> {total} barang siap sewa
+          </motion.div>
+
+          <motion.h1
+            initial={{ opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, ease, delay: 0.05 }}
+            className="text-4xl md:text-6xl font-bold tracking-tight leading-tight"
+          >
+            Cari barang yang{" "}
+            <span className="font-display text-primary">tepat</span>.
+          </motion.h1>
+
+          <motion.p
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, ease, delay: 0.1 }}
+            className="mt-4 text-base md:text-lg text-muted-foreground max-w-xl mx-auto"
+          >
+            Telusuri ribuan barang dari penyedia terpercaya. Filter sesuai kebutuhanmu.
+          </motion.p>
+
+          <motion.form
+            id="catalog-search-form"
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, ease, delay: 0.15 }}
+            onSubmit={handleSearch}
+            className="mt-8 flex items-center bg-card border border-border rounded-full p-1.5 pl-5 shadow-soft max-w-xl mx-auto focus-within:ring-2 focus-within:ring-primary/30 transition"
+          >
+            <Search className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+            <input
+              type="text"
+              placeholder="Cari nama barang..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              className="bg-transparent border-none outline-none flex-1 px-3 py-2.5 text-sm placeholder:text-muted-foreground"
+            />
+            <Button type="submit" className="rounded-full px-5 h-10">
+              Cari
+            </Button>
+          </motion.form>
+        </div>
+      </section>
+
+      {/* ══ MAIN ══════════════════════════════════════════ */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-10">
+        <div className="grid lg:grid-cols-12 gap-8">
+          {/* Desktop sidebar */}
+          <aside id="catalog-filter-sidebar" className="hidden lg:block lg:col-span-3">
+            <div className="sticky top-24 rounded-3xl border border-border bg-card p-6">
+              <div className="flex items-center gap-2 mb-5">
+                <SlidersHorizontal className="w-4 h-4 text-primary" />
+                <h3 className="font-semibold tracking-tight">Filter</h3>
+              </div>
+              {FilterPanel}
+            </div>
+          </aside>
+
+          {/* Items column */}
+          <div className="lg:col-span-9">
+            {/* Top bar */}
+            <div className="flex items-center justify-between gap-3 mb-6">
+              <div id="catalog-results-count" className="text-sm text-muted-foreground">
+                {loading ? (
+                  "Memuat..."
+                ) : (
+                  <>
+                    Menampilkan <span className="font-semibold text-foreground">{items.length}</span>
+                    {" "}dari <span className="font-semibold text-foreground">{total}</span> barang
+                  </>
+                )}
+              </div>
+
+              <button
+                onClick={() => setFilterOpen(true)}
+                className="lg:hidden inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border border-border text-xs font-semibold hover:border-primary hover:text-primary transition-colors"
               >
-                <motion.button
-                  whileHover={{ scale: 1.04 }}
-                  whileTap={{ scale: 0.96 }}
-                  disabled={page === 0}
-                  onClick={() => setPage(p => p - 1)}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:border-primary hover:text-primary disabled:opacity-40 disabled:cursor-not-allowed transition-colors bg-white shadow-sm"
+                <Filter className="w-3.5 h-3.5" /> Filter
+                {hasFilter && <span className="w-1.5 h-1.5 rounded-full bg-primary" />}
+              </button>
+            </div>
+
+            {/* Active filter chips */}
+            <AnimatePresence>
+              {hasFilter && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="overflow-hidden mb-5"
                 >
-                  <ArrowLeft className="w-4 h-4" /> Sebelumnya
-                </motion.button>
-                <span className="text-sm text-slate-500 font-medium px-2">
-                  {page + 1} / {Math.ceil(total / LIMIT)}
-                </span>
-                <motion.button
-                  whileHover={{ scale: 1.04 }}
-                  whileTap={{ scale: 0.96 }}
-                  disabled={(page + 1) * LIMIT >= total}
-                  onClick={() => setPage(p => p + 1)}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:border-primary hover:text-primary disabled:opacity-40 disabled:cursor-not-allowed transition-colors bg-white shadow-sm"
+                  <div className="flex items-center flex-wrap gap-2 text-sm">
+                    <span className="text-xs text-muted-foreground">Aktif:</span>
+                    {search && (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium">
+                        "{search}"
+                        <button onClick={() => { setSearch(""); setSearchInput(""); setPage(0) }} className="hover:opacity-80">
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    )}
+                    {categoryId && (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium">
+                        {categories.find(c => String(c.id) === categoryId)?.nama}
+                        <button onClick={() => { setCategoryId(""); setPage(0) }} className="hover:opacity-80">
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    )}
+                    {sortPrice && (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium">
+                        {sortPrice === "asc" ? "Termurah" : "Termahal"}
+                        <button onClick={() => { setSortPrice(""); setPage(0) }} className="hover:opacity-80">
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    )}
+                    {(priceMin || priceMax) && (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium">
+                        Harga: {priceMin || "0"} — {priceMax || "∞"}
+                        <button onClick={() => { setPriceMin(""); setPriceMax(""); setPage(0) }} className="hover:opacity-80">
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Grid */}
+            {loading ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+                {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
+              </div>
+            ) : items.length === 0 ? (
+              <EmptyState onReset={clearFilter} />
+            ) : (
+              <>
+                <motion.div
+                  id="catalog-items-grid"
+                  layout
+                  className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5"
                 >
-                  Selanjutnya <ArrowRight className="w-4 h-4" />
-                </motion.button>
-              </motion.div>
+                  <AnimatePresence mode="popLayout">
+                    {items.map((item, i) => (
+                      <ItemCard
+                        key={item.id}
+                        item={item}
+                        onRent={handleRent}
+                        index={i}
+                      />
+                    ))}
+                  </AnimatePresence>
+                </motion.div>
+
+                {/* Pagination */}
+                {total > LIMIT && (
+                  <div className="flex justify-center items-center gap-3 mt-12">
+                    <Button
+                      variant="outline"
+                      className="rounded-full"
+                      disabled={page === 0}
+                      onClick={() => setPage(p => p - 1)}
+                    >
+                      <ArrowLeft className="w-4 h-4 mr-1" /> Sebelumnya
+                    </Button>
+                    <span className="text-sm text-muted-foreground font-medium px-3">
+                      {page + 1} / {totalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      className="rounded-full"
+                      disabled={(page + 1) * LIMIT >= total}
+                      onClick={() => setPage(p => p + 1)}
+                    >
+                      Selanjutnya <ArrowRight className="w-4 h-4 ml-1" />
+                    </Button>
+                  </div>
+                )}
+              </>
             )}
-          </>
-        )}
+          </div>
+        </div>
       </main>
 
-      {/* ── FOOTER ──────────────────────────────────────── */}
-      <motion.footer
-        className="border-t bg-card mt-8 py-7"
-        initial={{ opacity: 0 }}
-        whileInView={{ opacity: 1 }}
-        viewport={{ once: true }}
-      >
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center">
-              <Package className="w-4 h-4 text-white" />
-            </div>
-            <span className="font-bold text-slate-700">Sewain</span>
-          </div>
-          <p className="text-xs text-slate-400">
-            &copy; {new Date().getFullYear()} Sewain Platform &middot; Kelompok Harahetta-2
-          </p>
-          <Link to="/" className="text-xs text-primary hover:underline font-medium">
-            Kembali ke Beranda
-          </Link>
-        </div>
-      </motion.footer>
+      {/* Mobile filter sheet */}
+      <AnimatePresence>
+        {filterOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 lg:hidden"
+          >
+            <button
+              onClick={() => setFilterOpen(false)}
+              className="absolute inset-0 bg-foreground/40 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ duration: 0.3, ease }}
+              className="absolute bottom-0 left-0 right-0 bg-background rounded-t-3xl p-6 max-h-[85vh] overflow-y-auto"
+            >
+              <div className="flex items-center justify-between mb-5">
+                <h3 className="text-lg font-bold tracking-tight">Filter</h3>
+                <button
+                  onClick={() => setFilterOpen(false)}
+                  className="w-9 h-9 rounded-full hover:bg-muted flex items-center justify-center"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              {FilterPanel}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <Footer />
+
+      {/* Tour button */}
+      <TourButton onClick={startTour} />
     </div>
   )
 }

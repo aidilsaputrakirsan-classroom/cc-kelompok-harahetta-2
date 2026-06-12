@@ -4,6 +4,7 @@ Konfigurasi test — setup database test terpisah dari database utama.
 import os
 # Force SQLite untuk testing *sebelum* import apapun yang membaca .env
 os.environ["DATABASE_URL"] = "sqlite:///./test.db"
+os.environ["EMAIL_ENABLED"] = "false"
 
 import pytest
 from fastapi.testclient import TestClient
@@ -53,14 +54,22 @@ def client(db_session):
 
 
 @pytest.fixture
-def auth_headers(client):
-    """Helper: register + login, return auth headers."""
+def auth_headers(client, db_session):
+    """Helper: register + verify email + login, return auth headers."""
+    from datetime import datetime, timezone
+    from models import User
+
     # Register — field 'nama' sesuai schema UserCreate
     client.post("/auth/register", json={
         "email": "test@example.com",
         "password": "TestPassword123",
         "nama": "Test User"
     })
+    # Tandai email sebagai verified langsung di DB (bypass email di test)
+    user = db_session.query(User).filter(User.email == "test@example.com").first()
+    user.email_verified_at = datetime.now(timezone.utc)
+    db_session.commit()
+
     # Login — OAuth2PasswordRequestForm pakai form data (username = email)
     response = client.post("/auth/login", data={
         "username": "test@example.com",

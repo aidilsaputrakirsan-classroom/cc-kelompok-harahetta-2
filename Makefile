@@ -139,6 +139,13 @@ help:
 	@echo "  make compose-restart → Restart semua services"
 	@echo "  make compose-clean   → Hapus containers, networks, volumes"
 	@echo ""
+	@echo "🔥 Development Mode (Hot-Reload):"
+	@echo "  make dev        → Jalankan semua services mode dev (hot-reload)"
+	@echo "  make dev-build  → Rebuild + jalankan mode dev"
+	@echo "  make dev-down   → Stop semua dev services"
+	@echo "  make dev-logs   → Lihat log realtime dev services"
+	@echo "  make dev-ps     → Status dev services"
+	@echo ""
 	@echo "📤 Push Commands:"
 	@echo "  make push-all  → Push backend + frontend ke Docker Hub"
 	@echo ""
@@ -240,6 +247,53 @@ compose-clean:
 	docker compose down -v
 	@echo "✅ Semua data dibersihkan!"
 
+up: compose-up
+down: compose-down
+status: compose-ps
+
+prod:
+	@echo "🚀 Menjalankan services dengan Docker Compose Production Overrides..."
+	docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+	@echo "✅ Services berjalan di environment production!"
+
+# ─────────────────────────────────────────────
+# DEVELOPMENT MODE (Hot-Reload)
+# Menggunakan docker-compose.dev.yml override
+# ─────────────────────────────────────────────
+dev:
+	@echo "🔥 Menjalankan semua services dalam mode development (hot-reload)..."
+	docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+	@echo ""
+	@echo "✅ Development services berjalan!"
+	@echo "   🌐 Frontend (Vite HMR) : http://localhost:5173"
+	@echo "   🔐 Auth Service        : http://localhost:8001"
+	@echo "   📦 Item Service        : http://localhost:8002"
+	@echo "   🏠 Rental Service      : http://localhost:8003"
+	@echo "   💳 Payment Service     : http://localhost:8004"
+	@echo "   💬 Chat Service        : http://localhost:8005"
+	@echo "   🤖 Chatbot Service     : http://localhost:8006"
+	@echo "   🔀 Gateway (Nginx)     : http://localhost:80"
+	@echo ""
+	@echo "   Perubahan kode di services/ akan langsung reload tanpa rebuild!"
+
+dev-build:
+	@echo "🔨 Rebuild development images dan jalankan services..."
+	docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build -d
+	@echo "✅ Development rebuild selesai!"
+
+dev-down:
+	@echo "⏹️  Menghentikan semua development services..."
+	docker compose -f docker-compose.yml -f docker-compose.dev.yml down
+	@echo "✅ Development services dihentikan."
+
+dev-logs:
+	@echo "📋 Menampilkan log real-time development services..."
+	docker compose -f docker-compose.yml -f docker-compose.dev.yml logs -f
+
+dev-ps:
+	@echo "📊 Status development services:"
+	docker compose -f docker-compose.yml -f docker-compose.dev.yml ps
+
 # ─────────────────────────────────────────────
 # LINT: Jalankan linter untuk backend (flake8) dan frontend (eslint)
 # ─────────────────────────────────────────────
@@ -277,4 +331,6 @@ pr-check: build fe-build test
 .PHONY: build run run-fg push stop clean logs health shell ps restart help \
         fe-build fe-push fe-run fe-stop fe-restart push-all \
         compose-up compose-down compose-build compose-logs compose-ps compose-restart compose-clean \
-        lint test pr-check
+        dev dev-build dev-down dev-logs dev-ps \
+        lint test pr-check \
+        up down status prod

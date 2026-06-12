@@ -5,17 +5,26 @@ Semua endpoint REST API sesuai implementation_plan_sewain (Modul 1-4)
 
 import os
 from dotenv import load_dotenv
-from fastapi import FastAPI, Depends, HTTPException, Query, status
+from typing import List
+from fastapi import FastAPI, Depends, HTTPException, Query, status, BackgroundTasks, Body
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from sqlalchemy.orm import joinedload
 from sqlalchemy import text
 
+from config import settings  # Konfigurasi terpusat berbasis environment
+
 from database import engine, get_db
+import chatbot
+import chat
 from models import Base, User, AdminProfile
 from schemas import (
     # Auth
     UserCreate, UserResponse, TokenResponse, UserUpdateByAdmin,
+    EmailVerifyRequest, ResendVerificationRequest, ForgotPasswordRequest, ResetPasswordRequest,
+    UserMeUpdate,
     # AdminProfile
     AdminProfileCreate, AdminProfileUpdate, AdminProfileResponse, AdminCreateRequest, AdminPaymentInfoResponse,
     # UserProfile
@@ -25,9 +34,20 @@ from schemas import (
     # Item
     ItemCreate, ItemUpdate, ItemResponse, ItemListResponse,
     # Rental
-    RentalCreate, RentalStatusUpdate, RentalResponse, RentalListResponse,
+    RentalCreate, RentalStatusUpdate, RentalResponse, RentalListResponse, PickupInfoResponse,
     # Payment
     PaymentCreate, PaymentUpdate, PaymentResponse, PaymentListResponse,
+    MidtransChargeResponse,
+    # Wallet & Withdrawal
+    WalletResponse, WithdrawalCreate, WithdrawalResponse,
+    WithdrawalListResponse, WithdrawalActionByAdmin,
+    # Review & Shop
+    ReviewCreate, ReviewUpdate, ReviewResponse, ReviewListResponse, ShopResponse,
+    # Promo
+    PromoCodeCreate, PromoCodeUpdate, PromoCodeResponse, PromoCodeListResponse,
+    PromoCodePublicResponse,
+    PromoValidateRequest, PromoValidateResponse,
+    PromoRedemptionListResponse,
 )
 from auth import (
     create_access_token, get_current_user,
@@ -35,13 +55,148 @@ from auth import (
     require_user, require_verified_user,
 )
 import crud
+import email_service
 
 # ==================== INIT ====================
 
-load_dotenv()
+load_dotenv(override=True)  # override=True agar .env selalu menimpa shell env vars
+
+# Validasi konfigurasi saat startup (log warning jika ada config tidak aman di production)
+settings.validate()
 
 # Buat semua tabel di database
 Base.metadata.create_all(bind=engine)
+
+
+def _ensure_user_photo_column() -> None:
+    """Idempotent migration: tambah kolom users.foto_profil jika belum ada.
+
+    Aman dipanggil setiap startup. Mendukung PostgreSQL & SQLite.
+    """
+    try:
+        from sqlalchemy import inspect as sa_inspect
+        insp = sa_inspect(engine)
+        if not insp.has_table("users"):
+            return
+        cols = {c["name"] for c in insp.get_columns("users")}
+        if "foto_profil" in cols:
+            return
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE users ADD COLUMN foto_profil TEXT"))
+        print("[startup] Kolom users.foto_profil berhasil ditambahkan.")
+    except Exception as exc:  # noqa: BLE001
+        print(f"[startup] Gagal menambah kolom foto_profil: {exc}")
+
+
+def _ensure_schema_migrations() -> None:
+    """
+    Idempotent migration komprehensif — pastikan SEMUA kolom baru ada di DB production.
+    Aman dipanggil setiap startup. Target: PostgreSQL.
+    Mencakup:
+    - rentals: pickup_*, diambil_at, return_requested_at, due_at
+    - payments: semua kolom Midtrans
+    - admins: latitude, longitude
+    """
+    try:
+        from sqlalchemy import inspect as sa_inspect
+        insp = sa_inspect(engine)
+        FLOAT = "DOUBLE PRECISION"
+        TS = "TIMESTAMP WITH TIME ZONE"
+
+        def _add_cols(table: str, columns: list) -> None:
+            """Helper: tambah kolom ke tabel jika belum ada."""
+            if not insp.has_table(table):
+                return
+            existing = {c["name"] for c in insp.get_columns(table)}
+            with engine.begin() as conn:
+                for col_name, col_type in columns:
+                    if col_name in existing:
+                        continue
+                    try:
+                        conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {col_name} {col_type}"))
+                        print(f"[startup] Kolom {table}.{col_name} ditambahkan.")
+                    except Exception as e:
+                        print(f"[startup] Gagal tambah {table}.{col_name}: {e}")
+
+        # ── rentals: kolom pickup snapshot & waktu
+        _add_cols("rentals", [
+            ("pickup_alamat",       "TEXT"),
+            ("pickup_latitude",     FLOAT),
+            ("pickup_longitude",    FLOAT),
+            ("pickup_nama_usaha",   "VARCHAR(100)"),
+            ("pickup_telepon",      "VARCHAR(20)"),
+            ("diambil_at",          TS),
+            ("due_at",              TS),
+            ("return_requested_at", TS),
+        ])
+
+        # ── payments: kolom Midtrans
+        _add_cols("payments", [
+            ("midtrans_order_id",       "VARCHAR(100)"),
+            ("midtrans_transaction_id", "VARCHAR(100)"),
+            ("snap_token",             "VARCHAR(255)"),
+            ("snap_redirect_url",      "TEXT"),
+            ("payment_channel",        "VARCHAR(50)"),
+            ("fraud_status",           "VARCHAR(20)"),
+            ("raw_notification",       "TEXT"),
+        ])
+
+        # ── admins: kolom koordinat lokasi usaha
+        _add_cols("admins", [
+            ("latitude",  FLOAT),
+            ("longitude", FLOAT),
+        ])
+
+        print("[startup] _ensure_schema_migrations selesai.")
+    except Exception as exc:  # noqa: BLE001
+        print(f"[startup] Gagal _ensure_schema_migrations: {exc}")
+
+
+def _ensure_promo_tables_and_columns() -> None:
+    """
+    Idempotent migration untuk fitur promo/diskon. Target: PostgreSQL.
+    """
+    try:
+        from sqlalchemy import inspect as sa_inspect
+        from datetime import datetime, timedelta
+
+        FLOAT_TYPE = "DOUBLE PRECISION"
+        BOOL_TRUE = "TRUE"
+
+        insp = sa_inspect(engine)
+        if insp.has_table("rentals"):
+            rcols = {c["name"] for c in insp.get_columns("rentals")}
+            new_cols = [("promo_code_id", "INTEGER"), ("discount_amount", FLOAT_TYPE), ("original_amount", FLOAT_TYPE)]
+            with engine.begin() as conn:
+                for col_name, col_type in new_cols:
+                    if col_name not in rcols:
+                        conn.execute(text(f"ALTER TABLE rentals ADD COLUMN {col_name} {col_type}"))
+
+        Base.metadata.create_all(bind=engine)
+
+        with engine.begin() as conn:
+            existing = conn.execute(text("SELECT id FROM promo_codes WHERE UPPER(code) = 'WELCOME50'")).first()
+            if not existing:
+                valid_until = datetime.utcnow() + timedelta(days=365)
+                conn.execute(
+                    text(f"""
+                        INSERT INTO promo_codes (
+                            code, nama, deskripsi, discount_type, discount_value, max_discount, min_order,
+                            eligibility, max_uses_per_user, max_total_uses, used_count, is_active, is_featured, valid_until
+                        ) VALUES (
+                            'WELCOME50', 'Promo Pengguna Baru', 'Diskon 50% untuk transaksi pertama.',
+                            'percentage', 50, 50000, 0, 'new_user', 1, NULL, 0,
+                            {BOOL_TRUE}, {BOOL_TRUE}, :valid_until
+                        )
+                    """), {"valid_until": valid_until},
+                )
+    except Exception as exc:
+        print(f"[startup] Gagal migrate promo: {exc}")
+
+
+_ensure_user_photo_column()
+_ensure_schema_migrations()
+_ensure_promo_tables_and_columns()
 
 # ==================== APP INSTANCE ====================
 
@@ -49,6 +204,7 @@ app = FastAPI(
     title="Sewain API",
     description="Platform Sewa Barang Online. Gunakan POST /auth/login untuk login dan dapatkan token.",
     version="1.0.0",
+    root_path="/api",  # Beritahu FastAPI bahwa dia di-deploy di belakang nginx proxy dengan prefix /api
     openapi_tags=[
         {"name": "🔐 Auth", "description": "Login & Token Management"},
         {"name": "👑 Super Admin", "description": "Super Admin Functions"},
@@ -56,24 +212,55 @@ app = FastAPI(
         {"name": "👤 User", "description": "User/Penyewa Functions"},
         {"name": "📦 Items", "description": "Barang Sewa Management"},
         {"name": "📋 Rentals", "description": "Transaksi Penyewaan"},
-        {"name": "� Payments — Pembayaran", "description": "Pembayaran Penyewaan"},
-        {"name": "�📂 Categories", "description": "Kategori Barang"},
+        {"name": "💳 Payments — Pembayaran", "description": "Pembayaran Penyewaan"},
+        {"name": "📂 Categories", "description": "Kategori Barang"},
+        {"name": "🤖 Chatbot AI", "description": "Chatbot AI Sewain"},
+        {"name": "💬 Chat", "description": "Chat User ↔ Admin"},
         {"name": "ℹ️ Info", "description": "Platform Information"},
     ]
 )
 
 # ==================== CORS ====================
-
-allowed_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:5173")
-origins_list = [origin.strip() for origin in allowed_origins.split(",")]
+# Dibaca dari settings (config.py) — otomatis beda antara dev dan production
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins_list,
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# ==================== OPENAPI 3.0.3 OVERRIDE ====================
+# FastAPI 0.100+ default ke OpenAPI 3.1.0 tapi Swagger UI di server
+# hanya support 3.0.x — override schema secara manual.
+from fastapi.openapi.utils import get_openapi
+
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+    schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        description=app.description,
+        routes=app.routes,
+        tags=app.openapi_tags,
+    )
+    schema["openapi"] = "3.0.3"  # Paksa versi 3.0.3
+    app.openapi_schema = schema
+    return app.openapi_schema
+
+app.openapi = custom_openapi
+
+
+# Daftarkan Router Chatbot
+app.include_router(chatbot.router)
+
+# Daftarkan Router Chat (User ↔ Admin)
+app.include_router(chat.router)
+
+
 
 
 # ============================================================
@@ -128,6 +315,21 @@ def team_info():
     }
 
 
+@app.get("/stats/public", tags=["ℹ️ Info"], summary="Statistik publik platform")
+def public_stats(db: Session = Depends(get_db)):
+    """
+    Statistik publik: jumlah pengguna aktif (role=user, is_active=True, email terverifikasi).
+    Tidak perlu login.
+    """
+    from models import UserRole
+    active_users = db.query(User).filter(
+        User.role == UserRole.user,
+        User.is_active == True,
+        User.email_verified_at.isnot(None),
+    ).count()
+    return {"active_users": active_users}
+
+
 # ============================================================
 # AUTH ENDPOINTS (PUBLIC)
 # ============================================================
@@ -139,7 +341,7 @@ def team_info():
     tags=["🔐 Auth"],
     summary="Daftar akun baru (hanya untuk Penyewa)",
 )
-def register(user_data: UserCreate, db: Session = Depends(get_db)):
+def register(user_data: UserCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     """
     Registrasi akun baru di Sewain sebagai **Penyewa** (role: user).
 
@@ -148,14 +350,24 @@ def register(user_data: UserCreate, db: Session = Depends(get_db)):
     - **Admin** (penyedia barang) dibuat oleh Super Admin via `POST /superadmin/admins`
     - **Super Admin** dibuat manual oleh developer/database seeder
 
-    Setelah registrasi, user perlu melengkapi profil dan upload KTP untuk diverifikasi.
+    Setelah registrasi, user harus verifikasi email sebelum bisa login.
     """
     user = crud.create_user(db=db, user_data=user_data)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email sudah terdaftar. Gunakan email lain atau login.",
+            detail="Email sudah terdaftar dan terverifikasi. Silakan login atau gunakan fitur lupa password.",
         )
+
+    # Kirim email verifikasi di background
+    token = email_service.create_verification_token(user.id)
+    background_tasks.add_task(
+        email_service.send_verification_email,
+        user.email,
+        user.nama,
+        token,
+    )
+
     return user
 
 
@@ -191,6 +403,12 @@ def login(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Akun Anda dinonaktifkan. Hubungi administrator.",
         )
+    # Cek email sudah diverifikasi (admin & super_admin bypass)
+    if user.role == "user" and not user.email_verified_at:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Email belum diverifikasi. Silakan cek inbox email Anda untuk link verifikasi.",
+        )
 
     token = create_access_token(data={"sub": str(user.id)})
     return {"access_token": token, "token_type": "bearer", "user": user}
@@ -205,6 +423,191 @@ def login(
 def get_me(current_user: User = Depends(get_current_user)):
     """Ambil data profil user yang sedang login berdasarkan JWT token."""
     return current_user
+
+
+@app.put(
+    "/auth/me",
+    response_model=UserResponse,
+    tags=["🔐 Auth"],
+    summary="Update data akun saya (nama / foto profil)",
+)
+def update_me(
+    data: UserMeUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Endpoint umum untuk semua role mengubah data ringan miliknya sendiri:
+    - `nama`: nama tampilan
+    - `foto_profil`: data URL / URL gambar (boleh string kosong untuk hapus)
+
+    Untuk batas ukuran: validasi dilakukan di sisi klien (kompresi sebelum upload).
+    """
+    payload = data.model_dump(exclude_unset=True)
+
+    if "nama" in payload:
+        nama = (payload["nama"] or "").strip()
+        if len(nama) < 2:
+            raise HTTPException(status_code=422, detail="Nama minimal 2 karakter")
+        current_user.nama = nama
+
+    if "foto_profil" in payload:
+        foto = payload["foto_profil"]
+        if foto is None or foto == "":
+            current_user.foto_profil = None
+        else:
+            # Batas ukuran payload (sekitar 4 MB base64 → ~3 MB raw)
+            if isinstance(foto, str) and len(foto) > 5_500_000:
+                raise HTTPException(
+                    status_code=413,
+                    detail="Foto terlalu besar. Mohon kompres ke ukuran lebih kecil.",
+                )
+            current_user.foto_profil = foto
+
+    db.commit()
+    db.refresh(current_user)
+    return current_user
+
+
+# ============================================================
+# EMAIL VERIFICATION & PASSWORD RESET ENDPOINTS
+# ============================================================
+
+@app.post(
+    "/auth/verify-email",
+    tags=["🔐 Auth"],
+    summary="Verifikasi email dengan token dari link",
+)
+def verify_email(data: EmailVerifyRequest, db: Session = Depends(get_db)):
+    """
+    Verifikasi email user menggunakan token yang dikirim via email.
+    Token valid selama 24 jam setelah registrasi.
+    """
+    payload = email_service.decode_email_token(data.token, "verify_email")
+    if not payload:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Token verifikasi tidak valid atau sudah expired. Silakan minta kirim ulang.",
+        )
+
+    user_id = int(payload["sub"])
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User tidak ditemukan.")
+
+    if user.email_verified_at:
+        return {"message": "Email sudah diverifikasi sebelumnya. Silakan login."}
+
+    from datetime import datetime, timezone
+    user.email_verified_at = datetime.now(timezone.utc)
+    db.commit()
+
+    return {"message": "Email berhasil diverifikasi! Silakan login."}
+
+
+@app.post(
+    "/auth/resend-verification",
+    tags=["🔐 Auth"],
+    summary="Kirim ulang email verifikasi",
+)
+def resend_verification(
+    data: ResendVerificationRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
+    """
+    Kirim ulang email verifikasi ke alamat email yang terdaftar.
+    Untuk keamanan, selalu return sukses meskipun email tidak ditemukan.
+    """
+    user = db.query(User).filter(User.email == data.email).first()
+
+    if user and not user.email_verified_at:
+        token = email_service.create_verification_token(user.id)
+        background_tasks.add_task(
+            email_service.send_verification_email,
+            user.email,
+            user.nama,
+            token,
+        )
+
+    # Selalu return sukses (security: jangan bocorkan info email terdaftar atau tidak)
+    return {"message": "Jika email terdaftar, link verifikasi telah dikirim. Cek inbox Anda."}
+
+
+@app.post(
+    "/auth/forgot-password",
+    tags=["🔐 Auth"],
+    summary="Request reset password via email",
+)
+def forgot_password(
+    data: ForgotPasswordRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
+    """
+    Kirim link reset password ke email user.
+    Untuk keamanan, selalu return sukses meskipun email tidak ditemukan.
+    """
+    user = db.query(User).filter(User.email == data.email).first()
+
+    if user and user.is_active:
+        token = email_service.create_reset_password_token(user.id)
+        background_tasks.add_task(
+            email_service.send_reset_password_email,
+            user.email,
+            user.nama,
+            token,
+        )
+
+    return {"message": "Jika email terdaftar, link reset password telah dikirim. Cek inbox Anda."}
+
+
+@app.post(
+    "/auth/reset-password",
+    tags=["🔐 Auth"],
+    summary="Reset password dengan token dari email",
+)
+def reset_password(data: ResetPasswordRequest, db: Session = Depends(get_db)):
+    """
+    Reset password menggunakan token yang dikirim via email.
+    Token valid selama 1 jam dan hanya bisa dipakai sekali.
+    """
+    payload = email_service.decode_email_token(data.token, "reset_password")
+    if not payload:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Token reset password tidak valid atau sudah expired. Silakan request ulang.",
+        )
+
+    user_id = int(payload["sub"])
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User tidak ditemukan.")
+
+    if not user.is_active:
+        raise HTTPException(status_code=403, detail="Akun tidak aktif.")
+
+    # Cek token belum dipakai: iat harus >= password_changed_at
+    from datetime import datetime, timezone
+    token_iat = datetime.fromtimestamp(payload["iat"], tz=timezone.utc)
+    if user.password_changed_at and token_iat < user.password_changed_at:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Token sudah tidak berlaku. Password sudah pernah diubah setelah token ini dibuat.",
+        )
+
+    # Update password
+    from auth import hash_password
+    user.hashed_password = hash_password(data.new_password)
+    user.password_changed_at = datetime.now(timezone.utc)
+
+    # Jika user belum verifikasi email, otomatis verifikasi (karena sudah buktikan akses email)
+    if not user.email_verified_at:
+        user.email_verified_at = datetime.now(timezone.utc)
+
+    db.commit()
+
+    return {"message": "Password berhasil direset! Silakan login dengan password baru."}
 
 
 # ============================================================
@@ -445,9 +848,11 @@ def update_my_admin_profile(
     current_user: User = Depends(require_admin),
 ):
     """Admin mengupdate profil usahanya."""
+    print(f"[DEBUG] PUT /admin/profile — lat={data.latitude}, lng={data.longitude}, alamat={data.alamat_usaha}")
     updated = crud.update_admin_profile(db=db, user_id=current_user.id, data=data)
     if not updated:
         raise HTTPException(status_code=404, detail="Profil usaha belum dibuat")
+    print(f"[DEBUG] DB setelah update — lat={updated.latitude}, lng={updated.longitude}")
     return updated
 
 
@@ -465,15 +870,20 @@ def get_admin_payment_info(
     Mengambil info pembayaran penyedia barang (publik).
     Digunakan user untuk melihat nomor rekening & QRIS saat akan membayar.
     """
-    profile = db.query(AdminProfile).filter(AdminProfile.id == admin_id).first()
+    profile = (
+        db.query(AdminProfile)
+        .options(joinedload(AdminProfile.user))
+        .filter(AdminProfile.id == admin_id)
+        .first()
+    )
     if not profile:
         raise HTTPException(status_code=404, detail=f"Admin ID {admin_id} tidak ditemukan")
     return AdminPaymentInfoResponse(
         admin_id=profile.id,
         nama_usaha=profile.nama_usaha,
-        nomor_rekening=profile.nomor_rekening,
-        foto_qris=profile.foto_qris,
         nomor_telepon=profile.nomor_telepon,
+        alamat_usaha=profile.alamat_usaha,
+        foto_profil=(profile.user.foto_profil if profile.user else None),
     )
 
 
@@ -646,6 +1056,10 @@ def list_items(
     category_id: int = Query(None, description="Filter by ID kategori"),
     category: str = Query(None, description="Filter by nama kategori, contoh: electronics"),
     item_status: str = Query(None, alias="status", description="Filter: available | rented | unavailable"),
+    city: str = Query(None, description="Filter by kota dari alamat usaha admin, contoh: Balikpapan"),
+    sort_price: str = Query(None, description="Sort harga: asc (termurah) | desc (termahal)"),
+    price_min: float = Query(None, description="Harga minimum per hari"),
+    price_max: float = Query(None, description="Harga maksimum per hari"),
     db: Session = Depends(get_db),
 ):
     """
@@ -658,8 +1072,17 @@ def list_items(
     - `category_id`: Filter berdasarkan ID kategori
     - `category`: Filter berdasarkan nama kategori (contoh: `electronics`, `outdoor`)
     - `status`: Filter berdasarkan ketersediaan (available, rented, unavailable)
+    - `city`: Filter berdasarkan kota lokasi usaha admin (contoh: `Balikpapan`)
+    - `sort_price`: Urutkan harga (asc = termurah, desc = termahal)
+    - `price_min`: Harga minimum per hari
+    - `price_max`: Harga maksimum per hari
     - `skip` & `limit`: Pagination
     """
+    # Katalog publik: default hanya tampilkan barang available
+    # (barang unavailable/rented tidak muncul di katalog user)
+    if not item_status:
+        item_status = "available"
+
     return crud.get_items(
         db=db,
         skip=skip,
@@ -668,6 +1091,10 @@ def list_items(
         category_id=category_id,
         category=category,
         status=item_status,
+        city=city,
+        sort_price=sort_price,
+        price_min=price_min,
+        price_max=price_max,
     )
 
 
@@ -732,6 +1159,7 @@ def create_item(
     Admin menambah barang baru yang akan disewakan.
 
     > ⚠️ Admin harus sudah memiliki profil usaha (`POST /admin/profile`) sebelum bisa menambah barang.
+    > ⚠️ Admin harus sudah mengisi **alamat usaha dan koordinat** (latitude/longitude) di profil.
     """
     # Dapatkan admin_profile dari user yang login
     admin_profile = crud.get_admin_profile(db=db, user_id=current_user.id)
@@ -739,6 +1167,12 @@ def create_item(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Buat profil usaha terlebih dahulu di POST /admin/profile",
+        )
+    # Guard: validasi alamat + koordinat wajib sebelum bisa posting barang
+    if not admin_profile.alamat_usaha or not admin_profile.latitude or not admin_profile.longitude:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Lengkapi alamat usaha dan titik koordinat di profil terlebih dahulu sebelum menambah barang.",
         )
     return crud.create_item(db=db, admin_id=admin_profile.id, data=data)
 
@@ -784,7 +1218,7 @@ def delete_item(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin),
 ):
-    """Admin menghapus barang dari katalog."""
+    """Admin menghapus/menonaktifkan barang dari katalog."""
     from models import UserRole as UR
     if current_user.role == UR.super_admin:
         success = crud.delete_item_superadmin(db=db, item_id=item_id)
@@ -1027,6 +1461,210 @@ def update_rental_status(
         )
     
     return updated
+
+
+# ──────────────────────────────────────────────────────────────
+# PICKUP INFO & KONFIRMASI PENGAMBILAN
+# ──────────────────────────────────────────────────────────────
+
+@app.get(
+    "/rentals/{rental_id}/pickup",
+    response_model=PickupInfoResponse,
+    tags=["📋 Rentals — Penyewaan"],
+    summary="[User] Info lokasi pengambilan barang",
+)
+def get_rental_pickup_info(
+    rental_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """
+    User melihat info lokasi pickup setelah pembayaran dikonfirmasi.
+
+    Menampilkan:
+    - Alamat teks usaha admin (snapshot saat rental disetujui, atau profil admin saat ini sebagai fallback)
+    - Koordinat latitude/longitude untuk tampil di peta
+    - Nama usaha + nomor telepon admin
+    - Tanggal mulai & selesai sewa
+
+    **Catatan:** Endpoint ini hanya tersedia setelah status rental `sedang_disewa`.
+    """
+    from models import UserRole as UR, RentalStatus as RS
+    rental = crud.get_rental(db=db, rental_id=rental_id)
+    if not rental:
+        raise HTTPException(status_code=404, detail=f"Rental ID {rental_id} tidak ditemukan")
+
+    # User hanya bisa lihat rental miliknya
+    if current_user.role == UR.user and rental.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Anda tidak punya akses ke transaksi ini")
+
+    # Pickup info hanya tersedia saat sedang_disewa, selesai,
+    # atau disetujui dengan payment sudah completed
+    from models import Payment as PaymentModel
+    allowed = rental.status in [RS.sedang_disewa, RS.selesai]
+    if not allowed and rental.status == RS.disetujui:
+        # Cek apakah payment sudah completed
+        pay = db.query(PaymentModel).filter(
+            PaymentModel.rental_id == rental_id,
+            PaymentModel.status == "completed",
+        ).first()
+        allowed = pay is not None
+
+    if not allowed:
+        raise HTTPException(
+            status_code=400,
+            detail="Info pickup hanya tersedia setelah pembayaran dikonfirmasi (status: sedang_disewa)",
+        )
+
+    # ── Strategi sumber data:
+    # - disetujui / sedang_disewa → SELALU pakai profil admin terkini (bisa berubah)
+    # - selesai → pakai snapshot (histori, tidak boleh berubah)
+    from models import RentalStatus as RS2
+
+    admin_profile = None
+    if rental.item and rental.item.admin_id:
+        admin_profile = crud.get_admin_profile_by_id(db=db, admin_id=rental.item.admin_id)
+
+    if rental.status in [RS.disetujui, RS.sedang_disewa] and admin_profile:
+        # Rental belum selesai: PAKAI profil admin terkini
+        pickup_lat = admin_profile.latitude
+        pickup_lng = admin_profile.longitude
+        pickup_alamat = admin_profile.alamat_usaha
+        pickup_nama_usaha = admin_profile.nama_usaha
+        pickup_telepon = admin_profile.nomor_telepon
+    else:
+        # Rental selesai: pakai snapshot (data histori saat transaksi)
+        pickup_lat = rental.pickup_latitude
+        pickup_lng = rental.pickup_longitude
+        pickup_alamat = rental.pickup_alamat
+        pickup_nama_usaha = rental.pickup_nama_usaha
+        pickup_telepon = rental.pickup_telepon
+
+        # Fallback ke profil admin jika snapshot kosong
+        if (not pickup_lat or not pickup_lng) and admin_profile:
+            pickup_lat = admin_profile.latitude
+            pickup_lng = admin_profile.longitude
+            pickup_alamat = pickup_alamat or admin_profile.alamat_usaha
+            pickup_nama_usaha = pickup_nama_usaha or admin_profile.nama_usaha
+            pickup_telepon = pickup_telepon or admin_profile.nomor_telepon
+
+    if not pickup_lat or not pickup_lng:
+        raise HTTPException(
+            status_code=404,
+            detail="Koordinat pickup tidak ditemukan. Admin belum mengisi koordinat lokasi usaha.",
+        )
+
+    return {
+        "rental_id": rental.id,
+        "pickup_alamat": pickup_alamat or "",
+        "pickup_latitude": pickup_lat,
+        "pickup_longitude": pickup_lng,
+        "pickup_nama_usaha": pickup_nama_usaha or "",
+        "pickup_telepon": pickup_telepon,
+        "tanggal_mulai": rental.tanggal_mulai,
+        "tanggal_selesai": rental.tanggal_selesai,
+        "item_nama": rental.item.nama if rental.item else "Unknown",
+    }
+
+
+@app.put(
+    "/rentals/{rental_id}/confirm-pickup",
+    tags=["📋 Rentals — Penyewaan"],
+    summary="[Admin] Konfirmasi barang sudah diambil penyewa",
+)
+def confirm_pickup(
+    rental_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    """
+    Admin mengonfirmasi bahwa barang sudah diambil oleh penyewa.
+
+    Menyimpan timestamp `diambil_at` sebagai bukti serah terima digital.
+    Status rental harus `sedang_disewa` sebelum bisa konfirmasi.
+    """
+    from models import RentalStatus as RS
+    from datetime import datetime as dt, timedelta, timezone as tz
+
+    rental = crud.get_rental(db=db, rental_id=rental_id)
+    if not rental:
+        raise HTTPException(status_code=404, detail=f"Rental ID {rental_id} tidak ditemukan")
+
+    if rental.status != RS.sedang_disewa:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Status rental harus 'sedang_disewa', saat ini: '{rental.status.value}'",
+        )
+
+    # Ambil rental langsung dari DB untuk update
+    from models import Rental as RentalModel
+    db_rental = db.query(RentalModel).filter(RentalModel.id == rental_id).first()
+
+    now = dt.now(tz.utc)
+    durasi_hari = max(1, (db_rental.tanggal_selesai - db_rental.tanggal_mulai).days)
+
+    db_rental.diambil_at = now
+    db_rental.due_at = now + timedelta(days=durasi_hari)
+
+    db.commit()
+    db.refresh(db_rental)
+
+    return {
+        "message": "Pengambilan barang berhasil dikonfirmasi",
+        "rental_id": rental_id,
+        "diambil_at": db_rental.diambil_at,
+        "due_at": db_rental.due_at,
+        "durasi_hari": durasi_hari,
+    }
+
+
+@app.post(
+    "/rentals/{rental_id}/request-return",
+    tags=["📋 Rentals — Penyewaan"],
+    summary="[User] Request pengembalian barang",
+)
+def request_return(
+    rental_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """
+    User memberitahu admin bahwa barang sudah dikembalikan.
+
+    Hanya menandai timestamp `return_requested_at`. Admin yang akan finalisasi
+    status menjadi `selesai` setelah memverifikasi barang fisik diterima.
+    """
+    from models import RentalStatus as RS, Rental as RentalModel
+    from datetime import datetime as dt
+
+    rental = db.query(RentalModel).filter(RentalModel.id == rental_id).first()
+    if not rental:
+        raise HTTPException(status_code=404, detail=f"Rental ID {rental_id} tidak ditemukan")
+
+    if rental.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Rental ini bukan milik Anda")
+
+    if rental.status != RS.sedang_disewa:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Hanya rental dengan status 'sedang_disewa' yang bisa di-request pengembalian. Status saat ini: '{rental.status.value}'",
+        )
+
+    if rental.return_requested_at:
+        raise HTTPException(
+            status_code=400,
+            detail="Pengembalian sudah pernah di-request. Tunggu konfirmasi admin.",
+        )
+
+    rental.return_requested_at = dt.now()
+    db.commit()
+    db.refresh(rental)
+
+    return {
+        "message": "Permintaan pengembalian berhasil dikirim. Tunggu konfirmasi admin.",
+        "rental_id": rental_id,
+        "return_requested_at": rental.return_requested_at,
+    }
 
 
 # ============================================================
@@ -1312,3 +1950,831 @@ def platform_payment_stats(
     }
 
 #penambahan sesuatu yang baru yaitu fitur statistik pembayaran untuk super admin
+
+
+
+# ============================================================
+# MIDTRANS PAYMENT GATEWAY
+# ============================================================
+
+from fastapi import Request  # lokal biar tidak mengganggu import atas
+
+import midtrans_service
+
+
+class MidtransNotificationPayload(BaseModel):
+    """Skema longgar untuk payload webhook Midtrans (banyak field opsional)."""
+    order_id: str
+    transaction_status: str
+    status_code: str
+    gross_amount: str
+    signature_key: str
+    transaction_id: str | None = None
+    payment_type: str | None = None
+    fraud_status: str | None = None
+    transaction_time: str | None = None
+
+    class Config:
+        extra = "allow"
+
+
+@app.post(
+    "/payments/rentals/{rental_id}/charge",
+    response_model=MidtransChargeResponse,
+    tags=["💳 Payments — Pembayaran"],
+    summary="[User] Generate Snap token Midtrans untuk rental yang sudah disetujui",
+)
+def create_midtrans_charge(
+    rental_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_verified_user),
+):
+    """
+    Flow:
+    1. Admin sudah menyetujui rental (status = disetujui)
+    2. User hit endpoint ini → backend panggil Midtrans Snap API
+    3. Backend simpan order_id & snap_token ke Payment row
+    4. Frontend buka popup Snap pakai token yang dikembalikan
+
+    Endpoint ini idempoten: kalau sudah ada snap_token yang masih fresh
+    (< 20 jam), token lama akan digunakan kembali agar user tidak
+    kena double-charge.
+    """
+    result = crud.create_or_get_snap_charge(
+        db=db,
+        rental_id=rental_id,
+        user_id=current_user.id,
+    )
+    if result is None:
+        raise HTTPException(status_code=404, detail="Rental tidak ditemukan")
+    if "error" in result:
+        raise HTTPException(status_code=result["code"], detail=result["error"])
+
+    payment = result["payment"]
+    return MidtransChargeResponse(
+        payment_id=payment.id,
+        rental_id=payment.rental_id,
+        order_id=result["order_id"],
+        snap_token=result["snap_token"],
+        snap_redirect_url=result["redirect_url"],
+        client_key=midtrans_service.get_client_key(),
+        jumlah=payment.jumlah,
+        status=payment.status.value,
+    )
+
+
+@app.post(
+    "/payments/rentals/{rental_id}/charge-direct",
+    tags=["💳 Payments — Pembayaran"],
+    summary="[User] Charge langsung via Midtrans Core API (tanpa popup Snap)",
+)
+def create_direct_charge(
+    rental_id: int,
+    body: dict = Body(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_verified_user),
+):
+    """
+    Charge langsung ke Midtrans Core API dengan metode pembayaran spesifik.
+
+    Body JSON:
+      - payment_type: "qris" | "bank_transfer" | "gopay" | "shopeepay"
+      - bank: (opsional, untuk bank_transfer) "bca" | "bni" | "bri" | "mandiri" | "permata"
+
+    Response berisi info pembayaran (VA number, QR URL, deeplink, dll).
+    """
+    from models import Rental, Payment, Item, UserProfile
+    from models import RentalStatus, PaymentStatus, PaymentMethod
+
+    payment_type = body.get("payment_type")
+    bank = body.get("bank")
+
+    if not payment_type:
+        raise HTTPException(status_code=400, detail="payment_type wajib diisi")
+
+    valid_types = ["qris", "bank_transfer", "gopay", "shopeepay"]
+    if payment_type not in valid_types:
+        raise HTTPException(status_code=400, detail=f"payment_type harus salah satu dari: {valid_types}")
+
+    if payment_type == "bank_transfer" and not bank:
+        raise HTTPException(status_code=400, detail="bank wajib diisi untuk bank_transfer (bca/bni/bri/mandiri/permata)")
+
+    # Validasi rental
+    rental = db.query(Rental).filter(Rental.id == rental_id).first()
+    if not rental:
+        raise HTTPException(status_code=404, detail="Rental tidak ditemukan")
+    if rental.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Rental ini bukan milik Anda")
+    if rental.status != RentalStatus.disetujui:
+        raise HTTPException(status_code=400, detail="Rental belum disetujui admin")
+
+    # Cek batas waktu pembayaran 24 jam
+    from datetime import datetime as dt_cls, timezone as tz_cls
+    if rental.payment_deadline and dt_cls.now(tz_cls.utc) > rental.payment_deadline:
+        # Auto-cancel
+        rental.status = RentalStatus.ditolak
+        item_check = db.query(Item).filter(Item.id == rental.item_id).first()
+        if item_check:
+            item_check.stok += 1
+        pending_pay = db.query(Payment).filter(Payment.rental_id == rental_id, Payment.status == PaymentStatus.pending).first()
+        if pending_pay:
+            pending_pay.status = PaymentStatus.failed
+            pending_pay.catatan = "Expired — batas waktu pembayaran 24 jam terlampaui"
+        db.commit()
+        raise HTTPException(status_code=400, detail="Batas waktu pembayaran (24 jam) telah terlampaui. Silakan buat pesanan baru.")
+
+    # Ambil/buat payment
+    payment = db.query(Payment).filter(Payment.rental_id == rental_id).first()
+    if not payment:
+        item_for_admin = db.query(Item).filter(Item.id == rental.item_id).first()
+        if not item_for_admin:
+            raise HTTPException(status_code=404, detail="Item tidak ditemukan")
+        payment = Payment(
+            rental_id=rental_id,
+            user_id=rental.user_id,
+            admin_id=item_for_admin.admin_id,
+            jumlah=rental.total_harga,
+            metode_pembayaran=PaymentMethod.midtrans,
+            status=PaymentStatus.pending,
+        )
+        db.add(payment)
+        db.commit()
+        db.refresh(payment)
+
+    if payment.status == PaymentStatus.completed:
+        raise HTTPException(status_code=400, detail="Pembayaran sudah lunas")
+
+    # Generate order_id baru
+    order_id = midtrans_service.build_order_id(rental_id)
+
+    # Ambil data item & user
+    item = db.query(Item).filter(Item.id == rental.item_id).first()
+    user_profile = db.query(UserProfile).filter(UserProfile.user_id == rental.user_id).first()
+    phone = user_profile.nomor_telepon if user_profile else None
+
+    try:
+        response = midtrans_service.create_core_charge(
+            order_id=order_id,
+            gross_amount=int(round(rental.total_harga)),
+            payment_type=payment_type,
+            item_name=(item.nama if item else f"Sewa #{rental_id}"),
+            customer_name=current_user.nama,
+            customer_email=current_user.email,
+            customer_phone=phone,
+            bank=bank,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Gagal charge Midtrans: {e}")
+
+    # Update payment record
+    payment.midtrans_order_id = order_id
+    payment.metode_pembayaran = PaymentMethod.midtrans
+    payment.status = PaymentStatus.pending
+
+    # Set expiry 30 menit dari sekarang
+    from datetime import datetime, timezone, timedelta
+    payment.expires_at = datetime.now(timezone.utc) + timedelta(minutes=30)
+
+    # Simpan response Midtrans (VA number, QR URL, dll) untuk ditampilkan ulang
+    import json
+    payment.charge_response = json.dumps(response)
+
+    # Simpan payment_channel
+    channel = payment_type
+    if payment_type == "bank_transfer":
+        channel = f"{bank}_va"
+    elif payment_type == "echannel":
+        channel = "mandiri_bill"
+    payment.payment_channel = channel
+
+    db.commit()
+    db.refresh(payment)
+
+    return {
+        "payment_id": payment.id,
+        "order_id": order_id,
+        "payment_type": payment_type,
+        "status": response.get("transaction_status", "pending"),
+        "midtrans_response": response,
+    }
+
+
+@app.post(
+    "/payments/midtrans/notification",
+    tags=["💳 Payments — Pembayaran"],
+    summary="[Midtrans Webhook] Terima notifikasi status pembayaran",
+    include_in_schema=True,
+)
+async def midtrans_notification(request: Request, db: Session = Depends(get_db)):
+    """
+    Endpoint webhook untuk Midtrans. **Tidak memerlukan JWT** — proteksi
+    dilakukan via verifikasi signature SHA512.
+
+    Signature formula:
+        SHA512(order_id + status_code + gross_amount + SERVER_KEY)
+
+    Pasang URL endpoint ini di Midtrans Dashboard
+    → Settings → Configuration → Payment Notification URL.
+
+    Untuk testing lokal, gunakan ngrok:
+        ngrok http 8000
+        → https://xxxxx.ngrok.io/payments/midtrans/notification
+    """
+    try:
+        payload = await request.json()
+    except Exception:  # noqa: BLE001
+        raise HTTPException(status_code=400, detail="Payload JSON tidak valid")
+
+    order_id = payload.get("order_id")
+    status_code = payload.get("status_code")
+    gross_amount = payload.get("gross_amount")
+    signature_key = payload.get("signature_key")
+
+    if not all([order_id, status_code, gross_amount, signature_key]):
+        raise HTTPException(
+            status_code=400,
+            detail="Payload tidak lengkap (order_id/status_code/gross_amount/signature_key wajib)",
+        )
+
+    # Verifikasi signature — tolak kalau tidak cocok
+    if not midtrans_service.verify_signature(
+        order_id=order_id,
+        status_code=status_code,
+        gross_amount=gross_amount,
+        signature_key=signature_key,
+    ):
+        raise HTTPException(status_code=403, detail="Signature Midtrans tidak valid")
+
+    result = crud.apply_midtrans_notification(db=db, notification=payload)
+    if not result.get("ok"):
+        # Tetap kembalikan 200 agar Midtrans tidak retry berulang untuk
+        # order_id yang memang tidak kita kenali, tapi catat reason-nya.
+        return {"status": "ignored", "reason": result.get("reason")}
+
+    return {
+        "status": "ok",
+        "payment_id": result["payment_id"],
+        "payment_status": result["new_status"],
+    }
+
+
+@app.post(
+    "/payments/{payment_id}/sync",
+    response_model=PaymentResponse,
+    tags=["💳 Payments — Pembayaran"],
+    summary="[User/Admin] Sinkronkan status pembayaran dari Midtrans",
+)
+def sync_payment_status(
+    payment_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """
+    Fallback kalau webhook Midtrans tidak sampai (ngrok mati, firewall, dsb).
+    Endpoint ini menarik status terbaru langsung dari Midtrans Core API.
+
+    Akses:
+    - User: hanya payment miliknya
+    - Admin: hanya payment untuk barangnya
+    - Super admin: semua
+    """
+    from models import UserRole as UR
+
+    payment = crud.get_payment(db=db, payment_id=payment_id)
+    if not payment:
+        raise HTTPException(status_code=404, detail=f"Payment ID {payment_id} tidak ditemukan")
+
+    # Access control
+    if current_user.role == UR.user and payment.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Anda tidak punya akses ke pembayaran ini")
+    if current_user.role == UR.admin:
+        admin_profile = crud.get_admin_profile(db=db, user_id=current_user.id)
+        if not admin_profile or payment.admin_id != admin_profile.id:
+            raise HTTPException(status_code=403, detail="Pembayaran ini bukan untuk barang Anda")
+
+    result = crud.sync_payment_from_midtrans(db=db, payment_id=payment_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"Payment ID {payment_id} tidak ditemukan")
+    if isinstance(result, dict) and "error" in result:
+        raise HTTPException(status_code=result["code"], detail=result["error"])
+    return result
+
+
+@app.get(
+    "/payments/config/public",
+    tags=["💳 Payments — Pembayaran"],
+    summary="Info konfigurasi publik Midtrans (client key)",
+)
+def midtrans_public_config():
+    """
+    Endpoint publik untuk frontend mengambil `client_key` Midtrans tanpa
+    perlu hardcode. Tidak mengembalikan server_key.
+    """
+    return {
+        "client_key": midtrans_service.get_client_key(),
+        "is_production": midtrans_service.is_production(),
+    }
+
+
+
+# ============================================================
+# WALLET & WITHDRAWAL — Saldo & Penarikan Admin
+# ============================================================
+
+@app.get(
+    "/admin/wallet",
+    response_model=WalletResponse,
+    tags=["💰 Wallet — Saldo Admin"],
+    summary="[Admin] Lihat saldo wallet saya",
+)
+def get_my_wallet(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    """
+    Admin melihat saldo wallet-nya.
+
+    Saldo bertambah otomatis setiap kali rental selesai (status = selesai)
+    dan pembayaran sudah completed.
+    """
+    admin_profile = crud.get_admin_profile(db=db, user_id=current_user.id)
+    if not admin_profile:
+        raise HTTPException(status_code=404, detail="Profil usaha tidak ditemukan")
+    wallet = crud.get_or_create_wallet(db=db, admin_id=admin_profile.id)
+    return wallet
+
+
+@app.get(
+    "/admin/wallet/transactions",
+    tags=["💰 Wallet — Saldo Admin"],
+    summary="[Admin] Riwayat pemasukan wallet",
+)
+def get_my_wallet_transactions(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    """
+    Admin melihat riwayat pemasukan ke wallet (dari rental yang selesai & dibayar).
+    """
+    admin_profile = crud.get_admin_profile(db=db, user_id=current_user.id)
+    if not admin_profile:
+        raise HTTPException(status_code=404, detail="Profil usaha tidak ditemukan")
+    return crud.get_wallet_transactions(db=db, admin_id=admin_profile.id, skip=skip, limit=limit)
+
+
+@app.post(
+    "/admin/wallet/withdraw",
+    response_model=WithdrawalResponse,
+    status_code=201,
+    tags=["💰 Wallet — Saldo Admin"],
+    summary="[Admin] Request penarikan saldo ke rekening bank",
+)
+def request_withdrawal(
+    data: WithdrawalCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    """
+    Admin mengajukan penarikan saldo ke rekening bank.
+
+    **Ketentuan:**
+    - Minimal penarikan: Rp 50.000
+    - Saldo harus cukup
+    - Pilih bank tujuan (BCA, BNI, Mandiri, BSI, dll)
+    - Estimasi proses: 1-3 hari kerja
+
+    **Flow:**
+    1. Admin request WD → status `pending`
+    2. Super admin proses → status `processing`
+    3. Transfer selesai → status `completed`
+
+    Jika ditolak, saldo dikembalikan ke wallet.
+    """
+    admin_profile = crud.get_admin_profile(db=db, user_id=current_user.id)
+    if not admin_profile:
+        raise HTTPException(status_code=404, detail="Profil usaha tidak ditemukan")
+
+    result = crud.create_withdrawal(db=db, admin_id=admin_profile.id, data=data)
+
+    if isinstance(result, dict) and "error" in result:
+        raise HTTPException(status_code=result["code"], detail=result["error"])
+
+    return result
+
+
+@app.get(
+    "/admin/wallet/withdrawals",
+    response_model=WithdrawalListResponse,
+    tags=["💰 Wallet — Saldo Admin"],
+    summary="[Admin] Riwayat penarikan saldo saya",
+)
+def my_withdrawals(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    wd_status: str = Query(None, alias="status", description="Filter: pending | processing | completed | rejected"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    """Admin melihat riwayat penarikan saldo."""
+    admin_profile = crud.get_admin_profile(db=db, user_id=current_user.id)
+    if not admin_profile:
+        return {"total": 0, "withdrawals": []}
+    return crud.get_withdrawals(db=db, skip=skip, limit=limit, admin_id=admin_profile.id, status=wd_status)
+
+
+# ── Super Admin: Kelola Withdrawal
+
+@app.get(
+    "/superadmin/withdrawals",
+    response_model=WithdrawalListResponse,
+    tags=["👑 Super Admin"],
+    summary="[Super Admin] Semua request penarikan",
+)
+def all_withdrawals(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    wd_status: str = Query(None, alias="status", description="Filter: pending | processing | completed | rejected"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_super_admin),
+):
+    """Super Admin melihat semua request penarikan saldo dari admin."""
+    return crud.get_withdrawals(db=db, skip=skip, limit=limit, status=wd_status)
+
+
+@app.put(
+    "/superadmin/withdrawals/{withdrawal_id}",
+    response_model=WithdrawalResponse,
+    tags=["👑 Super Admin"],
+    summary="[Super Admin] Proses/tolak penarikan saldo",
+)
+def process_withdrawal(
+    withdrawal_id: int,
+    data: WithdrawalActionByAdmin,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_super_admin),
+):
+    """
+    Super Admin memproses request penarikan saldo admin.
+
+    **Flow status:**
+    - `pending` → `processing` (sedang diproses, estimasi 1-3 hari)
+    - `processing` → `completed` (transfer berhasil)
+    - `pending`/`processing` → `rejected` (ditolak, saldo dikembalikan)
+
+    Jika ditolak, sertakan `rejected_reason` agar admin tahu alasannya.
+    """
+    result = crud.update_withdrawal_status(db=db, withdrawal_id=withdrawal_id, data=data)
+
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"Withdrawal ID {withdrawal_id} tidak ditemukan")
+
+    if isinstance(result, dict) and "error" in result:
+        raise HTTPException(status_code=result["code"], detail=result["error"])
+
+    return result
+
+
+# ════════════════════════════════════════════════════════════
+# 🏪 SHOP (Profil Toko) — public
+# ════════════════════════════════════════════════════════════
+
+@app.get(
+    "/admins/{admin_id}/shop",
+    response_model=ShopResponse,
+    tags=["🏪 Admin — Profil Usaha"],
+    summary="[Public] Profil toko + ringkasan rating",
+)
+def get_shop(
+    admin_id: int,
+    db: Session = Depends(get_db),
+):
+    """Ambil profil publik toko: data admin, total barang, dan summary rating."""
+    shop = crud.get_shop_profile(db=db, admin_id=admin_id)
+    if not shop:
+        raise HTTPException(status_code=404, detail=f"Toko (admin_id={admin_id}) tidak ditemukan")
+    return shop
+
+
+@app.get(
+    "/admins/{admin_id}/items",
+    response_model=ItemListResponse,
+    tags=["🏪 Admin — Profil Usaha"],
+    summary="[Public] Daftar barang milik toko",
+)
+def get_shop_items(
+    admin_id: int,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    search: str = Query(None, description="Cari nama/deskripsi barang dalam toko"),
+    item_status: str = Query(None, alias="status", description="Filter: available | rented | unavailable"),
+    db: Session = Depends(get_db),
+):
+    """Daftar semua barang dari satu toko (admin)."""
+    profile = crud.get_admin_profile_by_id(db=db, admin_id=admin_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail=f"Toko (admin_id={admin_id}) tidak ditemukan")
+    return crud.get_items(
+        db=db,
+        skip=skip,
+        limit=limit,
+        search=search,
+        admin_id=admin_id,
+        status=item_status,
+    )
+
+
+@app.get(
+    "/admins/{admin_id}/reviews",
+    response_model=ReviewListResponse,
+    tags=["⭐ Reviews"],
+    summary="[Public] Daftar review/testimoni untuk toko",
+)
+def get_shop_reviews(
+    admin_id: int,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+):
+    """Daftar review dari semua barang milik toko + summary."""
+    profile = crud.get_admin_profile_by_id(db=db, admin_id=admin_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail=f"Toko (admin_id={admin_id}) tidak ditemukan")
+    result = crud.get_reviews_by_admin(db=db, admin_id=admin_id, skip=skip, limit=limit)
+    reviews = [crud._serialize_review(r) for r in result["reviews"]]
+    return {"summary": result["summary"], "total": result["total"], "reviews": reviews}
+
+
+# ════════════════════════════════════════════════════════════
+# ⭐ REVIEWS — testimoni rental
+# ════════════════════════════════════════════════════════════
+
+@app.get(
+    "/items/{item_id}/reviews",
+    response_model=ReviewListResponse,
+    tags=["⭐ Reviews"],
+    summary="[Public] Daftar review untuk satu barang",
+)
+def list_item_reviews(
+    item_id: int,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+):
+    """Ambil semua review untuk satu barang + summary."""
+    result = crud.get_reviews_by_item(db=db, item_id=item_id, skip=skip, limit=limit)
+    reviews = [crud._serialize_review(r) for r in result["reviews"]]
+    return {"summary": result["summary"], "total": result["total"], "reviews": reviews}
+
+
+@app.get(
+    "/rentals/{rental_id}/review",
+    response_model=ReviewResponse,
+    tags=["⭐ Reviews"],
+    summary="Ambil review untuk satu rental (jika ada)",
+)
+def get_rental_review(
+    rental_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """User cek apakah rental-nya sudah punya review (untuk render tombol Review/Edit)."""
+    rental = crud.get_rental(db=db, rental_id=rental_id)
+    if not rental:
+        raise HTTPException(status_code=404, detail="Rental tidak ditemukan")
+
+    from models import UserRole as UR
+    if current_user.role == UR.user and rental.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Bukan rental Anda")
+
+    review = crud.get_review_by_rental(db=db, rental_id=rental_id)
+    if not review:
+        raise HTTPException(status_code=404, detail="Belum ada review untuk rental ini")
+    return crud._serialize_review(review)
+
+
+@app.post(
+    "/rentals/{rental_id}/review",
+    response_model=ReviewResponse,
+    status_code=201,
+    tags=["⭐ Reviews"],
+    summary="Buat review untuk rental yang sudah selesai",
+)
+def create_rental_review(
+    rental_id: int,
+    data: ReviewCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """
+    Penyewa membuat review setelah barang dikembalikan (rental status = `selesai`).
+    Setiap rental hanya bisa direview satu kali.
+    """
+    review, err = crud.create_review_for_rental(
+        db=db, user_id=current_user.id, rental_id=rental_id, data=data
+    )
+    if err:
+        # 404 untuk rental tidak ada, 403 bukan milik user, 400 untuk validasi lain
+        if "tidak ditemukan" in err.lower():
+            raise HTTPException(status_code=404, detail=err)
+        if "bukan milik" in err.lower():
+            raise HTTPException(status_code=403, detail=err)
+        raise HTTPException(status_code=400, detail=err)
+    return crud._serialize_review(review)
+
+
+@app.put(
+    "/reviews/{review_id}",
+    response_model=ReviewResponse,
+    tags=["⭐ Reviews"],
+    summary="Update review (pemilik dlm 7 hari, atau super_admin)",
+)
+def update_review_endpoint(
+    review_id: int,
+    data: ReviewUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    from models import UserRole as UR
+    is_admin = current_user.role in (UR.admin, UR.super_admin)
+    review, err = crud.update_review(
+        db=db, review_id=review_id, user_id=current_user.id,
+        is_admin=is_admin, data=data,
+    )
+    if err:
+        if "tidak ditemukan" in err.lower():
+            raise HTTPException(status_code=404, detail=err)
+        if "bukan pemilik" in err.lower():
+            raise HTTPException(status_code=403, detail=err)
+        raise HTTPException(status_code=400, detail=err)
+    return crud._serialize_review(review)
+
+
+@app.delete(
+    "/reviews/{review_id}",
+    status_code=204,
+    tags=["⭐ Reviews"],
+    summary="Hapus review (pemilik atau super_admin)",
+)
+def delete_review_endpoint(
+    review_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    from models import UserRole as UR
+    is_admin = current_user.role in (UR.admin, UR.super_admin)
+    ok, err = crud.delete_review(
+        db=db, review_id=review_id, user_id=current_user.id, is_admin=is_admin,
+    )
+    if not ok:
+        if err and "tidak ditemukan" in err.lower():
+            raise HTTPException(status_code=404, detail=err)
+        if err and "bukan pemilik" in err.lower():
+            raise HTTPException(status_code=403, detail=err)
+        raise HTTPException(status_code=400, detail=err or "Gagal menghapus review")
+    return
+
+
+
+# ============================================================
+# PROMO / DISKON — Public, User, Super Admin
+# ============================================================
+
+# ── Public: Banner promo di landing page
+
+@app.get(
+    "/promos/featured",
+    response_model=List[PromoCodePublicResponse],
+    tags=["🎁 Promo — Diskon"],
+    summary="[Public] Promo aktif untuk ditampilkan di landing page",
+)
+def list_featured_promos(
+    db: Session = Depends(get_db),
+):
+    """
+    List promo yang sedang aktif & flagged sebagai featured.
+    Dipakai banner/slider di LandingPage.
+    """
+    return crud.get_featured_promos(db=db, limit=10)
+
+
+# ── User: Validasi/preview diskon di halaman checkout
+
+@app.post(
+    "/promos/validate",
+    response_model=PromoValidateResponse,
+    tags=["🎁 Promo — Diskon"],
+    summary="[User] Cek apakah kode promo bisa dipakai untuk transaksi ini",
+)
+def validate_promo_endpoint(
+    data: PromoValidateRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_user),
+):
+    """
+    Preview diskon SEBELUM membuat rental. User submit kode promo
+    + item_id + tanggal sewa, server return breakdown harga.
+    """
+    result = crud.validate_promo_for_user(
+        db=db,
+        user_id=current_user.id,
+        code=data.code,
+        item_id=data.item_id,
+        tanggal_mulai=data.tanggal_mulai,
+        tanggal_selesai=data.tanggal_selesai,
+    )
+    return result
+
+
+# ── Super Admin: CRUD kupon
+
+@app.get(
+    "/superadmin/promos",
+    response_model=PromoCodeListResponse,
+    tags=["👑 Super Admin"],
+    summary="[Super Admin] List semua kupon promo",
+)
+def superadmin_list_promos(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_super_admin),
+):
+    return crud.get_promo_codes(db=db, skip=skip, limit=limit)
+
+
+@app.post(
+    "/superadmin/promos",
+    response_model=PromoCodeResponse,
+    status_code=201,
+    tags=["👑 Super Admin"],
+    summary="[Super Admin] Buat kupon promo baru",
+)
+def superadmin_create_promo(
+    data: PromoCodeCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_super_admin),
+):
+    result = crud.create_promo_code(db=db, super_admin_id=current_user.id, data=data)
+    if isinstance(result, dict) and "error" in result:
+        raise HTTPException(status_code=result.get("code", 400), detail=result["error"])
+    return result
+
+
+@app.put(
+    "/superadmin/promos/{promo_id}",
+    response_model=PromoCodeResponse,
+    tags=["👑 Super Admin"],
+    summary="[Super Admin] Update kupon promo",
+)
+def superadmin_update_promo(
+    promo_id: int,
+    data: PromoCodeUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_super_admin),
+):
+    promo = crud.update_promo_code(db=db, promo_id=promo_id, data=data)
+    if not promo:
+        raise HTTPException(status_code=404, detail=f"Promo ID {promo_id} tidak ditemukan")
+    if isinstance(promo, dict) and "error" in promo:
+        raise HTTPException(status_code=promo["code"], detail=promo["error"])
+    return promo
+
+
+@app.delete(
+    "/superadmin/promos/{promo_id}",
+    status_code=204,
+    tags=["👑 Super Admin"],
+    summary="[Super Admin] Hapus / nonaktifkan kupon",
+)
+def superadmin_delete_promo(
+    promo_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_super_admin),
+):
+    """
+    Hapus kupon. Jika sudah pernah dipakai (ada redemption), akan
+    di-soft-delete (is_active=False) demi menjaga integritas history.
+    """
+    ok = crud.delete_promo_code(db=db, promo_id=promo_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail=f"Promo ID {promo_id} tidak ditemukan")
+    return
+
+
+@app.get(
+    "/superadmin/promos/{promo_id}/redemptions",
+    response_model=PromoRedemptionListResponse,
+    tags=["👑 Super Admin"],
+    summary="[Super Admin] Riwayat pemakaian kupon",
+)
+def superadmin_promo_redemptions(
+    promo_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_super_admin),
+):
+    promo = crud.get_promo_code(db=db, promo_id=promo_id)
+    if not promo:
+        raise HTTPException(status_code=404, detail=f"Promo ID {promo_id} tidak ditemukan")
+    return crud.get_promo_redemptions(db=db, promo_id=promo_id)

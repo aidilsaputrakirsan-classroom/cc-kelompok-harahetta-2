@@ -2,9 +2,27 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/logo-sewain.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/logo-sewain.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/logo-sewain.png" />
+    <link rel="shortcut icon" href="/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Sewain - Platform Sewa Barang</title>
+    <!-- Leaflet CSS untuk komponen peta interaktif -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!--
+      Midtrans Snap.js — diload dengan client key sandbox.
+      Saat production, ganti ke https://app.midtrans.com/snap/snap.js
+      dan set data-client-key ke PRODUCTION client key.
+      Client key aman untuk dipublish (public key, bukan server key).
+    -->
+    <script
+      type="text/javascript"
+      src="https://app.sandbox.midtrans.com/snap/snap.js"
+      data-client-key=""
+      id="midtrans-snap-script"
+    ></script>
   </head>
   <body>
     <div id="root"></div>

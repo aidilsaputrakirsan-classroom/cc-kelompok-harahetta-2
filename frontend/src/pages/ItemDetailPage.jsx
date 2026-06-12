@@ -1,480 +1,409 @@
+/**
+ * ItemDetailPage — Sewain
+ * Clean layout: hero image + single column detail below.
+ * No QRIS/rekening (pakai payment gateway Midtrans).
+ */
 import { useState, useEffect } from "react"
 import { useParams, useNavigate, Link } from "react-router-dom"
 import { useAuth } from "../context/AuthContext"
-import { fetchItem, fetchAdminPaymentInfo } from "../services/api"
+import { fetchItem, fetchAdminPaymentInfo, fetchItemReviews } from "../services/api"
+import { openChatRoomForItem } from "../services/chat"
 import { formatPrice } from "../lib/utils"
 import { Button } from "../components/ui/Button"
+import { Skeleton } from "../components/ui/Skeleton"
+import RatingStars from "../components/RatingStars"
+import ReviewSummary from "../components/ReviewSummary"
+import ReviewList from "../components/ReviewList"
+import { motion } from "framer-motion"
 import {
   ArrowLeft, Package, ShoppingCart, Tag, CheckCircle,
-  XCircle, AlertTriangle, Store, Phone, CreditCard,
-  Calendar, ChevronRight, LayoutDashboard, LogOut,
-  Menu, X, Sparkles, QrCode, Building2, Copy, Star,
+  XCircle, AlertTriangle, Store, Phone,
+  Calendar, MapPin, Shield, Timer, Clock, Star, MessageCircle, Loader2, ChevronRight,
 } from "lucide-react"
+import { useTour } from "../hooks/useTour"
+import TourButton from "../components/TourButton"
+import { TOUR_KEYS } from "../lib/tour"
+import { itemDetailSteps } from "../lib/tourSteps"
 
-// ── Navbar (sama dengan CatalogPage) ─────────────────────────
-function Navbar() {
-  const [open, setOpen] = useState(false)
-  const { isAuthenticated, isAdmin, isSuperAdmin, user, logout } = useAuth()
-  const navigate = useNavigate()
-  const homeRoute = isAdmin || isSuperAdmin ? "/dashboard" : "/home"
-  const handleLogout = () => { logout(); navigate("/"); setOpen(false) }
-
-  return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-lg border-b border-slate-200 shadow-sm">
-      <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-2">
-          <img src="/sewainLogo.webp" alt="Sewain" className="w-9 h-9 rounded-xl object-cover" />
-          <span className="font-bold text-xl text-slate-800">Sewain</span>
-        </Link>
-
-        <div className="hidden md:flex items-center gap-1 text-sm text-slate-500">
-          <Link to="/" className="hover:text-slate-800 transition-colors">Beranda</Link>
-          <ChevronRight className="w-3.5 h-3.5" />
-          <Link to="/catalog" className="hover:text-slate-800 transition-colors">Katalog Barang</Link>
-          <ChevronRight className="w-3.5 h-3.5" />
-          <span className="font-semibold text-slate-800">Detail Barang</span>
-        </div>
-
-        <div className="hidden md:flex items-center gap-3">
-          {isAuthenticated ? (
-            <>
-              <span className="text-sm text-slate-500">
-                Halo, <span className="font-semibold text-slate-800">{user?.nama?.split(" ")[0]}</span>
-              </span>
-              <Button size="sm" variant="outline" onClick={() => navigate(homeRoute)}>
-                <LayoutDashboard className="w-4 h-4 mr-1.5" /> Dashboard
-              </Button>
-              <button onClick={handleLogout} className="text-slate-400 hover:text-slate-600 transition-colors">
-                <LogOut className="w-4 h-4" />
-              </button>
-            </>
-          ) : (
-            <Link to="/login"><Button size="sm">Masuk / Daftar</Button></Link>
-          )}
-        </div>
-
-        <button className="md:hidden" onClick={() => setOpen(!open)}>
-          {open ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-        </button>
-      </div>
-      {open && (
-        <div className="md:hidden bg-white border-b px-4 pb-4 space-y-2">
-          {isAuthenticated ? (
-            <>
-              <Button className="w-full" size="sm" variant="outline" onClick={() => { navigate(homeRoute); setOpen(false) }}>
-                <LayoutDashboard className="w-4 h-4 mr-1.5" /> Dashboard
-              </Button>
-              <button onClick={handleLogout} className="w-full text-sm text-destructive flex items-center justify-center gap-1 py-2">
-                <LogOut className="w-4 h-4" /> Keluar
-              </button>
-            </>
-          ) : (
-            <Link to="/login" onClick={() => setOpen(false)}><Button className="w-full">Masuk / Daftar</Button></Link>
-          )}
-        </div>
-      )}
-    </nav>
-  )
+/* ─── status ──────────────────────────────────────────────── */
+const STATUS_META = {
+  available:   { label: "Tersedia",       cls: "bg-white/90 text-emerald-700 backdrop-blur-sm border border-emerald-200",     dot: "bg-emerald-500" },
+  rented:      { label: "Sedang disewa",  cls: "bg-white/90 text-amber-700 backdrop-blur-sm border border-amber-200",    dot: "bg-amber-500" },
+  unavailable: { label: "Tidak tersedia", cls: "bg-white/90 text-muted-foreground backdrop-blur-sm border border-border", dot: "bg-muted-foreground" },
 }
 
-// ── Status config ─────────────────────────────────────────────
-const STATUS_CONFIG = {
-  available:   { label: "Tersedia",       cls: "bg-emerald-100 text-emerald-700",  dot: "bg-emerald-500" },
-  rented:      { label: "Sedang Disewa",  cls: "bg-amber-100  text-amber-700",     dot: "bg-amber-500"   },
-  unavailable: { label: "Tidak Tersedia", cls: "bg-slate-100  text-slate-500",     dot: "bg-slate-400"   },
-}
+function calcDays(s, e) { return Math.max(0, Math.ceil((new Date(e) - new Date(s)) / 86400000)) }
 
-// ── Skeleton loading ──────────────────────────────────────────
-function SkeletonDetail() {
-  return (
-    <div className="pt-16 min-h-screen bg-[#f8f8f6]">
-      <div className="max-w-6xl mx-auto px-4 py-8 md:py-12">
-        <div className="h-4 w-40 bg-slate-200 rounded-full animate-pulse mb-8" />
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <div className="aspect-[4/3] bg-slate-200 rounded-3xl animate-pulse" />
-          <div className="space-y-4">
-            <div className="h-8 bg-slate-200 rounded-full w-2/3 animate-pulse" />
-            <div className="h-5 bg-slate-200 rounded-full w-1/3 animate-pulse" />
-            <div className="h-24 bg-slate-200 rounded-3xl animate-pulse" />
-            <div className="h-12 bg-slate-200 rounded-2xl animate-pulse" />
-            <div className="h-12 bg-slate-200 rounded-2xl animate-pulse" />
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ── Main Page ─────────────────────────────────────────────────
 export default function ItemDetailPage({ addToast }) {
   const { itemId } = useParams()
   const navigate = useNavigate()
-  const { isAuthenticated, isVerified } = useAuth()
+  const { isAuthenticated, isVerified, isAdmin, isSuperAdmin } = useAuth()
+
+  const { startTour } = useTour({
+    tourKey:   TOUR_KEYS.itemDetail,
+    steps:     itemDetailSteps,
+    autoStart: false,
+  })
 
   const [item, setItem]           = useState(null)
   const [adminInfo, setAdminInfo] = useState(null)
   const [loading, setLoading]     = useState(true)
-  const [copied, setCopied]       = useState(false)
-
-  // Kalkulator estimasi biaya
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate]     = useState("")
+  const [openingChat, setOpeningChat] = useState(false)
+  const [reviewSummary, setReviewSummary] = useState({ average: 0, total: 0, distribution: {} })
+  const [recentReviews, setRecentReviews] = useState([])
+  const [loadingReviews, setLoadingReviews] = useState(true)
+
   const today = new Date().toISOString().split("T")[0]
-  const days = startDate && endDate
-    ? Math.max(0, Math.ceil((new Date(endDate) - new Date(startDate)) / 86400000))
-    : 0
+  const days = startDate && endDate ? calcDays(startDate, endDate) : 0
   const estimated = item ? item.harga_per_hari * days : 0
 
   useEffect(() => {
-    const load = async () => {
+    (async () => {
       try {
         const data = await fetchItem(itemId)
         setItem(data)
-        if (data.admin_id) {
-          fetchAdminPaymentInfo(data.admin_id).then(setAdminInfo).catch(() => {})
-        }
+        if (data.admin_id) fetchAdminPaymentInfo(data.admin_id).then(setAdminInfo).catch(() => {})
       } catch (err) {
-        if (err.message === "UNAUTHORIZED") {
-          navigate("/login")
-          return
-        }
+        if (err.message.includes("Sesi habis")) { addToast?.("Sesi habis, silakan login kembali", "warning"); navigate("/login"); return }
         addToast?.(err.message || "Barang tidak ditemukan", "error")
         navigate("/catalog")
-      } finally {
-        setLoading(false)
-      }
-    }
-    load()
+      } finally { setLoading(false) }
+    })()
   }, [itemId, navigate, addToast])
 
+  // Load review summary + 3 review terbaru
+  useEffect(() => {
+    let cancelled = false
+    setLoadingReviews(true)
+    fetchItemReviews(itemId, { limit: 3 })
+      .then((d) => {
+        if (cancelled) return
+        setReviewSummary(d.summary || { average: 0, total: 0, distribution: {} })
+        setRecentReviews(d.reviews || [])
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoadingReviews(false) })
+    return () => { cancelled = true }
+  }, [itemId])
+
   const handleRent = () => {
-    if (!isAuthenticated) {
-      addToast?.("Silakan login terlebih dahulu", "info")
-      navigate("/login")
-      return
-    }
+    if (!isAuthenticated) { addToast?.("Silakan login terlebih dahulu", "info"); navigate("/login"); return }
     navigate(`/rentals/new?item=${itemId}`)
   }
 
-  const copyRekening = () => {
-    if (!adminInfo?.nomor_rekening) return
-    navigator.clipboard.writeText(adminInfo.nomor_rekening).then(() => {
-      setCopied(true); setTimeout(() => setCopied(false), 2000)
-    })
+  const handleAskAdmin = async () => {
+    if (!isAuthenticated) {
+      addToast?.("Login dulu untuk bisa chat dengan penyedia", "info")
+      navigate("/login")
+      return
+    }
+    if (isAdmin || isSuperAdmin) {
+      addToast?.("Hanya akun penyewa yang bisa memulai chat dari halaman item", "warning")
+      return
+    }
+    setOpeningChat(true)
+    try {
+      const room = await openChatRoomForItem(Number(itemId))
+      navigate(`/chat/${room.id}`)
+    } catch (err) {
+      if (err.message.includes("Sesi habis")) { addToast?.("Sesi habis, silakan login kembali", "warning"); navigate("/login"); return }
+      addToast?.(err.message || "Gagal membuka chat", "error")
+    } finally {
+      setOpeningChat(false)
+    }
   }
 
-  const imgFallback = (name) =>
-    `https://ui-avatars.com/api/?name=${encodeURIComponent(name || "Item")}&background=1b7e6a&color=fff&size=800&bold=true`
+  const fallback = (n) => `https://ui-avatars.com/api/?name=${encodeURIComponent(n || "I")}&background=0a6e4a&color=fff&size=800&bold=true`
 
-  if (loading) return <><Navbar /><SkeletonDetail /></>
+  if (loading) return (
+    <div className="w-full max-w-4xl mx-auto px-4 py-10 space-y-6">
+      <Skeleton className="h-5 w-28" />
+      <Skeleton className="w-full aspect-[16/9] rounded-3xl" />
+      <Skeleton className="h-48 rounded-3xl" />
+    </div>
+  )
 
   if (!item) return (
-    <div className="pt-16 min-h-screen bg-[#f8f8f6] flex items-center justify-center">
-      <Navbar />
+    <div className="flex items-center justify-center min-h-[60vh]">
       <div className="text-center">
-        <XCircle className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-        <h3 className="text-xl font-bold text-slate-700">Barang tidak ditemukan</h3>
-        <Button className="mt-4" onClick={() => navigate("/catalog")}>
-          <ArrowLeft className="w-4 h-4 mr-1" /> Kembali ke Katalog
+        <div className="w-20 h-20 rounded-3xl bg-secondary flex items-center justify-center mx-auto mb-5">
+          <XCircle className="w-9 h-9 text-muted-foreground" />
+        </div>
+        <h3 className="text-xl font-bold tracking-tight">Barang tidak ditemukan</h3>
+        <Button className="mt-5 rounded-full" onClick={() => navigate("/catalog")}>
+          <ArrowLeft className="w-4 h-4 mr-1.5" /> Kembali ke katalog
         </Button>
       </div>
     </div>
   )
 
-  const st = STATUS_CONFIG[item.status] || STATUS_CONFIG.unavailable
+  const st = STATUS_META[item.status] || STATUS_META.unavailable
   const isAvailable = item.status === "available" && item.stok > 0
 
   return (
-    <div className="min-h-screen bg-[#f8f8f6]">
-      <Navbar />
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+      className="w-full max-w-4xl mx-auto px-4 sm:px-6 py-6 space-y-6"
+    >
+      {/* Back */}
+      <button onClick={() => navigate(-1)} className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors">
+        <ArrowLeft className="w-4 h-4" /> Kembali
+      </button>
 
-      {/* ── CONTENT ──────────────────────────────────────────── */}
-      <div className="pt-16">
+      {/* ═══ HERO IMAGE ═══ */}
+      <div id="item-detail-gallery" className="relative w-full rounded-3xl overflow-hidden aspect-[16/9] bg-secondary border border-border">
+        <img
+          src={item.foto_url || fallback(item.nama)}
+          alt={item.nama}
+          className="w-full h-full object-cover"
+          onError={(e) => { e.target.src = fallback(item.nama) }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+        {/* Badges */}
+        <span className={`absolute top-4 right-4 inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full backdrop-blur-sm ${st.cls}`}>
+          <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} /> {st.label}
+        </span>
+        {item.category && (
+          <span className="absolute top-4 left-4 inline-flex items-center gap-1 text-xs font-semibold bg-background/90 backdrop-blur text-primary px-3 py-1.5 rounded-full border border-border">
+            <Tag className="w-3 h-3" /> {item.category.nama}
+          </span>
+        )}
+        {/* Title overlay */}
+        <div className="absolute bottom-0 left-0 right-0 p-6">
+          <h1 className="text-3xl md:text-4xl font-bold text-white tracking-tight drop-shadow-lg">{item.nama}</h1>
+        </div>
+      </div>
 
-        {/* Thin teal strip for breadcrumb */}
-        <div className="bg-gradient-to-r from-[#0d5c4a] to-[#1b7e6a] py-3">
-          <div className="max-w-6xl mx-auto px-4 flex items-center gap-1.5 text-sm text-white/80">
-            <Link to="/" className="hover:text-white transition-colors">Beranda</Link>
-            <ChevronRight className="w-3.5 h-3.5 flex-shrink-0" />
-            <Link to="/catalog" className="hover:text-white transition-colors">Katalog</Link>
-            <ChevronRight className="w-3.5 h-3.5 flex-shrink-0" />
-            <span className="text-white font-semibold truncate max-w-[200px]">{item.nama}</span>
+      {/* ═══ MAIN CONTENT — single card full width ═══ */}
+      <div id="item-detail-info" className="rounded-3xl border border-border bg-card p-6 md:p-8 space-y-6">
+
+        {/* Top row: price + status + stok */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-baseline gap-2">
+              <span className="text-3xl md:text-4xl font-bold tracking-tight text-primary">{formatPrice(item.harga_per_hari)}</span>
+              <span className="text-base text-muted-foreground">/ hari</span>
+            </div>
+            <div className="flex items-center gap-3 mt-2 flex-wrap">
+              <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full ${st.cls}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} /> {st.label}
+              </span>
+              <span className="text-xs text-muted-foreground">Stok: <strong className="text-foreground">{item.stok} unit</strong></span>
+              {item.category && (
+                <span className="text-xs text-muted-foreground">Kategori: <strong className="text-foreground">{item.category.nama}</strong></span>
+              )}
+            </div>
           </div>
+
+          {/* Provider mini */}
+          {adminInfo && (
+            <div id="item-detail-shop" className="bg-secondary/60 rounded-2xl px-4 py-3 sm:max-w-xs w-full">
+              <Link
+                to={`/shops/${item.admin_id}`}
+                className="flex items-center gap-3 group"
+              >
+                {adminInfo.foto_profil ? (
+                  <img
+                    src={adminInfo.foto_profil}
+                    alt={adminInfo.nama_usaha}
+                    className="w-9 h-9 rounded-xl object-cover flex-shrink-0 ring-1 ring-primary/20"
+                    onError={(e) => { e.currentTarget.style.display = "none"; e.currentTarget.nextSibling.style.display = "flex" }}
+                  />
+                ) : null}
+                <div
+                  className="w-9 h-9 rounded-xl bg-primary/10 items-center justify-center text-primary flex-shrink-0"
+                  style={{ display: adminInfo.foto_profil ? "none" : "flex" }}
+                >
+                  <Store className="w-4 h-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold tracking-tight truncate group-hover:text-primary transition-colors">
+                    {adminInfo.nama_usaha}
+                  </p>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    {reviewSummary.total > 0 ? (
+                      <span className="inline-flex items-center gap-1">
+                        <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                        <span className="font-semibold text-foreground tabular-nums">
+                          {Number(reviewSummary.average).toFixed(1)}
+                        </span>
+                        <span>({reviewSummary.total})</span>
+                      </span>
+                    ) : adminInfo.nomor_telepon ? (
+                      <span className="inline-flex items-center gap-1 truncate">
+                        <Phone className="w-3 h-3 flex-shrink-0" /> {adminInfo.nomor_telepon}
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full flex-shrink-0">
+                  <CheckCircle className="w-3 h-3" /> Verified
+                </span>
+              </Link>
+
+              {/* Tanya admin — di bawah info toko */}
+              {!isAdmin && !isSuperAdmin && (
+                <button
+                  onClick={handleAskAdmin}
+                  disabled={openingChat}
+                  className="mt-3 w-full h-9 rounded-xl border border-primary/30 text-primary bg-background hover:bg-primary/10 transition font-semibold text-xs inline-flex items-center justify-center gap-1.5 disabled:opacity-60"
+                >
+                  {openingChat
+                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    : <MessageCircle className="w-3.5 h-3.5" />
+                  }
+                  Tanya admin
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
-        <div className="max-w-6xl mx-auto px-4 py-8 md:py-12">
+        {/* Deskripsi */}
+        {item.deskripsi && (
+          <div>
+            <h2 className="text-sm font-bold mb-2">Deskripsi</h2>
+            <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">{item.deskripsi}</p>
+          </div>
+        )}
 
-          {/* Back button */}
-          <button
-            onClick={() => navigate(-1)}
-            className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-primary transition-colors mb-6"
-          >
-            <ArrowLeft className="w-4 h-4" /> Kembali
-          </button>
+        {/* Lokasi penyedia */}
+        {adminInfo?.alamat_usaha && (
+          <div className="flex items-start gap-2.5 text-sm text-muted-foreground bg-secondary/40 rounded-2xl p-4">
+            <MapPin className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="font-semibold text-foreground text-xs mb-0.5">Lokasi pengambilan</p>
+              <p>{adminInfo.alamat_usaha}</p>
+            </div>
+          </div>
+        )}
 
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_420px] gap-8 items-start">
+        <div className="border-t border-border" />
 
-            {/* ── LEFT: IMAGE + PROVIDER ── */}
-            <div className="space-y-5">
-
-              {/* Main image */}
-              <div className="relative rounded-3xl overflow-hidden aspect-[4/3] bg-slate-100 shadow-sm">
-                <img
-                  src={item.foto_url || imgFallback(item.nama)}
-                  alt={item.nama}
-                  className="w-full h-full object-cover"
-                  onError={(e) => { e.target.src = imgFallback(item.nama) }}
+        {/* Estimasi biaya + CTA */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Estimasi */}
+          <div>
+            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3 inline-flex items-center gap-1.5">
+              <Timer className="w-3.5 h-3.5" /> Estimasi biaya
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">Tanggal mulai</label>
+                <input type="date" min={today} value={startDate}
+                  onChange={(e) => { setStartDate(e.target.value); if (endDate < e.target.value) setEndDate("") }}
+                  className="w-full text-sm px-3 py-2.5 rounded-xl border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 transition"
                 />
-                {/* Status badge */}
-                <span className={`absolute top-4 right-4 flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full shadow-sm ${st.cls}`}>
-                  <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} />
-                  {st.label}
-                </span>
-                {/* Category badge */}
-                {item.category && (
-                  <span className="absolute top-4 left-4 flex items-center gap-1 text-xs font-semibold bg-white/90 text-primary px-3 py-1.5 rounded-full shadow-sm">
-                    <Tag className="w-3 h-3" /> {item.category.nama}
-                  </span>
-                )}
               </div>
-
-              {/* Provider info card */}
-              {adminInfo && (
-                <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-5 space-y-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center flex-shrink-0">
-                      <Store className="w-5 h-5 text-primary" />
-                    </div>
-                    <div>
-                      <p className="font-bold text-slate-800 text-sm">{adminInfo.nama_usaha}</p>
-                      <p className="text-xs text-slate-400">Penyedia Barang Sewa</p>
-                    </div>
-                    <span className="ml-auto flex items-center gap-1 text-xs text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full font-semibold">
-                      <CheckCircle className="w-3 h-3" /> Terverifikasi
-                    </span>
-                  </div>
-
-                  <div className="space-y-2">
-                    {adminInfo.nomor_telepon && (
-                      <div className="flex items-center gap-2 text-sm text-slate-600">
-                        <Phone className="w-4 h-4 text-slate-400 flex-shrink-0" />
-                        {adminInfo.nomor_telepon}
-                      </div>
-                    )}
-                    {adminInfo.nomor_rekening && (
-                      <div className="flex items-center gap-2">
-                        <Building2 className="w-4 h-4 text-slate-400 flex-shrink-0" />
-                        <span className="text-sm text-slate-600 flex-1 truncate">{adminInfo.nomor_rekening}</span>
-                        <button
-                          onClick={copyRekening}
-                          className="flex items-center gap-1 text-xs text-primary bg-primary/10 px-2 py-1 rounded-lg hover:bg-primary/20 transition flex-shrink-0"
-                        >
-                          {copied
-                            ? <><CheckCircle className="w-3 h-3" /> Tersalin</>
-                            : <><Copy className="w-3 h-3" /> Salin</>
-                          }
-                        </button>
-                      </div>
-                    )}
-                    {adminInfo.foto_qris && (
-                      <div className="mt-3">
-                        <div className="flex items-center gap-1.5 text-xs text-slate-400 mb-2">
-                          <QrCode className="w-3.5 h-3.5" /> QRIS
-                        </div>
-                        <div className="bg-slate-50 rounded-2xl p-3 flex justify-center">
-                          <img src={adminInfo.foto_qris} alt="QRIS" className="w-36 h-36 object-contain" />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Promo/trust card */}
-              <div className="bg-gradient-to-br from-[#0d5c4a] to-[#1b7e6a] rounded-3xl p-5 text-white">
-                <div className="flex items-center gap-2 mb-3">
-                  <Sparkles className="w-4 h-4 text-white/70" />
-                  <p className="text-sm font-bold">Keunggulan Sewain</p>
-                </div>
-                <div className="space-y-2">
-                  {[
-                    "Penyedia terverifikasi & terpercaya",
-                    "Transaksi aman & terjamin",
-                    "Proses sewa cepat & mudah",
-                    "Dukungan tim 7 hari seminggu",
-                  ].map(t => (
-                    <div key={t} className="flex items-center gap-2 text-xs text-white/80">
-                      <CheckCircle className="w-3.5 h-3.5 text-emerald-300 flex-shrink-0" />
-                      {t}
-                    </div>
-                  ))}
-                </div>
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">Tanggal selesai</label>
+                <input type="date" min={startDate || today} value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="w-full text-sm px-3 py-2.5 rounded-xl border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/30 transition"
+                />
               </div>
             </div>
-
-            {/* ── RIGHT: DETAILS + CTA ── */}
-            <div className="space-y-4 lg:sticky lg:top-24">
-
-              {/* Main detail card */}
-              <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 space-y-5">
-
-                {/* Title & category */}
-                <div>
-                  {item.category && (
-                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary bg-primary/10 px-2.5 py-1 rounded-full mb-2">
-                      <Tag className="w-3 h-3" /> {item.category.nama}
-                    </span>
-                  )}
-                  <h1 className="text-2xl md:text-3xl font-black text-slate-800 leading-tight">{item.nama}</h1>
-                  <div className="flex items-center gap-3 mt-2">
-                    <div className={`flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full ${st.cls}`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} />
-                      {st.label}
-                    </div>
-                    <span className="text-xs text-slate-400">Stok: <span className="font-bold text-slate-700">{item.stok} unit</span></span>
-                  </div>
-                </div>
-
-                {/* Price */}
-                <div className="bg-gradient-to-br from-primary/5 to-primary/10 rounded-2xl p-4 border border-primary/10">
-                  <p className="text-xs text-slate-500 mb-1">Harga Sewa</p>
-                  <div className="flex items-baseline gap-1">
-                    <span className="text-3xl font-black text-primary">{formatPrice(item.harga_per_hari)}</span>
-                    <span className="text-sm text-slate-400 font-medium">/ hari</span>
-                  </div>
-                </div>
-
-                {/* Deskripsi */}
-                {item.deskripsi && (
-                  <div>
-                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Deskripsi</p>
-                    <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-line">{item.deskripsi}</p>
-                  </div>
-                )}
-
-                {/* Separator */}
-                <div className="border-t border-slate-100" />
-
-                {/* Kalkulator estimasi */}
-                <div>
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3 flex items-center gap-1.5">
-                    <Calendar className="w-3.5 h-3.5" /> Estimasi Biaya
-                  </p>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="text-xs text-slate-500 font-medium block mb-1">Tanggal Mulai</label>
-                      <input
-                        type="date"
-                        min={today}
-                        value={startDate}
-                        onChange={(e) => { setStartDate(e.target.value); if (endDate < e.target.value) setEndDate("") }}
-                        className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-slate-500 font-medium block mb-1">Tanggal Selesai</label>
-                      <input
-                        type="date"
-                        min={startDate || today}
-                        value={endDate}
-                        onChange={(e) => setEndDate(e.target.value)}
-                        className="w-full text-xs px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition"
-                      />
-                    </div>
-                  </div>
-                  {days > 0 && (
-                    <div className="mt-3 bg-slate-50 rounded-2xl p-3 space-y-1.5 text-xs">
-                      <div className="flex justify-between text-slate-500">
-                        <span>Durasi</span>
-                        <span className="font-semibold text-slate-700">{days} hari</span>
-                      </div>
-                      <div className="flex justify-between text-slate-500">
-                        <span>Harga/hari</span>
-                        <span className="font-semibold text-slate-700">{formatPrice(item.harga_per_hari)}</span>
-                      </div>
-                      <div className="border-t border-slate-200 pt-1.5 flex justify-between font-bold">
-                        <span className="text-slate-700">Total Estimasi</span>
-                        <span className="text-primary text-sm">{formatPrice(estimated)}</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Verif warning */}
-                {isAuthenticated && !isVerified && (
-                  <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-2xl p-3">
-                    <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
-                    <div className="text-xs text-amber-700">
-                      <p className="font-semibold mb-0.5">Verifikasi diperlukan</p>
-                      <p>Upload KTP untuk bisa menyewa barang.</p>
-                      <Link to="/profile" className="underline font-bold mt-1 inline-block">Verifikasi Sekarang →</Link>
-                    </div>
-                  </div>
-                )}
-
-                {/* CTA button */}
-                {isAvailable ? (
-                  <Button
-                    className="w-full rounded-2xl py-3 text-base font-bold"
-                    size="lg"
-                    onClick={handleRent}
-                  >
-                    <ShoppingCart className="w-5 h-5 mr-2" />
-                    Sewa Sekarang
-                  </Button>
-                ) : (
-                  <button
-                    disabled
-                    className="w-full py-3 rounded-2xl bg-slate-100 text-slate-400 font-bold text-sm cursor-not-allowed flex items-center justify-center gap-2"
-                  >
-                    <XCircle className="w-5 h-5" />
-                    {item.status === "rented" ? "Sedang Disewa" : "Tidak Tersedia"}
-                  </button>
-                )}
-
-                {!isAuthenticated && (
-                  <p className="text-center text-xs text-slate-500">
-                    Belum punya akun?{" "}
-                    <Link to="/login" className="text-primary underline font-semibold">Login atau Daftar</Link>
-                  </p>
-                )}
+            {days > 0 && (
+              <div className="mt-3 rounded-2xl bg-secondary/60 p-4 space-y-2 text-sm">
+                <div className="flex justify-between text-muted-foreground"><span>Durasi</span><span className="font-semibold text-foreground">{days} hari</span></div>
+                <div className="flex justify-between text-muted-foreground"><span>Harga/hari</span><span className="font-semibold text-foreground">{formatPrice(item.harga_per_hari)}</span></div>
+                <div className="border-t border-border pt-2 flex justify-between font-bold text-base"><span>Total</span><span className="text-primary">{formatPrice(estimated)}</span></div>
               </div>
+            )}
+          </div>
 
-              {/* Info tambahan */}
-              <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-5">
-                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3 flex items-center gap-1.5">
-                  <Star className="w-3.5 h-3.5" /> Info Tambahan
-                </p>
-                <div className="space-y-2">
-                  {[
-                    { icon: Package,      label: "Stok",      val: `${item.stok} unit` },
-                    { icon: CreditCard,   label: "Harga",     val: `${formatPrice(item.harga_per_hari)} / hari` },
-                    { icon: Tag,          label: "Kategori",  val: item.category?.nama || "Umum" },
-                    { icon: CheckCircle,  label: "Status",    val: st.label },
-                  ].map(({ icon: Icon, label, val }) => (
-                    <div key={label} className="flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-2 text-slate-500">
-                        <Icon className="w-3.5 h-3.5 text-slate-400" />
-                        {label}
-                      </div>
-                      <span className="font-semibold text-slate-700">{val}</span>
-                    </div>
-                  ))}
+          {/* CTA side */}
+          <div className="flex flex-col justify-between">
+            {/* Trust points */}
+            <div className="grid grid-cols-2 gap-2 mb-5">
+              {[
+                { icon: Shield,      text: "Transaksi aman" },
+                { icon: CheckCircle, text: "Penyedia verified" },
+                { icon: Clock,       text: "Proses cepat" },
+                { icon: Star,        text: "Dukungan 7 hari" },
+              ].map(({ icon: Icon, text }) => (
+                <div key={text} className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Icon className="w-3.5 h-3.5 text-primary flex-shrink-0" /> {text}
                 </div>
-              </div>
-
+              ))}
             </div>
+
+            {/* Verif warning */}
+            {isAuthenticated && !isVerified && (
+              <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-2xl p-3 mb-4">
+                <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+                <div className="text-xs text-amber-800">
+                  <p className="font-semibold">Verifikasi diperlukan</p>
+                  <p className="mt-0.5">Upload KTP untuk bisa menyewa.</p>
+                  <Link to="/profile" className="underline font-bold mt-1 inline-block">Verifikasi →</Link>
+                </div>
+              </div>
+            )}
+
+            {/* CTA */}
+            {isAvailable ? (
+              <Button id="item-detail-rent-btn" className="w-full rounded-2xl h-12 text-base font-bold" size="lg" onClick={handleRent}>
+                <ShoppingCart className="w-5 h-5 mr-2" /> Sewa sekarang
+              </Button>
+            ) : (
+              <button disabled className="w-full h-12 rounded-2xl bg-muted text-muted-foreground font-bold text-sm cursor-not-allowed flex items-center justify-center gap-2">
+                <XCircle className="w-5 h-5" />
+                {item.status === "rented" ? "Sedang disewa" : "Tidak tersedia"}
+              </button>
+            )}
+
+            {!isAuthenticated && (
+              <p className="text-center text-xs text-muted-foreground mt-3">
+                Belum punya akun? <Link to="/login" className="text-primary font-semibold hover:underline">Login / Daftar</Link>
+              </p>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Footer */}
-      <footer className="border-t border-slate-200 bg-white mt-12">
-        <div className="max-w-7xl mx-auto px-4 py-5 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-400">
-          <span>© 2026 Sewain Platform · Kelompok Harahetta-2</span>
-          <Link to="/catalog" className="text-primary hover:underline font-medium">Kembali ke Katalog</Link>
+      {/* ═══ REVIEW SECTION ═══ */}
+      <section id="item-detail-reviews" className="rounded-3xl border border-border bg-card p-6 md:p-8 space-y-5">
+        <div className="flex items-end justify-between gap-3 flex-wrap">
+          <div>
+            <h2 className="text-lg sm:text-xl font-bold tracking-tight inline-flex items-center gap-2">
+              <Star className="w-5 h-5 text-amber-400 fill-amber-400" />
+              Ulasan barang ini
+            </h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Penilaian dari penyewa yang sudah selesai pakai barang ini.
+            </p>
+          </div>
+          {item?.admin_id && reviewSummary.total > 0 && (
+            <Link
+              to={`/shops/${item.admin_id}`}
+              className="text-xs font-semibold text-primary hover:underline inline-flex items-center gap-1"
+            >
+              Lihat semua ulasan toko <ChevronRight className="w-3.5 h-3.5" />
+            </Link>
+          )}
         </div>
-      </footer>
-    </div>
+
+        {reviewSummary.total > 0 ? (
+          <>
+            <ReviewSummary summary={reviewSummary} />
+            <ReviewList reviews={recentReviews} loading={loadingReviews} />
+          </>
+        ) : (
+          <div className="rounded-2xl border border-dashed border-border bg-card p-8 text-center">
+            <Star className="w-10 h-10 text-muted-foreground/40 mx-auto mb-2" />
+            <p className="text-sm text-muted-foreground">
+              Belum ada ulasan untuk barang ini.
+            </p>
+          </div>
+        )}
+      </section>
+
+      {/* Tour button */}
+      <TourButton onClick={startTour} />
+    </motion.div>
   )
 }

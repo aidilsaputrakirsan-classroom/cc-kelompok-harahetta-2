@@ -1,0 +1,320 @@
+# ==============================================
+# docker-compose.dev.yml — Development Overrides
+# Sewain — Kelompok Harahetta-2
+#
+# File ini TIDAK bisa dijalankan sendiri. Digunakan sebagai
+# override di atas docker-compose.yml untuk environment development.
+#
+# Cara pakai:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+#
+# Atau dengan Makefile:
+#   make dev
+#
+# Fitur development mode:
+#   - Hot-reload: kode langsung ter-reload tanpa rebuild image
+#   - Port diekspose langsung ke host (tanpa gateway) untuk debugging
+#   - Resource limits dikurangi (cocok untuk mesin lokal)
+#   - Log level: DEBUG
+#   - Database port tetap terbuka untuk koneksi langsung (misal DBeaver)
+# ==============================================
+
+services:
+  # ================================
+  # AUTH SERVICE — Dev Hot-Reload
+  # ================================
+  auth-service:
+    build:
+      context: ./services/auth-service
+      target: development
+    volumes:
+      # Mount source code untuk hot-reload
+      - ./services/auth-service:/app
+    environment:
+      APP_ENV: development
+      DEBUG: "true"
+      LOG_LEVEL: DEBUG
+      SECRET_KEY: dev-secret-key-do-not-use-in-production
+    # Override command: jalankan dengan --reload
+    command:
+      [
+        "uvicorn", "main:app",
+        "--host", "0.0.0.0",
+        "--port", "8001",
+        "--reload",
+        "--reload-dir", "/app",
+        "--log-level", "debug"
+      ]
+    # Expose port langsung ke host untuk debugging tanpa gateway
+    ports:
+      - "8001:8001"
+    # Resource limits lebih rendah untuk dev
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+        reservations:
+          cpus: "0.10"
+          memory: 128M
+
+  # ================================
+  # ITEM SERVICE — Dev Hot-Reload
+  # ================================
+  item-service:
+    build:
+      context: ./services/item-service
+      target: development
+    volumes:
+      - ./services/item-service:/app
+    environment:
+      APP_ENV: development
+      DEBUG: "true"
+      LOG_LEVEL: DEBUG
+    command:
+      [
+        "uvicorn", "main:app",
+        "--host", "0.0.0.0",
+        "--port", "8002",
+        "--reload",
+        "--reload-dir", "/app",
+        "--log-level", "debug"
+      ]
+    ports:
+      - "8002:8002"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+        reservations:
+          cpus: "0.10"
+          memory: 128M
+
+  # ================================
+  # RENTAL SERVICE — Dev Hot-Reload
+  # ================================
+  rental-service:
+    build:
+      context: ./services/rental-service
+      target: development
+    volumes:
+      - ./services/rental-service:/app
+    environment:
+      APP_ENV: development
+      DEBUG: "true"
+      LOG_LEVEL: DEBUG
+    command:
+      [
+        "uvicorn", "main:app",
+        "--host", "0.0.0.0",
+        "--port", "8003",
+        "--reload",
+        "--reload-dir", "/app",
+        "--log-level", "debug"
+      ]
+    ports:
+      - "8003:8003"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+        reservations:
+          cpus: "0.10"
+          memory: 128M
+
+  # ================================
+  # PAYMENT SERVICE — Dev Hot-Reload
+  # ================================
+  payment-service:
+    build:
+      context: ./services/payment-service
+      target: development
+    volumes:
+      - ./services/payment-service:/app
+    environment:
+      APP_ENV: development
+      DEBUG: "true"
+      LOG_LEVEL: DEBUG
+    command:
+      [
+        "uvicorn", "main:app",
+        "--host", "0.0.0.0",
+        "--port", "8004",
+        "--reload",
+        "--reload-dir", "/app",
+        "--log-level", "debug"
+      ]
+    ports:
+      - "8004:8004"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+        reservations:
+          cpus: "0.10"
+          memory: 128M
+
+  # ================================
+  # CHAT SERVICE — Dev Hot-Reload
+  # ================================
+  chat-service:
+    build:
+      context: ./services/chat-service
+      target: development
+    volumes:
+      - ./services/chat-service:/app
+    environment:
+      APP_ENV: development
+      DEBUG: "true"
+      LOG_LEVEL: DEBUG
+    command:
+      [
+        "uvicorn", "main:app",
+        "--host", "0.0.0.0",
+        "--port", "8005",
+        "--reload",
+        "--reload-dir", "/app",
+        "--log-level", "debug"
+      ]
+    ports:
+      - "8005:8005"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+        reservations:
+          cpus: "0.10"
+          memory: 128M
+
+  # ================================
+  # CHATBOT SERVICE — Dev Hot-Reload
+  # ================================
+  chatbot-service:
+    build:
+      context: ./services/chatbot-service
+      target: development
+    volumes:
+      - ./services/chatbot-service:/app
+    environment:
+      APP_ENV: development
+      DEBUG: "true"
+      LOG_LEVEL: DEBUG
+    command:
+      [
+        "uvicorn", "main:app",
+        "--host", "0.0.0.0",
+        "--port", "8006",
+        "--reload",
+        "--reload-dir", "/app",
+        "--log-level", "debug"
+      ]
+    ports:
+      - "8006:8006"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+        reservations:
+          cpus: "0.10"
+          memory: 128M
+
+  # ================================
+  # FRONTEND — Dev dengan Vite HMR
+  # ================================
+  frontend:
+    # Untuk dev, jalankan Vite dev server (bukan build statis)
+    build:
+      context: ./frontend
+      target: development
+    volumes:
+      - ./frontend:/app
+      # Hindari override node_modules dari container
+      - /app/node_modules
+    environment:
+      VITE_API_URL: http://localhost
+      NODE_ENV: development
+    # Vite dev server menggantikan build statis
+    command: ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+    ports:
+      # Vite HMR langsung di port 5173
+      - "5173:5173"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 512M
+        reservations:
+          cpus: "0.10"
+          memory: 256M
+
+  # ================================
+  # DATABASES — Port expose untuk debugging
+  # (Sudah terbuka di base compose, tidak perlu override)
+  # ================================
+  auth-db:
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
+        reservations:
+          cpus: "0.05"
+          memory: 64M
+
+  item-db:
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
+        reservations:
+          cpus: "0.05"
+          memory: 64M
+
+  rental-db:
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
+        reservations:
+          cpus: "0.05"
+          memory: 64M
+
+  payment-db:
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
+        reservations:
+          cpus: "0.05"
+          memory: 64M
+
+  chat-db:
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
+        reservations:
+          cpus: "0.05"
+          memory: 64M
+
+  # ================================
+  # GATEWAY — Resource lebih kecil di dev
+  # ================================
+  gateway:
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 64M
+        reservations:
+          cpus: "0.05"
+          memory: 32M

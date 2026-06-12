@@ -1,5 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback } from "react"
-import { login as apiLogin, register as apiRegister, getMe, clearToken, setToken } from "../services/api"
+import { login as apiLogin, register as apiRegister, getMe, clearToken, setToken, isServiceUnavailableError } from "../services/api"
+import { toast } from "sonner"
+import { useServiceStatus } from "./ServiceStatusContext"
 
 const AuthContext = createContext(null)
 
@@ -7,6 +9,7 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [token, setTokenState] = useState(null)
   const [loading, setLoading] = useState(true)
+  const { markServiceDown, markServiceUp } = useServiceStatus()
 
   // Restore from localStorage on mount, then refresh from server
   useEffect(() => {
@@ -15,6 +18,7 @@ export function AuthProvider({ children }) {
     if (savedToken && savedUser) {
       try {
         const parsedUser = JSON.parse(savedUser)
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setTokenState(savedToken)
         setToken(savedToken)
         setUser(parsedUser) // set cached data first so UI loads fast
@@ -23,14 +27,25 @@ export function AuthProvider({ children }) {
           .then((me) => {
             setUser(me)
             localStorage.setItem("sewain_user", JSON.stringify(me))
+            markServiceUp("auth") // auth berhasil — tandai normal kembali
           })
-          .catch(() => {
-            // Token expired or invalid — logout
-            clearToken()
-            setTokenState(null)
-            setUser(null)
-            localStorage.removeItem("sewain_token")
-            localStorage.removeItem("sewain_user")
+          .catch((err) => {
+            if (isServiceUnavailableError(err)) {
+              // Auth service down — jangan logout, tapi tandai service down
+              markServiceDown("auth")
+              // Tetap pakai cached user agar UX tidak terputus
+            } else {
+              // Token expired atau invalid — logout
+              clearToken()
+              setTokenState(null)
+              setUser(null)
+              localStorage.removeItem("sewain_token")
+              localStorage.removeItem("sewain_user")
+              // Delay toast sedikit agar Toaster sudah mounted
+              setTimeout(() => {
+                toast.warning("Sesi habis, silakan login kembali", { id: "session-expired" })
+              }, 100)
+            }
           })
           .finally(() => setLoading(false))
         return
@@ -40,6 +55,7 @@ export function AuthProvider({ children }) {
       }
     }
     setLoading(false)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const handleLogin = useCallback(async (email, password) => {
@@ -52,9 +68,10 @@ export function AuthProvider({ children }) {
   }, [])
 
   const handleRegister = useCallback(async (userData) => {
-    await apiRegister(userData)
-    return await handleLogin(userData.email, userData.password)
-  }, [handleLogin])
+    const result = await apiRegister(userData)
+    // Jangan auto-login — user harus verifikasi email dulu
+    return result
+  }, [])
 
   const handleLogout = useCallback(() => {
     clearToken()
@@ -97,6 +114,7 @@ export function AuthProvider({ children }) {
   )
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
   const ctx = useContext(AuthContext)
   if (!ctx) throw new Error("useAuth must be used within AuthProvider")

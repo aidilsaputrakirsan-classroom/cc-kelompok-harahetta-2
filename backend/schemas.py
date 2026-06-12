@@ -52,6 +52,17 @@ class PaymentMethodEnum(str, enum.Enum):
     cash = "cash"
     e_wallet = "e_wallet"
     credit_card = "credit_card"
+    midtrans = "midtrans"
+
+
+class DiscountTypeEnum(str, enum.Enum):
+    percentage = "percentage"
+    fixed = "fixed"
+
+
+class PromoEligibilityEnum(str, enum.Enum):
+    new_user = "new_user"
+    all = "all"
 
 
 # ============================================================
@@ -86,10 +97,21 @@ class UserResponse(BaseModel):
     role: UserRoleEnum
     is_active: bool
     is_verified: bool
+    email_verified_at: Optional[datetime] = None
+    foto_profil: Optional[str] = None
     created_at: datetime
 
     class Config:
         from_attributes = True
+
+
+class UserMeUpdate(BaseModel):
+    """Schema untuk user (semua role) update profil ringan miliknya sendiri."""
+    nama: Optional[str] = Field(None, min_length=2, max_length=100)
+    foto_profil: Optional[str] = Field(
+        None,
+        description="Data URL (data:image/...;base64,...) atau URL gambar publik",
+    )
 
 
 class UserUpdateByAdmin(BaseModel):
@@ -106,6 +128,38 @@ class TokenResponse(BaseModel):
     user: UserResponse
 
 
+class EmailVerifyRequest(BaseModel):
+    """Schema untuk verifikasi email via token."""
+    token: str
+
+
+class ResendVerificationRequest(BaseModel):
+    """Schema untuk resend email verifikasi."""
+    email: EmailStr
+
+
+class ForgotPasswordRequest(BaseModel):
+    """Schema untuk request reset password."""
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    """Schema untuk reset password dengan token."""
+    token: str
+    new_password: str = Field(..., min_length=8)
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_password_strength(cls, value: str):
+        """Password: min 8 karakter, harus ada huruf besar, kecil, dan angka."""
+        pattern = r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$"
+        if not re.match(pattern, value):
+            raise ValueError(
+                "Password harus minimal 8 karakter dan mengandung huruf besar, huruf kecil, dan angka."
+            )
+        return value
+
+
 # ============================================================
 # ADMIN PROFILE SCHEMAS
 # ============================================================
@@ -115,8 +169,8 @@ class AdminProfileCreate(BaseModel):
     nama_usaha: str = Field(..., min_length=2, max_length=100, examples=["Toko Sewa Jaya"])
     alamat_usaha: Optional[str] = Field(None, examples=["Jl. Soekarno-Hatta No.1, Balikpapan"])
     nomor_telepon: Optional[str] = Field(None, max_length=20, examples=["08123456789"])
-    nomor_rekening: Optional[str] = Field(None, max_length=100, examples=["BCA 1234567890 a/n Toko Sewa Jaya"])
-    foto_qris: Optional[str] = Field(None, examples=["data:image/png;base64,..."])
+    latitude: Optional[float] = Field(None, ge=-90.0, le=90.0, examples=[-1.2654])   # ← Koordinat lokasi
+    longitude: Optional[float] = Field(None, ge=-180.0, le=180.0, examples=[116.8312])  # ← Koordinat lokasi
 
 
 class AdminProfileUpdate(BaseModel):
@@ -124,8 +178,8 @@ class AdminProfileUpdate(BaseModel):
     nama_usaha: Optional[str] = Field(None, max_length=100)
     alamat_usaha: Optional[str] = None
     nomor_telepon: Optional[str] = Field(None, max_length=20)
-    nomor_rekening: Optional[str] = Field(None, max_length=100)
-    foto_qris: Optional[str] = None
+    latitude: Optional[float] = Field(None, ge=-90.0, le=90.0)    # ← Koordinat lokasi
+    longitude: Optional[float] = Field(None, ge=-180.0, le=180.0)  # ← Koordinat lokasi
 
 
 class AdminProfileResponse(BaseModel):
@@ -135,8 +189,8 @@ class AdminProfileResponse(BaseModel):
     nama_usaha: str
     alamat_usaha: Optional[str]
     nomor_telepon: Optional[str]
-    nomor_rekening: Optional[str]
-    foto_qris: Optional[str]
+    latitude: Optional[float]    # ← Koordinat lokasi
+    longitude: Optional[float]   # ← Koordinat lokasi
     created_at: datetime
     user: UserResponse
 
@@ -148,9 +202,9 @@ class AdminPaymentInfoResponse(BaseModel):
     """Schema response info pembayaran admin (publik, untuk user yang mau sewa)."""
     admin_id: int
     nama_usaha: str
-    nomor_rekening: Optional[str]
-    foto_qris: Optional[str]
     nomor_telepon: Optional[str]
+    alamat_usaha: Optional[str] = None
+    foto_profil: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -307,6 +361,9 @@ class ItemResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     category: Optional[CategoryResponse]
+    admin_nama_usaha: Optional[str] = None
+    admin_alamat_usaha: Optional[str] = None
+    admin_kota: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -328,6 +385,7 @@ class RentalCreate(BaseModel):
     tanggal_mulai: date = Field(..., examples=["2026-04-10"])
     tanggal_selesai: date = Field(..., examples=["2026-04-15"])
     catatan: Optional[str] = Field(None, examples=["Tolong siapkan baterai cadangan"])
+    promo_code: Optional[str] = Field(None, examples=["WELCOME50"], max_length=50)
 
     @field_validator("tanggal_selesai")
     @classmethod
@@ -336,6 +394,14 @@ class RentalCreate(BaseModel):
         if "tanggal_mulai" in info.data and tanggal_selesai <= info.data["tanggal_mulai"]:
             raise ValueError("Tanggal selesai harus setelah tanggal mulai")
         return tanggal_selesai
+
+    @field_validator("promo_code")
+    @classmethod
+    def normalize_promo_code(cls, v):
+        if v is None:
+            return None
+        v = v.strip().upper()
+        return v or None
 
 
 class RentalStatusUpdate(BaseModel):
@@ -354,10 +420,41 @@ class RentalResponse(BaseModel):
     total_harga: float
     status: RentalStatusEnum
     catatan: Optional[str]
+    # ── Promo / diskon
+    promo_code_id: Optional[int] = None
+    discount_amount: Optional[float] = None
+    original_amount: Optional[float] = None
+    promo_code: Optional["PromoCodeBriefResponse"] = None
+    # ── Snapshot info pickup (diisi saat rental disetujui)
+    pickup_alamat: Optional[str] = None
+    pickup_latitude: Optional[float] = None
+    pickup_longitude: Optional[float] = None
+    pickup_nama_usaha: Optional[str] = None
+    pickup_telepon: Optional[str] = None
+    diambil_at: Optional[datetime] = None
+    due_at: Optional[datetime] = None
+    return_requested_at: Optional[datetime] = None
+    payment_deadline: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
     item: Optional[ItemResponse]
     user: Optional[UserResponse]
+
+    class Config:
+        from_attributes = True
+
+
+class PickupInfoResponse(BaseModel):
+    """Schema response info lokasi pickup untuk user setelah bayar."""
+    rental_id: int
+    pickup_alamat: str
+    pickup_latitude: float
+    pickup_longitude: float
+    pickup_nama_usaha: str
+    pickup_telepon: Optional[str]
+    tanggal_mulai: date
+    tanggal_selesai: date
+    item_nama: str
 
     class Config:
         from_attributes = True
@@ -399,8 +496,30 @@ class PaymentResponse(BaseModel):
     bukti_pembayaran: Optional[str]
     catatan: Optional[str]
     tanggal_pembayaran: Optional[datetime]
+    # ── Midtrans fields
+    midtrans_order_id: Optional[str] = None
+    snap_token: Optional[str] = None
+    snap_redirect_url: Optional[str] = None
+    payment_channel: Optional[str] = None
+    charge_response: Optional[str] = None
+    expires_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class MidtransChargeResponse(BaseModel):
+    """Response saat generate Snap token."""
+    payment_id: int
+    rental_id: int
+    order_id: str
+    snap_token: str
+    snap_redirect_url: str
+    client_key: str
+    jumlah: float
+    status: PaymentStatusEnum
 
     class Config:
         from_attributes = True
@@ -417,3 +536,399 @@ class PaymentDetailResponse(BaseModel):
     payment: PaymentResponse
     rental: RentalResponse
     user: UserResponse
+
+# ============================================================
+# WALLET & WITHDRAWAL SCHEMAS
+# ============================================================
+
+class WithdrawalStatusEnum(str, enum.Enum):
+    pending = "pending"
+    processing = "processing"
+    completed = "completed"
+    rejected = "rejected"
+
+
+class WalletResponse(BaseModel):
+    """Schema response wallet admin."""
+    id: int
+    admin_id: int
+    saldo: float
+    total_pendapatan: float
+    total_withdrawn: float
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class WalletTransactionResponse(BaseModel):
+    """Schema response riwayat transaksi masuk ke wallet."""
+    rental_id: int
+    item_nama: str
+    jumlah: float
+    tanggal: datetime
+    penyewa: str
+
+
+class WithdrawalCreate(BaseModel):
+    """Schema untuk request withdrawal."""
+    jumlah: float = Field(..., gt=0, examples=[500000.0])
+    bank_name: str = Field(..., min_length=2, max_length=50, examples=["BCA"])
+    account_number: str = Field(..., min_length=5, max_length=50, examples=["1234567890"])
+    account_holder: str = Field(..., min_length=2, max_length=100, examples=["Toko Sewa Jaya"])
+    catatan: Optional[str] = Field(None, examples=["Penarikan bulanan"])
+
+
+class WithdrawalResponse(BaseModel):
+    """Schema response withdrawal."""
+    id: int
+    wallet_id: int
+    admin_id: int
+    jumlah: float
+    bank_name: str
+    account_number: str
+    account_holder: str
+    status: WithdrawalStatusEnum
+    catatan: Optional[str]
+    rejected_reason: Optional[str]
+    completed_at: Optional[datetime]
+    created_at: datetime
+    updated_at: Optional[datetime]
+
+    class Config:
+        from_attributes = True
+
+
+class WithdrawalListResponse(BaseModel):
+    """Response untuk list withdrawal dengan total count."""
+    total: int
+    withdrawals: List[WithdrawalResponse]
+
+
+class WithdrawalActionByAdmin(BaseModel):
+    """Schema untuk super admin memproses withdrawal."""
+    status: WithdrawalStatusEnum = Field(..., examples=["processing"])
+    catatan: Optional[str] = Field(None, examples=["Sedang diproses ke rekening tujuan"])
+    rejected_reason: Optional[str] = Field(None, examples=["Nomor rekening tidak valid"])
+
+
+# ============================================================
+# CHAT SCHEMAS
+# ============================================================
+
+class ChatRoomCreate(BaseModel):
+    """Schema untuk membuka room chat dari sisi user (penyewa).
+    Server akan mencari atau membuat room (user, admin pemilik item, item).
+    """
+    item_id: int = Field(..., examples=[1])
+
+
+class ChatMessageCreate(BaseModel):
+    """Schema untuk mengirim pesan baru ke sebuah room."""
+    body: str = Field(..., min_length=1, max_length=2000, examples=["Halo, barang masih tersedia?"])
+
+
+class ChatMessageResponse(BaseModel):
+    """Schema response satu pesan chat."""
+    id: int
+    room_id: int
+    sender_id: int
+    body: str
+    is_read: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ChatRoomResponse(BaseModel):
+    """Schema response room chat (lengkap dengan info partner)."""
+    id: int
+    user_id: int
+    admin_id: int
+    item_id: Optional[int] = None
+    last_message_at: Optional[datetime] = None
+    created_at: datetime
+    # Info ringkas — diisi manual di endpoint
+    partner_id: int
+    partner_nama: str
+    partner_role: str
+    partner_avatar: Optional[str] = None
+    item_nama: Optional[str] = None
+    item_foto_url: Optional[str] = None
+    last_message_preview: Optional[str] = None
+    unread_count: int = 0
+    partner_online: bool = False
+
+    class Config:
+        from_attributes = True
+
+
+class ChatRoomListResponse(BaseModel):
+    total: int
+    rooms: List[ChatRoomResponse]
+
+
+class ChatMessageListResponse(BaseModel):
+    total: int
+    messages: List[ChatMessageResponse]
+
+
+# ============================================================
+# REVIEW / TESTIMONI SCHEMAS
+# ============================================================
+
+class ReviewCreate(BaseModel):
+    """Schema untuk user membuat review setelah rental selesai."""
+    rating: int = Field(..., ge=1, le=5, examples=[5])
+    komentar: Optional[str] = Field(
+        None,
+        max_length=1000,
+        examples=["Barangnya bagus, owner ramah!"],
+    )
+
+
+class ReviewUpdate(BaseModel):
+    """Schema untuk update review (rating dan/atau komentar)."""
+    rating: Optional[int] = Field(None, ge=1, le=5)
+    komentar: Optional[str] = Field(None, max_length=1000)
+
+
+class ReviewResponse(BaseModel):
+    """Schema response satu review."""
+    id: int
+    rental_id: int
+    user_id: int
+    item_id: int
+    admin_id: int
+    rating: int
+    komentar: Optional[str]
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    # Denormalized untuk tampilan
+    user_nama: Optional[str] = None
+    user_foto_profil: Optional[str] = None
+    item_nama: Optional[str] = None
+    item_foto_url: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class ReviewSummary(BaseModel):
+    """Ringkasan rating: rata-rata, total, dan distribusi 1..5."""
+    average: float = 0.0
+    total: int = 0
+    distribution: dict = Field(default_factory=lambda: {"1": 0, "2": 0, "3": 0, "4": 0, "5": 0})
+
+
+class ReviewListResponse(BaseModel):
+    """Response list review + summary."""
+    summary: ReviewSummary
+    total: int
+    reviews: List[ReviewResponse]
+
+
+# ============================================================
+# SHOP (TOKO) SCHEMAS — profil publik penyedia
+# ============================================================
+
+class ShopResponse(BaseModel):
+    """Profil publik toko (admin) — untuk halaman profil toko."""
+    admin_id: int
+    user_id: int
+    nama_usaha: str
+    alamat_usaha: Optional[str] = None
+    nomor_telepon: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    foto_profil: Optional[str] = None
+    is_verified: bool = False
+    created_at: Optional[datetime] = None
+    total_items: int = 0
+    rating: ReviewSummary = Field(default_factory=ReviewSummary)
+
+    class Config:
+        from_attributes = True
+
+
+# ============================================================
+# PROMO CODE SCHEMAS — Diskon / Kupon Platform
+# ============================================================
+
+class PromoCodeCreate(BaseModel):
+    """Schema super admin membuat kupon promo baru."""
+    code: str = Field(..., min_length=2, max_length=50, examples=["WELCOME50"])
+    nama: str = Field(..., min_length=2, max_length=40, examples=["Promo Pengguna Baru"])
+    deskripsi: Optional[str] = Field(None, max_length=100, examples=["Diskon 50% untuk transaksi pertama"])
+
+    discount_type: DiscountTypeEnum = Field(DiscountTypeEnum.percentage)
+    discount_value: float = Field(..., gt=0, examples=[50])
+    max_discount: Optional[float] = Field(None, ge=0, examples=[50000])
+    min_order: float = Field(0.0, ge=0)
+
+    eligibility: PromoEligibilityEnum = Field(PromoEligibilityEnum.all)
+    max_uses_per_user: int = Field(1, ge=1)
+    max_total_uses: Optional[int] = Field(None, ge=1)
+
+    is_active: bool = Field(True)
+    is_featured: bool = Field(False)
+    valid_from: Optional[datetime] = None
+    valid_until: Optional[datetime] = None
+
+    @field_validator("code")
+    @classmethod
+    def normalize_code(cls, v: str) -> str:
+        v = v.strip().upper()
+        if not re.match(r"^[A-Z0-9_-]+$", v):
+            raise ValueError("Code hanya boleh huruf, angka, '-' atau '_'")
+        return v
+
+    @field_validator("discount_value")
+    @classmethod
+    def validate_discount_value(cls, v, info):
+        dtype = info.data.get("discount_type")
+        if dtype == DiscountTypeEnum.percentage and (v <= 0 or v > 100):
+            raise ValueError("Untuk percentage, discount_value harus 1-100")
+        return v
+
+
+class PromoCodeUpdate(BaseModel):
+    """Schema update kupon (semua field opsional)."""
+    nama: Optional[str] = Field(None, min_length=2, max_length=100)
+    deskripsi: Optional[str] = None
+    discount_type: Optional[DiscountTypeEnum] = None
+    discount_value: Optional[float] = Field(None, gt=0)
+    max_discount: Optional[float] = Field(None, ge=0)
+    min_order: Optional[float] = Field(None, ge=0)
+    eligibility: Optional[PromoEligibilityEnum] = None
+    max_uses_per_user: Optional[int] = Field(None, ge=1)
+    max_total_uses: Optional[int] = Field(None, ge=1)
+    is_active: Optional[bool] = None
+    is_featured: Optional[bool] = None
+    valid_from: Optional[datetime] = None
+    valid_until: Optional[datetime] = None
+
+
+class PromoCodeBriefResponse(BaseModel):
+    """Versi ringkas untuk embed di RentalResponse."""
+    id: int
+    code: str
+    nama: str
+    discount_type: DiscountTypeEnum
+    discount_value: float
+    max_discount: Optional[float] = None
+
+    class Config:
+        from_attributes = True
+
+
+class PromoCodeResponse(BaseModel):
+    """Response lengkap untuk super admin."""
+    id: int
+    code: str
+    nama: str
+    deskripsi: Optional[str] = None
+
+    discount_type: DiscountTypeEnum
+    discount_value: float
+    max_discount: Optional[float] = None
+    min_order: float
+
+    eligibility: PromoEligibilityEnum
+    max_uses_per_user: int
+    max_total_uses: Optional[int] = None
+    used_count: int
+
+    is_active: bool
+    is_featured: bool
+    valid_from: Optional[datetime] = None
+    valid_until: Optional[datetime] = None
+
+    created_by: Optional[int] = None
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class PromoCodeListResponse(BaseModel):
+    total: int
+    promos: List[PromoCodeResponse]
+
+
+class PromoCodePublicResponse(BaseModel):
+    """
+    Response publik untuk landing page (tanpa data sensitif/internal).
+    """
+    code: str
+    nama: str
+    deskripsi: Optional[str] = None
+    discount_type: DiscountTypeEnum
+    discount_value: float
+    max_discount: Optional[float] = None
+    min_order: float
+    eligibility: PromoEligibilityEnum
+    valid_until: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+# ── Validate / preview diskon (saat user klik "Gunakan" di checkout)
+
+class PromoValidateRequest(BaseModel):
+    code: str = Field(..., min_length=1, max_length=50, examples=["WELCOME50"])
+    item_id: int
+    tanggal_mulai: date
+    tanggal_selesai: date
+
+    @field_validator("code")
+    @classmethod
+    def normalize_code(cls, v: str) -> str:
+        return v.strip().upper()
+
+    @field_validator("tanggal_selesai")
+    @classmethod
+    def validate_dates(cls, v, info):
+        if "tanggal_mulai" in info.data and v <= info.data["tanggal_mulai"]:
+            raise ValueError("Tanggal selesai harus setelah tanggal mulai")
+        return v
+
+
+class PromoValidateResponse(BaseModel):
+    valid: bool
+    code: Optional[str] = None
+    nama: Optional[str] = None
+    original_amount: Optional[float] = None
+    discount_amount: Optional[float] = None
+    final_amount: Optional[float] = None
+    message: str
+
+
+# ── Audit / log redemptions (super admin)
+
+class PromoRedemptionResponse(BaseModel):
+    id: int
+    promo_code_id: int
+    user_id: int
+    rental_id: int
+    original_amount: float
+    discount_amount: float
+    final_amount: float
+    redeemed_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class PromoRedemptionListResponse(BaseModel):
+    total: int
+    total_discount_given: float
+    redemptions: List[PromoRedemptionResponse]
+
+
+
+# Resolve forward references (RentalResponse → PromoCodeBriefResponse)
+RentalResponse.model_rebuild()

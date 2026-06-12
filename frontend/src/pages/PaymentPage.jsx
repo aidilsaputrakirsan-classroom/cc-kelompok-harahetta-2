@@ -1,140 +1,280 @@
 import { useState, useEffect, useRef } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import {
-  fetchMyRentals, fetchMyPayments, createPaymentForRental,
-  uploadPaymentProof, fetchAdminPaymentInfo,
+  fetchMyRentals, fetchMyPayments,
+  fetchAdminPaymentInfo, fetchRentalPickupInfo,
+  chargeDirectMidtrans, syncMidtransPayment,
 } from "../services/api"
 import { formatPrice } from "../lib/utils"
-import { Skeleton } from "../components/ui/skeleton"
+import { Skeleton } from "../components/ui/Skeleton"
+import PickupMap from "../components/PickupMap"
 import {
-  ArrowLeft, Upload, CreditCard, Building2, QrCode, Copy,
-  CheckCircle, Loader2, ImageIcon, X, Calendar, Package,
-  Clock, AlertTriangle, BadgeCheck,
+  ArrowLeft, CreditCard, CheckCircle, Loader2, Clock,
+  AlertTriangle, BadgeCheck, MapPin, Navigation,
+  Calendar, RefreshCw, Shield, XCircle, QrCode, Building2, Smartphone,
 } from "lucide-react"
 
-// ── Compress image helper
-function compressImg(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      const img = new Image()
-      img.onload = () => {
-        const MAX = 900
-        let { width, height } = img
-        if (width > MAX || height > MAX) {
-          if (width > height) { height = Math.round(height * MAX / width); width = MAX }
-          else { width = Math.round(width * MAX / height); height = MAX }
-        }
-        const canvas = document.createElement("canvas")
-        canvas.width = width; canvas.height = height
-        canvas.getContext("2d").drawImage(img, 0, 0, width, height)
-        resolve(canvas.toDataURL("image/jpeg", 0.78))
-      }
-      img.onerror = reject
-      img.src = e.target.result
-    }
-    reader.onerror = reject
-    reader.readAsDataURL(file)
+
+const PAY_STATUS = {
+  pending:   { label: "Menunggu Pembayaran",  cls: "bg-amber-100 text-amber-700",  icon: Clock },
+  completed: { label: "Lunas",                cls: "bg-green-100 text-green-700",  icon: CheckCircle },
+  failed:    { label: "Gagal",                cls: "bg-red-100 text-red-700",      icon: XCircle },
+  cancelled: { label: "Kedaluwarsa",          cls: "bg-slate-100 text-slate-500",  icon: XCircle },
+}
+
+const RENTAL_STATUS = {
+  pending:       { label: "Menunggu Persetujuan Admin", cls: "bg-amber-100 text-amber-700" },
+  disetujui:     { label: "Disetujui Admin",            cls: "bg-blue-100 text-blue-700" },
+  sedang_disewa: { label: "Sedang Disewa",              cls: "bg-teal-100 text-teal-700" },
+  selesai:       { label: "Selesai",                    cls: "bg-green-100 text-green-700" },
+  ditolak:       { label: "Ditolak",                    cls: "bg-red-100 text-red-700" },
+}
+
+/* Payment method options */
+const PAYMENT_METHODS = [
+  {
+    id: "qris",
+    label: "QRIS",
+    description: "Scan QR — GoPay, OVO, DANA, ShopeePay, dll",
+    icon: QrCode,
+    type: "qris",
+    bank: null,
+  },
+  {
+    id: "gopay",
+    label: "GoPay",
+    description: "Bayar langsung via GoPay",
+    icon: Smartphone,
+    type: "gopay",
+    bank: null,
+  },
+  {
+    id: "shopeepay",
+    label: "ShopeePay",
+    description: "Bayar langsung via ShopeePay",
+    icon: Smartphone,
+    type: "shopeepay",
+    bank: null,
+  },
+  {
+    id: "bca_va",
+    label: "BCA Virtual Account",
+    description: "Transfer via ATM/Mobile Banking BCA",
+    icon: Building2,
+    type: "bank_transfer",
+    bank: "bca",
+  },
+  {
+    id: "bni_va",
+    label: "BNI Virtual Account",
+    description: "Transfer via ATM/Mobile Banking BNI",
+    icon: Building2,
+    type: "bank_transfer",
+    bank: "bni",
+  },
+  {
+    id: "bri_va",
+    label: "BRI Virtual Account",
+    description: "Transfer via ATM/Mobile Banking BRI",
+    icon: Building2,
+    type: "bank_transfer",
+    bank: "bri",
+  },
+  {
+    id: "mandiri_va",
+    label: "Mandiri Bill Payment",
+    description: "Transfer via ATM/Mobile Banking Mandiri",
+    icon: Building2,
+    type: "bank_transfer",
+    bank: "mandiri",
+  },
+  {
+    id: "permata_va",
+    label: "Permata Virtual Account",
+    description: "Transfer via ATM/Mobile Banking Permata",
+    icon: Building2,
+    type: "bank_transfer",
+    bank: "permata",
+  },
+]
+
+
+/* ─── Countdown Timer Component ─── */
+function PaymentDeadlineCountdown({ deadline }) {
+  const [timeLeft, setTimeLeft] = useState(() => {
+    const diff = new Date(deadline).getTime() - Date.now()
+    return Math.max(0, Math.floor(diff / 1000))
   })
+
+  useEffect(() => {
+    if (timeLeft <= 0) return
+    const timer = setInterval(() => {
+      const diff = new Date(deadline).getTime() - Date.now()
+      setTimeLeft(Math.max(0, Math.floor(diff / 1000)))
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [deadline])
+
+  if (timeLeft <= 0) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-2xl p-3 text-center">
+        <p className="text-sm font-bold text-red-700">⏰ Batas waktu pembayaran habis</p>
+      </div>
+    )
+  }
+
+  const hours = Math.floor(timeLeft / 3600)
+  const mins = Math.floor((timeLeft % 3600) / 60)
+  const secs = timeLeft % 60
+
+  return (
+    <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3 text-center">
+      <p className="text-xs text-amber-600 font-semibold">Batas waktu pembayaran</p>
+      <p className="text-lg font-mono font-black text-amber-700 mt-0.5">
+        {String(hours).padStart(2, "0")}:{String(mins).padStart(2, "0")}:{String(secs).padStart(2, "0")}
+      </p>
+    </div>
+  )
 }
 
-const STATUS_LABEL = {
-  pending:   { label: "Menunggu",    cls: "bg-amber-100 text-amber-700",  icon: Clock },
-  completed: { label: "Lunas",       cls: "bg-green-100 text-green-700",  icon: CheckCircle },
-  failed:    { label: "Ditolak",     cls: "bg-red-100 text-red-700",      icon: AlertTriangle },
-  cancelled: { label: "Dibatalkan",  cls: "bg-slate-100 text-slate-500",  icon: X },
-}
+function PaymentCountdown({ expiresAt, onExpired }) {
+  const [timeLeft, setTimeLeft] = useState(() => {
+    const diff = new Date(expiresAt).getTime() - Date.now()
+    return Math.max(0, Math.floor(diff / 1000))
+  })
+  const firedRef = useRef(false)
 
-export default function PaymentPage({ addToast }) {
+  useEffect(() => {
+    if (timeLeft <= 0) {
+      if (!firedRef.current) { firedRef.current = true; onExpired?.() }
+      return
+    }
+    const timer = setInterval(() => {
+      const diff = new Date(expiresAt).getTime() - Date.now()
+      const secs = Math.max(0, Math.floor(diff / 1000))
+      setTimeLeft(secs)
+      if (secs <= 0) {
+        clearInterval(timer)
+        if (!firedRef.current) { firedRef.current = true; onExpired?.() }
+      }
+    }, 1000)
+    return () => clearInterval(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expiresAt])
+
+  const mins = Math.floor(timeLeft / 60)
+  const secs = timeLeft % 60
+  const isUrgent = timeLeft < 300 // kurang dari 5 menit
+
+  if (timeLeft <= 0) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-2xl p-3 text-center">
+        <p className="text-sm font-bold text-red-700">⏰ Waktu pembayaran habis</p>
+        <p className="text-xs text-red-600 mt-0.5">Silakan buat pesanan baru.</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className={`rounded-2xl p-3 text-center border ${isUrgent ? "bg-red-50 border-red-200" : "bg-amber-50 border-amber-200"}`}>
+      <p className={`text-xs font-semibold ${isUrgent ? "text-red-600" : "text-amber-600"}`}>Batas waktu pembayaran</p>
+      <p className={`text-2xl font-mono font-black mt-1 ${isUrgent ? "text-red-700" : "text-amber-700"}`}>
+        {String(mins).padStart(2, "0")}:{String(secs).padStart(2, "0")}
+      </p>
+    </div>
+  )
+}export default function PaymentPage({ addToast }) {
   const { rentalId } = useParams()
   const navigate     = useNavigate()
 
   const [rental, setRental]         = useState(null)
   const [payment, setPayment]       = useState(null)
   const [adminInfo, setAdminInfo]   = useState(null)
+  const [pickupInfo, setPickupInfo] = useState(null)
   const [loading, setLoading]       = useState(true)
+  const [charging, setCharging]     = useState(null) // id of method being charged
+  const [syncing, setSyncing]       = useState(false)
+  const [chargeResult, setChargeResult] = useState(null) // result from direct charge
 
-  const [buktiPreview, setBuktiPreview] = useState(null) // new file preview
-  const [catatan, setCatatan]           = useState("")
-  const [submitting, setSubmitting]     = useState(false)
-  const [copied, setCopied]             = useState(false)
-  const fileRef = useRef()
-
-  // ── Load data
-  useEffect(() => {
-    if (!rentalId) { navigate("/home"); return }
+  const loadAll = async () => {
     const id = parseInt(rentalId, 10)
+    if (Number.isNaN(id)) { navigate("/home"); return }
 
-    fetchMyRentals({ limit: 100 })
-      .then(async (rentalsData) => {
-        const rentals = Array.isArray(rentalsData)
-          ? rentalsData
-          : (rentalsData?.rentals || rentalsData?.items || [])
-        const r = rentals.find(x => x.id === id)
-        if (!r) {
-          addToast?.("Data sewa tidak ditemukan", "error")
-          navigate("/home")
-          return
-        }
-        setRental(r)
+    const rentalsData = await fetchMyRentals({ limit: 100 }).catch(() => ({ rentals: [] }))
+    const rentals = Array.isArray(rentalsData) ? rentalsData : (rentalsData?.rentals || [])
+    const r = rentals.find(x => x.id === id)
+    if (!r) {
+      addToast?.("Data sewa tidak ditemukan", "error")
+      navigate("/home"); return
+    }
+    setRental(r)
 
-        // ── payments (opsional)
-        fetchMyPayments({ limit: 100 }).then(paymentsData => {
-          const pays = Array.isArray(paymentsData) ? paymentsData : (paymentsData?.payments || [])
-          const pay = pays.find(x => x.rental_id === id) || null
-          setPayment(pay)
-        }).catch(() => {/* endpoint belum ada di backend v2, abaikan */})
+    const paymentsData = await fetchMyPayments({ limit: 100 }).catch(() => ({ payments: [] }))
+    const pays = Array.isArray(paymentsData) ? paymentsData : (paymentsData?.payments || [])
+    const pay = pays.find(x => x.rental_id === id) || null
+    setPayment(pay)
 
-        // ── admin payment info
-        if (r.item?.admin_id) {
-          const info = await fetchAdminPaymentInfo(r.item.admin_id).catch(() => null)
-          setAdminInfo(info)
-        }
-      })
-      .catch(err => {
-        console.error("PaymentPage rentals error:", err)
-        addToast?.("Gagal memuat data sewa", "error")
-        navigate("/home")
-      })
-      .finally(() => setLoading(false))
-  }, [rentalId, navigate])
+    // Restore charge result dari backend jika sudah pernah charge dan masih pending
+    if (pay?.status === "pending" && pay?.charge_response && !chargeResult) {
+      try {
+        const savedResponse = JSON.parse(pay.charge_response)
+        setChargeResult({ midtrans_response: savedResponse, payment_id: pay.id, order_id: pay.midtrans_order_id })
+      } catch { /* ignore parse error */ }
+    }
 
-  const handleFileChange = async (e) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    try { setBuktiPreview(await compressImg(file)) }
-    catch { addToast?.("Gagal memproses gambar", "error") }
-  }
+    if (pay?.status === "completed" || ["sedang_disewa", "selesai"].includes(r.status)) {
+      fetchRentalPickupInfo(id).then(setPickupInfo).catch(() => {})
+    }
 
-  const copyRek = () => {
-    if (!adminInfo?.nomor_rekening) return
-    navigator.clipboard.writeText(adminInfo.nomor_rekening).then(() => {
-      setCopied(true); setTimeout(() => setCopied(false), 2500)
-    })
-  }
-
-  const handleSubmit = async () => {
-    if (!buktiPreview) { addToast?.("Pilih foto bukti terlebih dahulu", "warning"); return }
-    setSubmitting(true)
-    try {
-      let pay = payment
-      if (!pay) pay = await createPaymentForRental(rentalId)
-      const updated = await uploadPaymentProof(pay.id, {
-        bukti_pembayaran: buktiPreview,
-        catatan: catatan || undefined,
-      })
-      setPayment(updated)
-      setBuktiPreview(null)
-      if (fileRef.current) fileRef.current.value = ""
-      addToast?.("Bukti pembayaran berhasil dikirim! Admin akan segera mengkonfirmasi.", "success")
-    } catch (err) {
-      addToast?.(err.message || "Gagal mengirim bukti", "error")
-    } finally {
-      setSubmitting(false)
+    if (r.item?.admin_id) {
+      fetchAdminPaymentInfo(r.item.admin_id).then(setAdminInfo).catch(() => {})
     }
   }
 
-  // ── Loading
+  useEffect(() => {
+    setLoading(true)
+    loadAll().finally(() => setLoading(false))
+  }, [rentalId])
+
+  // Handle direct charge
+  const handleCharge = async (method) => {
+    setCharging(method.id)
+    try {
+      const result = await chargeDirectMidtrans(rentalId, {
+        payment_type: method.type,
+        bank: method.bank,
+      })
+      setChargeResult(result)
+      addToast?.("Pembayaran berhasil dibuat! Ikuti instruksi di bawah.", "success")
+      await loadAll()
+    } catch (err) {
+      addToast?.(err.message || "Gagal membuat pembayaran", "error")
+    } finally {
+      setCharging(null)
+    }
+  }
+
+  // Manual sync
+  const handleSync = async () => {
+    if (!payment?.id) return
+    setSyncing(true)
+    try {
+      const syncResult = await syncMidtransPayment(payment.id)
+      await loadAll()
+      // Reset instruksi hanya jika payment sudah selesai
+      if (syncResult?.status === "completed" || syncResult?.status === "failed") {
+        setChargeResult(null)
+        addToast?.("Pembayaran berhasil dikonfirmasi!", "success")
+      } else {
+        addToast?.("Pembayaran belum terdeteksi. Coba lagi dalam beberapa saat.", "info")
+      }
+    } catch (err) {
+      addToast?.(err.message || "Gagal sync status", "error")
+    } finally {
+      setSyncing(false)
+    }
+  }
+
   if (loading) return (
     <div className="max-w-2xl mx-auto space-y-4 pt-4">
       <Skeleton className="h-6 w-32" />
@@ -142,31 +282,28 @@ export default function PaymentPage({ addToast }) {
       <Skeleton className="h-64 rounded-3xl" />
     </div>
   )
-
   if (!rental) return null
 
   const item = rental.item
   const imgFallback = `https://ui-avatars.com/api/?name=${encodeURIComponent(item?.nama || "Item")}&background=1b7e6a&color=fff&size=200&bold=true`
-  const payStatus = payment ? (STATUS_LABEL[payment.status] || STATUS_LABEL.pending) : null
-  const PayIcon = payStatus?.icon || Clock
-  const isPaid = payment?.status === "completed"
-  const hasBukti = !!payment?.bukti_pembayaran
-  const hasPayInfo = adminInfo?.nomor_rekening || adminInfo?.foto_qris
-  // Bisa upload kapan saja selama belum confirmed
-  const canUpload = !isPaid && rental?.status !== "selesai" && rental?.status !== "ditolak"
+  const isApproved = rental.status === "disetujui"
+  const isPaid     = payment?.status === "completed"
+  const isRunning  = rental.status === "sedang_disewa"
+  const canPay     = isApproved && !isPaid
+  const payMeta    = payment ? (PAY_STATUS[payment.status] || PAY_STATUS.pending) : null
+  const rs         = RENTAL_STATUS[rental.status] || RENTAL_STATUS.pending
+  const PayIcon    = payMeta?.icon || Clock
 
-  const rentalStatusLabel = {
-    pending:      { label: "Menunggu Verifikasi Admin", cls: "bg-amber-100 text-amber-700" },
-    disetujui:    { label: "Disetujui Admin",           cls: "bg-blue-100 text-blue-700" },
-    sedang_disewa:{ label: "Sedang Disewa",             cls: "bg-teal-100 text-teal-700" },
-    selesai:      { label: "Selesai",                  cls: "bg-green-100 text-green-700" },
-    ditolak:      { label: "Ditolak",                  cls: "bg-red-100 text-red-700" },
-  }
-  const rs = rentalStatusLabel[rental?.status] || rentalStatusLabel.pending
+  // Extract payment info from charge result
+  const midResp = chargeResult?.midtrans_response
+  const vaNumbers = midResp?.va_numbers || []
+  const qrUrl = midResp?.actions?.find(a => a.name === "generate-qr-code")?.url
+    || midResp?.actions?.find(a => a.name === "deeplink-redirect")?.url
+  const billKey = midResp?.bill_key
+  const billerCode = midResp?.biller_code
 
   return (
     <div className="max-w-2xl mx-auto space-y-5 pb-10">
-      {/* Back */}
       <button
         onClick={() => navigate("/home")}
         className="flex items-center gap-1.5 text-sm text-primary hover:text-primary/80 transition"
@@ -177,30 +314,55 @@ export default function PaymentPage({ addToast }) {
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h1 className="text-2xl font-black text-slate-800">Pembayaran Sewa</h1>
         <div className="flex items-center gap-2 flex-wrap">
-          {/* rental status */}
           <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${rs.cls}`}>{rs.label}</span>
-          {/* payment status */}
-          {payStatus && (
-            <span className={`flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full ${payStatus.cls}`}>
-              <PayIcon className="w-3.5 h-3.5" /> {payStatus.label}
+          {payMeta && rental.status !== "pending" && (
+            <span className={`flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full ${payMeta.cls}`}>
+              <PayIcon className="w-3.5 h-3.5" /> {payMeta.label}
             </span>
           )}
         </div>
       </div>
 
-      {/* Pending guide banner */}
-      {rental?.status === "pending" && (
-        <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 text-sm text-blue-700 space-y-1">
-          <p className="font-bold">📋 Langkah Pembayaran</p>
-          <ol className="list-decimal list-inside space-y-0.5 text-xs">
-            <li>Transfer ke rekening penyedia di bawah</li>
-            <li>Upload foto bukti transfer</li>
-            <li>Admin akan memverifikasi bukti &amp; menyetujui pesananmu</li>
-          </ol>
+      {/* Banner: masih pending approval */}
+      {rental.status === "pending" && (
+        <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 text-sm text-blue-800 flex items-start gap-3">
+          <Clock className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="font-bold">Menunggu Persetujuan Admin</p>
+            <p className="text-xs text-blue-700 mt-0.5">
+              Admin sedang meninjau permintaan sewamu. Pilihan pembayaran akan muncul setelah disetujui.
+            </p>
+          </div>
         </div>
       )}
 
-      {/* ── Rental summary card */}
+      {/* Banner: ditolak */}
+      {rental.status === "ditolak" && (
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-sm text-red-800 flex items-start gap-3">
+          <XCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="font-bold">{payment?.catatan?.includes("expired") ? "Pembayaran Kedaluwarsa" : "Permintaan Sewa Ditolak"}</p>
+            <p className="text-xs text-red-700 mt-0.5">
+              {payment?.catatan?.includes("expired")
+                ? "Batas waktu pembayaran 30 menit telah terlampaui. Silakan buat pesanan baru."
+                : rental.catatan ? `Catatan admin: ${rental.catatan}` : ""}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Banner: payment failed/expired */}
+      {payment?.status === "failed" && rental.status !== "ditolak" && (
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-sm text-red-800 flex items-start gap-3">
+          <XCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="font-bold">Pembayaran Gagal</p>
+            <p className="text-xs text-red-700 mt-0.5">{payment.catatan || "Pembayaran tidak berhasil. Silakan coba lagi atau buat pesanan baru."}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Ringkasan rental */}
       <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
         <div className="flex gap-4 p-4">
           <img
@@ -225,7 +387,156 @@ export default function PaymentPage({ addToast }) {
         </div>
       </div>
 
-      {/* ── Paid confirmation */}
+      {/* Pilih Metode Pembayaran */}
+      {canPay && !chargeResult && (
+        <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-5 space-y-4">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+              <CreditCard className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <p className="font-black text-slate-800">Pilih Metode Pembayaran</p>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Klik metode yang kamu inginkan untuk langsung membuat pembayaran.
+              </p>
+            </div>
+          </div>
+
+          {/* Countdown 24 jam batas waktu pembayaran */}
+          {rental.payment_deadline && (
+            <PaymentDeadlineCountdown deadline={rental.payment_deadline} />
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {PAYMENT_METHODS.map(method => {
+              const Icon = method.icon
+              return (
+                <button
+                  key={method.id}
+                  onClick={() => handleCharge(method)}
+                  disabled={charging !== null}
+                  className="flex items-center gap-3 p-4 rounded-2xl border border-slate-200 hover:border-primary hover:bg-primary/5 transition-all text-left disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center flex-shrink-0">
+                    {charging === method.id ? (
+                      <Loader2 className="w-5 h-5 text-primary animate-spin" />
+                    ) : (
+                      <Icon className="w-5 h-5 text-slate-600" />
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-semibold text-sm text-slate-800">{method.label}</p>
+                    <p className="text-[11px] text-slate-500 truncate">{method.description}</p>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+
+          <div className="flex items-center gap-2 text-[11px] text-slate-400 justify-center pt-1">
+            <Shield className="w-3 h-3" />
+            <span>Transaksi diproses aman oleh Midtrans</span>
+          </div>
+        </div>
+      )}
+
+      {/* Instruksi Pembayaran (setelah charge) */}
+      {canPay && chargeResult && (
+        <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-5 space-y-4">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-amber-100 flex items-center justify-center flex-shrink-0">
+              <Clock className="w-5 h-5 text-amber-600" />
+            </div>
+            <div>
+              <p className="font-black text-slate-800">Instruksi Pembayaran</p>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Selesaikan pembayaran sebelum batas waktu berakhir.
+              </p>
+            </div>
+          </div>
+
+          {/* Countdown Timer */}
+          {payment?.expires_at && (
+            <PaymentCountdown expiresAt={payment.expires_at} onExpired={() => { loadAll(); setChargeResult(null) }} />
+          )}
+
+          {/* VA Numbers */}
+          {vaNumbers.length > 0 && (
+            <div className="bg-slate-50 rounded-2xl p-4 space-y-3">
+              {vaNumbers.map((va, i) => (
+                <div key={i}>
+                  <p className="text-xs text-slate-500 uppercase font-semibold">{va.bank} Virtual Account</p>
+                  <p className="text-2xl font-mono font-bold text-slate-800 tracking-wider mt-1 select-all">{va.va_number}</p>
+                </div>
+              ))}
+              <p className="text-xs text-slate-500">
+                Transfer tepat <span className="font-bold text-slate-700">{formatPrice(rental.total_harga)}</span> ke nomor VA di atas.
+              </p>
+            </div>
+          )}
+
+          {/* Mandiri Bill Payment */}
+          {billerCode && billKey && (
+            <div className="bg-slate-50 rounded-2xl p-4 space-y-2">
+              <div>
+                <p className="text-xs text-slate-500 uppercase font-semibold">Biller Code</p>
+                <p className="text-xl font-mono font-bold text-slate-800 select-all">{billerCode}</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-500 uppercase font-semibold">Bill Key</p>
+                <p className="text-xl font-mono font-bold text-slate-800 select-all">{billKey}</p>
+              </div>
+              <p className="text-xs text-slate-500">
+                Transfer tepat <span className="font-bold text-slate-700">{formatPrice(rental.total_harga)}</span> menggunakan Mandiri Bill Payment.
+              </p>
+            </div>
+          )}
+
+          {/* QR Code / Deeplink */}
+          {qrUrl && (
+            <div className="bg-slate-50 rounded-2xl p-4 flex flex-col items-center gap-3">
+              <img src={qrUrl} alt="QR Code" className="w-48 h-48 rounded-xl" />
+              <p className="text-xs text-slate-500 text-center">
+                Scan QR code di atas menggunakan aplikasi e-wallet kamu.
+              </p>
+            </div>
+          )}
+
+          {/* GoPay/ShopeePay deeplink */}
+          {midResp?.actions && !qrUrl && (
+            <div className="bg-slate-50 rounded-2xl p-4 space-y-2">
+              {midResp.actions.filter(a => a.name === "deeplink-redirect" || a.name === "get-status").map((action, i) => (
+                action.name === "deeplink-redirect" && (
+                  <a
+                    key={i}
+                    href={action.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block w-full py-3 rounded-2xl bg-primary text-white font-bold text-sm text-center hover:bg-primary/90 transition"
+                  >
+                    Buka Aplikasi untuk Bayar
+                  </a>
+                )
+              ))}
+            </div>
+          )}
+
+          {/* Sync button */}
+          <button
+            onClick={handleSync}
+            disabled={syncing}
+            className="w-full py-3 rounded-2xl bg-primary text-white font-bold text-sm flex items-center justify-center gap-2 hover:bg-primary/90 disabled:opacity-50 transition"
+          >
+            {syncing
+              ? <><Loader2 className="w-4 h-4 animate-spin" /> Mengecek status...</>
+              : <><RefreshCw className="w-4 h-4" /> Sudah bayar? Cek status</>
+            }
+          </button>
+
+        </div>
+      )}
+
+      {/* Konfirmasi lunas */}
       {isPaid && (
         <div className="bg-green-50 border border-green-200 rounded-3xl p-5 flex items-center gap-4">
           <div className="w-12 h-12 rounded-2xl bg-green-100 flex items-center justify-center flex-shrink-0">
@@ -233,151 +544,72 @@ export default function PaymentPage({ addToast }) {
           </div>
           <div>
             <p className="font-bold text-green-700">Pembayaran Terkonfirmasi</p>
-            <p className="text-sm text-green-600 mt-0.5">Admin telah mengkonfirmasi bukti transfermu. Silakan ambil barang sesuai jadwal.</p>
-          </div>
-        </div>
-      )}
-
-      {/* ── Admin payment info */}
-      {hasPayInfo && (
-        <div className="bg-white border border-slate-200 rounded-3xl p-5 space-y-4">
-          <div>
-            <p className="text-slate-800 font-bold text-sm">Transfer ke</p>
-            <p className="text-slate-500 text-xs mt-0.5">{adminInfo.nama_usaha}</p>
-          </div>
-
-          {adminInfo.nomor_rekening && (
-            <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4">
-              <div className="flex items-center gap-1.5 text-xs text-slate-400 mb-2">
-                <Building2 className="w-3.5 h-3.5" /> Nomor Rekening / Bank
-              </div>
-              <div className="flex items-center gap-3">
-                <p className="font-black text-slate-800 text-base flex-1">{adminInfo.nomor_rekening}</p>
-                <button
-                  onClick={copyRek}
-                  className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl bg-primary/10 text-primary hover:bg-primary/20 transition flex-shrink-0"
-                >
-                  {copied
-                    ? <><CheckCircle className="w-3.5 h-3.5" /> Tersalin!</>
-                    : <><Copy className="w-3.5 h-3.5" /> Salin</>
-                  }
-                </button>
-              </div>
-            </div>
-          )}
-
-          {adminInfo.foto_qris && (
-            <div>
-              <div className="flex items-center gap-1.5 text-xs text-slate-400 mb-2">
-                <QrCode className="w-3.5 h-3.5" /> QRIS — Scan dengan app pembayaranmu
-              </div>
-              <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 flex justify-center">
-                <img
-                  src={adminInfo.foto_qris}
-                  alt="QRIS"
-                  className="max-w-[220px] w-full object-contain"
-                />
-              </div>
-            </div>
-          )}
-
-          {adminInfo.nomor_telepon && (
-            <p className="text-slate-500 text-xs">
-              Konfirmasi ke penyedia: {adminInfo.nomor_telepon}
+            <p className="text-sm text-green-600 mt-0.5">
+              {payment?.payment_channel
+                ? <>Dibayar via <span className="font-semibold capitalize">{payment.payment_channel.replace(/_/g, " ")}</span>. Silakan ambil barang sesuai jadwal.</>
+                : <>Silakan ambil barang sesuai jadwal.</>}
             </p>
-          )}
+          </div>
         </div>
       )}
 
-      {/* ── Upload / view bukti */}
-      {canUpload && (
+      {/* Pickup map */}
+      {(isPaid || isRunning) && pickupInfo && (
         <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-5 space-y-4">
           <div>
-            <p className="font-black text-slate-800">Upload Bukti Pembayaran</p>
-            <p className="text-xs text-slate-400 mt-0.5">Foto struk transfer / screenshot konfirmasi</p>
+            <p className="font-black text-slate-800 flex items-center gap-2">
+              <MapPin className="w-4 h-4 text-blue-600" />
+              {isRunning ? "Lokasi Pengembalian Barang" : "Lokasi Pengambilan Barang"}
+            </p>
+            <p className="text-xs text-slate-400 mt-0.5">
+              {isRunning ? "Kembalikan barang ke lokasi berikut" : "Ambil barang di lokasi berikut sesuai jadwal"}
+            </p>
           </div>
 
-          {/* Current uploaded bukti */}
-          {hasBukti && !buktiPreview && (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-xs text-amber-600 font-semibold">
-                <Clock className="w-3.5 h-3.5" /> Bukti sudah dikirim · menunggu konfirmasi admin
-              </div>
-              <img
-                src={payment.bukti_pembayaran}
-                alt="Bukti"
-                className="w-full rounded-2xl object-cover max-h-56 border border-slate-200"
-              />
-            </div>
-          )}
+          <div className="bg-slate-50 rounded-2xl p-4 space-y-1.5">
+            {pickupInfo.pickup_nama_usaha && <p className="font-bold text-slate-700">{pickupInfo.pickup_nama_usaha}</p>}
+            {pickupInfo.pickup_alamat      && <p className="text-sm text-slate-600">{pickupInfo.pickup_alamat}</p>}
+            {pickupInfo.pickup_telepon     && <p className="text-sm text-slate-500">📞 {pickupInfo.pickup_telepon}</p>}
+          </div>
 
-          {/* New file preview */}
-          {buktiPreview ? (
-            <div className="relative">
-              <img src={buktiPreview} alt="preview" className="w-full rounded-2xl object-cover max-h-56 border border-slate-200" />
-              <button
-                onClick={() => { setBuktiPreview(null); if (fileRef.current) fileRef.current.value = "" }}
-                className="absolute top-2 right-2 w-8 h-8 bg-white rounded-full shadow flex items-center justify-center text-slate-500 hover:text-destructive"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={() => fileRef.current?.click()}
-              className="w-full border-2 border-dashed border-slate-200 rounded-2xl p-7 flex flex-col items-center gap-2 text-slate-400 hover:border-primary hover:text-primary transition"
-            >
-              <Upload className="w-8 h-8" />
-              <span className="text-sm font-semibold">{hasBukti ? "Ganti Foto Bukti" : "Pilih Foto Bukti"}</span>
-              <span className="text-xs">JPG, PNG, WEBP</span>
-            </button>
-          )}
-
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            className="hidden"
-            onChange={handleFileChange}
+          <PickupMap
+            lat={pickupInfo.pickup_latitude}
+            lng={pickupInfo.pickup_longitude}
+            label={pickupInfo.pickup_nama_usaha || "Lokasi Pickup"}
           />
 
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
-              Catatan (Opsional)
-            </label>
-            <textarea
-              value={catatan}
-              onChange={(e) => setCatatan(e.target.value)}
-              placeholder="Misal: Transfer BCA 15:30, ref 1234..."
-              rows={2}
-              className="w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/30 bg-slate-50"
-            />
-          </div>
-
-          <button
-            onClick={handleSubmit}
-            disabled={submitting || !buktiPreview}
-            className="w-full py-3 rounded-2xl bg-primary text-white font-bold text-sm flex items-center justify-center gap-2 hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition"
+          <a
+            href={`https://www.google.com/maps?q=${pickupInfo.pickup_latitude},${pickupInfo.pickup_longitude}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full py-3 rounded-2xl bg-blue-600 text-white font-bold text-sm flex items-center justify-center gap-2 hover:bg-blue-700 transition"
           >
-            {submitting
-              ? <><Loader2 className="w-4 h-4 animate-spin" /> Mengirim...</>
-              : <><Upload className="w-4 h-4" /> Kirim Bukti Pembayaran</>
-            }
-          </button>
+            <Navigation className="w-4 h-4" />
+            Buka di Google Maps
+          </a>
         </div>
       )}
 
-      {/* ── If no payment info configured yet */}
-      {!hasPayInfo && !loading && (
+      {/* Pickup info tidak tersedia */}
+      {isPaid && !pickupInfo && (
         <div className="bg-amber-50 border border-amber-200 rounded-3xl p-4 flex items-start gap-3">
           <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
           <div>
-            <p className="text-sm font-semibold text-amber-700">Info Rekening Belum Diisi</p>
+            <p className="text-sm font-semibold text-amber-700">Koordinat Lokasi Belum Tersedia</p>
             <p className="text-xs text-amber-600 mt-0.5">
-              Penyedia barang belum mengisi nomor rekening. Hubungi penyedia untuk konfirmasi cara pembayaran.
+              Admin belum mengisi koordinat lokasi usaha. Hubungi penyedia untuk konfirmasi pickup.
             </p>
+            {adminInfo?.nomor_telepon && (
+              <p className="text-xs font-semibold text-amber-700 mt-1">📞 {adminInfo.nomor_telepon}</p>
+            )}
           </div>
         </div>
+      )}
+
+      {adminInfo?.nomor_telepon && (
+        <p className="text-center text-xs text-slate-400">
+          Butuh bantuan? Hubungi penyedia: <span className="font-semibold text-slate-600">{adminInfo.nomor_telepon}</span>
+        </p>
       )}
     </div>
   )
