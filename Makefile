@@ -247,6 +247,15 @@ compose-clean:
 	docker compose down -v
 	@echo "✅ Semua data dibersihkan!"
 
+up: compose-up
+down: compose-down
+status: compose-ps
+
+prod:
+	@echo "🚀 Menjalankan services dengan Docker Compose Production Overrides..."
+	docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+	@echo "✅ Services berjalan di environment production!"
+
 # ─────────────────────────────────────────────
 # DEVELOPMENT MODE (Hot-Reload)
 # Menggunakan docker-compose.dev.yml override
@@ -323,4 +332,5 @@ pr-check: build fe-build test
         fe-build fe-push fe-run fe-stop fe-restart push-all \
         compose-up compose-down compose-build compose-logs compose-ps compose-restart compose-clean \
         dev dev-build dev-down dev-logs dev-ps \
-        lint test pr-check
+        lint test pr-check \
+        up down status prod
