@@ -1,156 +1,148 @@
 # 🚀 Catatan Rilis (Release Notes) — Milestone 3 (Final)
 
-## 🎯 Perjalanan Pengembangan Arsitektur
+# 🎯 Perjalanan Pengembangan Arsitektur
 
-Pengembangan platform Sewain dilakukan melalui tiga tahap utama yang menunjukkan perkembangan sistem dari aplikasi sederhana menjadi arsitektur microservices yang lebih skalabel dan andal.
+Pengembangan platform Sewain oleh Kelompok Harahetta-2 telah diselesaikan melalui tiga tahapan pencapaian (milestones) utama. Perjalanan ini mencerminkan transisi sistem dari aplikasi sederhana hingga menjadi sistem matang yang siap produksi sekaligus memiliki kesiapan arsitektur skala besar (microservices-ready).
 
 ```text
-[MILESTONE 1]            [MILESTONE 2]            [MILESTONE 3]
-Monolithic App    ───►   Containerized App ───►   Microservices App
-
-- 1 Backend             - Docker Compose         - 6 Microservices
-- 1 Database            - CI/CD Pipeline         - 5 Database Terpisah
-- Deploy Manual         - Deploy Otomatis        - Security & Resilience
+[MILESTONE 1]                 [MILESTONE 2]                 [MILESTONE 3] (Rilis Final)
+Monolithic Foundation     ──► Containerized App     ──►   Structured Monolith (Production)
+- 1 Core Backend              - Docker Compose            - Modular Monolith (DeployCC)
+- 1 PostgreSQL DB             - Automated CI/CD           - Experimental Microservices Lab
+- Manual Deployment           - Zero-Downtime Deploy      - Enterprise Integrations (Midtrans & AI)
 ```
 
-### Milestone 1 — Foundation
+---
 
-Pada tahap awal, aplikasi dikembangkan menggunakan arsitektur monolitik yang terdiri dari FastAPI, React, dan satu database PostgreSQL. Fokus utama tahap ini adalah memastikan seluruh proses bisnis utama berjalan dengan baik.
+# Milestone 1 — Foundation (Pondasi Aplikasi)
 
-### Milestone 2 — Containerization
+Fokus awal adalah membangun fungsionalitas dasar bisnis persewaan barang. Kami mengembangkan backend monolitik menggunakan FastAPI, frontend interaktif menggunakan React, serta satu database relasional PostgreSQL. Seluruh integrasi REST API, manajemen token, dan visualisasi data dipastikan berjalan secara lokal.
 
-Pada tahap ini aplikasi dikemas menggunakan Docker Compose untuk mempermudah proses pengembangan dan deployment. Selain itu, GitHub Actions mulai digunakan untuk mengotomatisasi proses pengujian dan deployment.
+# Milestone 2 — Containerization & DevOps (Kontainerisasi)
 
-### Milestone 3 — Microservices
+Kami mengemas seluruh komponen aplikasi ke dalam kontainer menggunakan Docker dan mengotomatisasikan orkestrasinya lewat Docker Compose. Pada tahap ini, jalur otomatisasi CI/CD menggunakan GitHub Actions diaktifkan untuk menjalankan pengujian otomatis (linter, unit testing frontend/backend) sebelum merilis pembaruan ke server secara otomatis.
 
-Pada tahap akhir, sistem dipecah menjadi beberapa layanan independen menggunakan arsitektur microservices. Selain itu, berbagai peningkatan pada aspek keamanan, keandalan sistem, dan integrasi layanan eksternal juga diterapkan.
+# Milestone 3 — Production Monolith & Experimental Microservices (Skalabilitas & Integrasi)
+
+Rilis final ini menandai puncak arsitektur Sewain dengan pendekatan ganda yang taktis:
+
+## Sistem Produksi Utama (Structured Monolith)
+
+Untuk efisiensi penggunaan sumber daya server awan (cloud resource), kemudahan pemeliharaan, serta jaminan konsistensi transaksi keuangan, sistem yang berjalan aktif di lingkungan produksi (DeployCC) adalah Monolith Terstruktur.
+
+## Modul Eksperimen (Microservices Lab)
+
+Untuk memenuhi target pembelajaran akademis Cloud Computing, kami juga berhasil mendekomposisikan kode backend menjadi 6 Microservices independen (berada di folder `/services`) lengkap dengan skema Database per Service, Nginx API gateway, dan ketahanan jaringan (network resilience).
 
 ---
 
-## 🆕 Fitur Baru dan Peningkatan pada Milestone 3
+# 🆕 Fitur Baru dan Peningkatan pada Milestone 3
 
-### 1. Arsitektur Microservices 
+# 1. Dual-Architecture Capability (Kemampuan Arsitektur Ganda)
 
-Sistem kini terdiri dari enam layanan utama yang memiliki tanggung jawab masing-masing.
+Kami menstrukturkan basis kode agar mendukung dua model eksekusi:
 
-| Service         | Fungsi Utama                                                |
-| --------------- | ----------------------------------------------------------- |
-| Auth Service    | Autentikasi, otorisasi, profil pengguna, dan verifikasi data |
-| Item Service    | Pengelolaan barang dan kategori                             |
-| Rental Service  | Transaksi penyewaan, ulasan, dan promo                      |
-| Payment Service | Pembayaran, wallet admin, dan integrasi Midtrans            |
-| Chat Service    | Fitur chat real-time menggunakan REST API dan WebSocket     |
-| Chatbot Service | Asisten virtual berbasis Gemini AI                          |
+## Monolith Terstruktur (Aktif di Produksi)
 
-Untuk meningkatkan skalabilitas dan kemandirian setiap layanan, sistem menerapkan pola Database per Service dengan lima database PostgreSQL yang terpisah.
+Satu layanan FastAPI terintegrasi yang mengelola seluruh modul bisnis secara modular (direktori `/auth`, `/items`, `/rentals`, `/payments`, dan `/chats`) dengan menggunakan satu database PostgreSQL terpusat berisi 14 tabel relasional.
 
+## Microservices Eksperimental (Modul Pembelajaran)
 
-### 2. Peningkatan Keamanan Sistem
+Enam layanan independen yang didekomposisikan untuk berjalan di portnya masing-masing:
 
-Beberapa mekanisme keamanan ditambahkan untuk melindungi aplikasi dari penyalahgunaan dan kesalahan penggunaan.
+| Service | Port Host | Fungsi Utama & Tanggung Jawab |
+|----------|-----------|-------------------------------|
+| Auth Service | 8001 | Autentikasi, otorisasi token JWT, dan verifikasi dokumen KYC. |
+| Item Service | 8002 | CRUD katalog barang, kategori, serta koordinat GPS toko. |
+| Rental Service | 8003 | Alur transaksi penyewaan, kode promo, dan kalkulasi diskon. |
+| Payment Service | 8004 | Integrasi webhook Midtrans, wallet saldo, dan penarikan dana. |
+| Chat Service | 8005 | Alur komunikasi obrolan real-time berbasis WebSockets. |
+| Chatbot Service | 8006 | Layanan asisten cerdas berbasis Gemini AI (via OpenAI SDK). |
 
-#### a. Rate Limiting pada API Gateway
-
-API Gateway menggunakan Nginx untuk membatasi jumlah request yang dapat diterima dalam periode tertentu.
-
-| Jenis Endpoint               | Batas Request    |
-| ---------------------------- | ---------------- |
-| Login dan Registrasi         | 5 request/detik  |
-| Endpoint Transaksi           | 20 request/detik |
-| Halaman Umum dan File Statis | 30 request/detik |
-
-#### b. Pengelolaan Kredensial yang Lebih Aman
-
-Seluruh data sensitif seperti API Key, JWT Secret, dan kredensial database tidak disimpan langsung di dalam kode program. Konfigurasi tersebut dikelola menggunakan environment variable.
-
-#### c. Validasi Input
-
-Validasi data dilakukan menggunakan Pydantic untuk:
-
-* Mencegah nilai negatif pada data tertentu.
-* Membatasi panjang input pengguna.
-* Memastikan password memenuhi standar keamanan minimum.
-
-
-### 3. Keandalan dan Ketahanan Sistem
-
-#### a. Circuit Breaker
-
-Sistem menerapkan mekanisme Circuit Breaker untuk mencegah kegagalan berantai antar layanan. Jika suatu layanan mengalami gangguan, permintaan sementara akan dihentikan dan sistem akan menampilkan pesan yang lebih ramah kepada pengguna.
-
-#### b. Automatic Retry
-
-Ketika terjadi gangguan sementara pada komunikasi antar layanan, sistem akan mencoba kembali permintaan tersebut hingga tiga kali menggunakan jeda waktu yang bertambah secara bertahap (exponential backoff).
-
-
-### 4. Integrasi Layanan Pihak Ketiga
-
-#### a. Midtrans Payment Gateway
-
-Sistem terintegrasi dengan Midtrans untuk mendukung berbagai metode pembayaran digital, seperti:
-
-* QRIS
-* GoPay
-* Virtual Account
-
-Webhook Midtrans juga dilindungi menggunakan verifikasi Signature Key untuk memastikan keaslian data transaksi.
-
-#### b. Gemini AI Assistant
-
-Platform Sewain menyediakan asisten virtual berbasis Gemini AI yang dapat membantu pengguna memperoleh informasi dan rekomendasi secara interaktif.
-
-
-### 5. Monitoring dan Observabilitas
-
-#### a. Structured Logging
-
-Setiap layanan menghasilkan log dalam format JSON yang dilengkapi Correlation ID sehingga alur request antar layanan dapat dilacak dengan lebih mudah.
-
-#### b. Metrics Endpoint
-
-Setiap layanan menyediakan endpoint `/metrics` untuk memantau:
-
-* Jumlah request
-* Tingkat error
-* Latensi respons (p50, p95, dan p99)
-
-#### c. Status Dashboard
-
-Sistem menyediakan halaman status yang secara berkala memeriksa kondisi seluruh layanan dan menampilkan status kesehatan sistem secara real-time.
+Layanan mikro ini menerapkan pola Database per Service dengan menggunakan lima basis data PostgreSQL terpisah demi menjamin isolasi data maksimal.
 
 ---
 
-## 📊 Statistik Pengembangan Milestone 3
+# 2. Peningkatan Keamanan Sistem Produksi
 
-| Metrik                         | Nilai                         |
-| ------------------------------ | ----------------------------- |
-| Total Kontainer Docker         | 13                            |
-| Total Microservices            | 6                             |
-| Total Database Terpisah        | 5 PostgreSQL                  |
-| Total Endpoint REST API        | 50+                           |
-| Backend Unit Test Coverage     | 53,4%                         |
-| UI Integration Scenario Passed | 10/10 (100%)                  |
-| Pipeline CI/CD                 | Lint, Test, Build, dan Deploy |
+Beberapa mekanisme keamanan tingkat lanjut (enterprise-grade) telah diterapkan pada sistem:
 
----
+- **Rate Limiting:** Pada skenario microservices, kami mengonfigurasi Nginx API Gateway untuk membatasi laju request demi menghindari serangan DDoS (5 req/s untuk auth, 20 req/s untuk transaksi). Pada versi monolith produksi, limitasi ini dijaga dengan middleware FastAPI.
 
-## 👥 Kontribusi Tim
+- **Stateless JWT Authentication:** Pengamanan akses halaman sensitif (seperti dashboard admin/toko) divalidasi langsung di sisi server secara stateless menggunakan JWT token.
 
-| Anggota Tim                       | Peran                 | Kontribusi Utama                                                                                         |
-| --------------------------------- | --------------------- | -------------------------------------------------------------------------------------------------------- |
-| Djaky Abbyyu Fauzan (10231032)    | Lead Backend          | Dekomposisi microservices, implementasi logika bisnis, integrasi Midtrans, dan chatbot AI                |
-| Achmad Zaki Zaidan (10231002)     | Lead Frontend         | Pengembangan antarmuka pengguna, dashboard, integrasi chat, dan chatbot                                  |
-| Muhammad Alif Setiawan (10231056) | Lead DevOps           | Konfigurasi Docker, API Gateway, Rate Limiting, CI/CD, dan deployment cloud                              |
-| Riqqah Khalda Karina (10231082)   | Lead QA & Dokumentasi | Pengujian unit, dokumentasi arsitektur, dokumentasi API, dan penyusunan release notes |
+- **Keamanan Kredensial:** Seluruh data sensitif (seperti kunci privat Midtrans API dan API Key Gemini AI) disembunyikan menggunakan variabel lingkungan (`.env`) yang dilindungi dengan GitHub Secrets di pipeline deployment.
+
+- **Sistem Verifikasi KYC (Know Your Customer):** Mewajibkan penyewa baru untuk mengunggah berkas KTP dan foto diri (selfie) yang harus diverifikasi secara manual oleh Super Admin sebelum diizinkan bertransaksi.
 
 ---
 
-## 🐛 Batasan Sistem dan Isu yang Diketahui
+# 3. Keandalan dan Ketahanan Sistem (Resilience)
 
-### 1. Latensi pada Midtrans Sandbox
+Khusus pada modul eksperimen microservices (folder `/services`), kami menambahkan pustaka ketahanan jaringan untuk menangani kegagalan komunikasi antarkontainer:
 
-Karena sistem masih menggunakan lingkungan Sandbox Midtrans, terkadang simulasi pembayaran membutuhkan waktu respons yang lebih lama. Kondisi ini berasal dari layanan pengujian Midtrans dan bukan merupakan kesalahan pada platform Sewain.
+- **Circuit Breaker:** Memutuskan aliran request secara sementara jika suatu service tujuan mengalami kegagalan beruntun agar server utama tidak mengalami crash total.
 
-### 2. Batas Penggunaan Gemini AI
+- **Automatic Retry with Exponential Backoff:** Melakukan pengiriman ulang request otomatis hingga 3 kali dengan jeda waktu yang meningkat jika terjadi gangguan koneksi sementara (network glitches).
 
-Layanan Gemini AI menggunakan kuota gratis harian. Apabila chatbot tidak merespons, kemungkinan kuota penggunaan harian telah habis dan akan kembali tersedia setelah periode reset kuota berikutnya.
+---
+
+# 4. Integrasi Layanan Pihak Ketiga
+
+- **Midtrans Payment Gateway:** Integrasi penuh yang aman dengan Midtrans Snap API untuk memproses transaksi digital secara instan via QRIS, GoPay, ShopeePay, dan Virtual Account Bank. Webhook dilindungi menggunakan verifikasi Signature Key dari Midtrans.
+
+- **Asisten Virtual Gemini AI:** Integrasi cerdas dengan AI generatif Google Gemini yang bertindak sebagai asisten virtual untuk membantu menyaring rekomendasi barang sewaan kepada pengguna.
+
+---
+
+# 5. Monitoring dan Observabilitas Terpadu
+
+- **Structured JSON Logging:** Menghasilkan log server terstruktur dalam format JSON di lingkungan produksi.
+
+- **Correlation ID Tracing:** Menyuntikkan `X-Correlation-ID` unik di setiap request untuk memudahkan pelacakan alur eksekusi dari klien hingga ke database monolith.
+
+- **Metrics Endpoint:** Menyediakan endpoint `/metrics` untuk memantau performa latensi respons (persentil p50, p95, p99) serta tingkat error aplikasi.
+
+---
+
+# 📊 Statistik Pengembangan Milestone 3
+
+| Metrik Pengembangan | Nilai pada Sistem Monolith (Produksi) | Nilai pada Modul Microservices (Lab) |
+|--------------------|----------------------------------------|--------------------------------------|
+| Total Kontainer Docker | 3 (frontend, backend, monolith-db) | 13 (6 Services, 5 DBs, Nginx, Frontend) |
+| Teknologi Database | PostgreSQL 16 (1 Database Terpusat) | PostgreSQL 16 (5 Database Terpisah) |
+| Unit Test Coverage (Pytest) | $\ge 50\%$ (Cakupan Minimum Tercapai) | $\ge 50\%$ (Cakupan Minimum Tercapai) |
+| Skenario Integrasi UI (Vitest) | Lolos 10/10 (100% Sukses) | Lolos 10/10 (100% Sukses) |
+| Jalur Automasi CI/CD | Lint, Test, Docker Build & DeployCC | Lint, Test, Docker Build (Manual Setup) |
+
+---
+
+# 👥 Kontribusi Tim (Kelompok Harahetta-2)
+
+## Achmad Zaki Zaidan (10231002) — Lead Frontend & UI/UX Designer
+
+Pengembangan antarmuka pengguna berbasis React 19, dashboard toko, dashboard admin, visualisasi maps Leaflet, dan UI integrasi chat/chatbot.
+
+## Djaky Abbyyu Fauzan Timumum (10231032) — Lead Backend & Database Engineer
+
+Perancangan 14 tabel relasional database PostgreSQL, pembuatan modul REST API FastAPI (Auth, Item, Rental, Payment), integrasi webhook Midtrans, dan asisten virtual Gemini AI.
+
+## Muhammad Alif Setiawan (10231056) — Lead DevOps & CI/CD Specialist
+
+Pembuatan arsitektur Docker Compose (Monolith & Microservices), konfigurasi Nginx Gateway, automasi pipeline CI/CD GitHub Actions, dan manajemen deployment server awan DeployCC.
+
+## Riqqah Khalda Karina (10231082) — Lead QA & Docs
+
+Pembuatan skenario pengujian unit (Pytest & Vitest), penyusunan dokumentasi API Swagger, dokumen arsitektur, dan penulisan dokumen rilis (release notes).
+
+---
+
+# 🐛 Batasan Sistem dan Isu yang Diketahui
+
+## 1. Latensi Respon Pembayaran Sandbox Midtrans
+
+Karena masih beroperasi di lingkungan Sandbox (pengujian) milik Midtrans, waktu tunggu pemrosesan webhook dan konfirmasi pembayaran terkadang mengalami sedikit keterlambatan respons. Hal ini merupakan batasan dari server Sandbox Midtrans dan bukan merupakan kendala pada core aplikasi Sewain.
+
+## 2. Batas Kuota Gratis (Rate Limit) Gemini AI API
+
+Layanan asisten virtual kami berjalan menggunakan model Gemini AI dengan kuota gratis harian. Jika chatbot tidak merespons secara tiba-tiba, hal itu mengindikasikan bahwa batas kuota gratis harian untuk API key tersebut telah habis dan akan pulih secara otomatis pada siklus harian berikutnya.
