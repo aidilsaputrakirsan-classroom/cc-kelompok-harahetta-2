@@ -234,10 +234,43 @@ class Item(Base):
     @property
     def admin_kota(self):
         """Kota penyedia barang (di-extract dari alamat_usaha)."""
-        from crud import extract_city
-        if self.admin and self.admin.alamat_usaha:
-            return extract_city(self.admin.alamat_usaha)
-        return None
+        if not self.admin or not self.admin.alamat_usaha:
+            return None
+        # Inline extract — menghindari circular import dari crud.py
+        alamat = self.admin.alamat_usaha
+        parts = [p.strip() for p in alamat.split(",") if p.strip()]
+        if not parts:
+            return None
+        _provinces = {
+            "aceh", "bali", "banten", "bengkulu", "yogyakarta",
+            "daerah istimewa yogyakarta", "di yogyakarta",
+            "dki jakarta", "jakarta", "gorontalo", "jambi",
+            "jawa barat", "jawa tengah", "jawa timur",
+            "kalimantan barat", "kalimantan selatan", "kalimantan tengah",
+            "kalimantan timur", "kalimantan utara",
+            "kepulauan bangka belitung", "kepulauan riau",
+            "lampung", "maluku", "maluku utara",
+            "nusa tenggara barat", "nusa tenggara timur",
+            "papua", "papua barat", "papua barat daya",
+            "papua pegunungan", "papua selatan", "papua tengah",
+            "riau", "sulawesi barat", "sulawesi selatan",
+            "sulawesi tengah", "sulawesi tenggara", "sulawesi utara",
+            "sumatera barat", "sumatera selatan", "sumatera utara",
+            "indonesia",
+        }
+        cleaned = []
+        for p in parts:
+            low = p.lower()
+            if low.replace(" ", "").isdigit():
+                continue
+            if low in _provinces:
+                continue
+            for prefix in ("kota ", "kabupaten ", "kab. ", "kab "):
+                if low.startswith(prefix):
+                    p = p[len(prefix):].strip()
+                    break
+            cleaned.append(p)
+        return cleaned[-1] if cleaned else None
 
     def __repr__(self):
         return f"<Item(id={self.id}, nama='{self.nama}', harga_per_hari={self.harga_per_hari})>"
