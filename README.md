@@ -13,11 +13,11 @@
   <img src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black" alt="React"/>
   <img src="https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white" alt="PostgreSQL"/>
   <img src="https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white" alt="Docker"/>
-  <img src="https://img.shields.io/badge/Nginx-Gateway-009639?logo=nginx&logoColor=white" alt="Nginx"/>
+  <img src="https://img.shields.io/badge/Nginx-Web%20Server-009639?logo=nginx&logoColor=white" alt="Nginx"/>
 </p>
 
 <p align="center">
-  <strong>Sewain</strong> adalah platform berbasis web yang memfasilitasi penyewaan barang secara online dengan arsitektur <strong>microservices</strong>, dikelola melalui Docker Compose, dan dideploy secara otomatis melalui <strong>CI/CD pipeline</strong> GitHub Actions.
+  <strong>Sewain</strong> adalah platform berbasis web yang memfasilitasi penyewaan barang secara online dengan arsitektur <strong>monolith</strong> terpusat, diorkestrasi menggunakan Docker Compose, dan dideploy secara otomatis melalui <strong>CI/CD pipeline</strong> GitHub Actions ke platform DeployCC.
 </p>
 
 <p align="center">
@@ -26,8 +26,7 @@
 
 <p align="center">
   🌐 <a href="https://cc-kelompok-harahetta-2.akhzafachrozy.my.id/">Live Demo</a> ·
-  📋 <a href="https://cc-kelompok-harahetta-2.akhzafachrozy.my.id/api/docs#/">API Docs</a> ·
-  📐 <a href="#-arsitektur-microservices">Arsitektur Detail</a>
+  📋 <a href="https://cc-kelompok-harahetta-2.akhzafachrozy.my.id/api/docs#/">API Docs</a>
 </p>
 
 
@@ -39,7 +38,7 @@
 - [Tim Pengembang](#-tim-pengembang)
 - [Fitur Utama](#-fitur-utama)
 - [Tech Stack](#-tech-stack)
-- [Arsitektur Microservices](#-arsitektur-microservices)
+- [Arsitektur Monolitik](#-arsitektur-monolitik)
 - [Database Schema](#-database-schema)
 - [CI/CD Pipeline](#-cicd-pipeline)
 - [Getting Started](#-getting-started)
@@ -154,26 +153,24 @@ SEWAIN memiliki **tiga peran pengguna** dengan hak akses yang berbeda:
 | DeployCC | Production deployment platform |
 | Pytest + pytest-cov | Backend testing & coverage |
 | Vitest + Testing Library | Frontend testing |
-| ESLint + Flake8 | Code linting |
 
 ---
 
-## 🏗 Arsitektur Microservices
+## 🏗 Arsitektur Monolitik (Monolithic Architecture)
 
-Sewain menggunakan arsitektur **microservices** dengan pola **Database per Service** dan **API Gateway** menggunakan Nginx sebagai reverse proxy tunggal. Sistem terdiri dari **6 backend service**, **5 database terisolasi**, **frontend React**, dan **Nginx gateway** yang diorkestrasi melalui Docker Compose — total **13 container**.
+Sewain menggunakan arsitektur **monolitik** di mana seluruh fungsionalitas backend diintegrasikan ke dalam satu layanan FastAPI tunggal (`backend/`). Seluruh data disimpan dalam satu database PostgreSQL terpusat (`monolith-db`). Hal ini dirancang untuk menyederhanakan komunikasi data, menyamakan konteks transaksi database, dan mempermudah proses deployment zero-downtime di environment production.
 
 ### Prinsip Desain
 
 | Prinsip | Implementasi di Sewain |
 |---------|------------------------|
-| **Database per Service** | Tiap service punya PostgreSQL sendiri (auth-db, item-db, rental-db, payment-db, chat-db) — tidak ada shared database |
-| **API Gateway** | Nginx sebagai satu-satunya entry point (port 80), routing per-path ke service tujuan |
-| **Stateless Auth** | Auth Service menerbitkan JWT; service lain memverifikasi token via HTTP ke Auth Service |
-| **Inter-Service via HTTP** | Komunikasi antar service menggunakan REST internal (httpx client) |
-| **Resilience** | Tiap client antar-service dilindungi **circuit breaker** untuk mencegah cascading failure |
-| **Observability** | Tiap service expose `/health` & `/metrics`, dengan structured logging middleware |
+| **Centralized Database** | Menggunakan satu database PostgreSQL (`data_sewain`) untuk semua modul. Hubungan relasional (foreign key) antar tabel terjaga dengan konsisten. |
+| **Modular Backend** | Kode backend FastAPI dibagi ke dalam modul-modul logis (auth, chat, chatbot, crud, email, midtrans) dengan model data (`models.py`) dan skema Pydantic (`schemas.py`) terpusat. |
+| **Unified Authentication** | Autentikasi JWT ditangani secara langsung oleh middleware internal backend tanpa overhead request HTTP inter-service. |
+| **WebSockets & AI Integration** | Fitur chat real-time (WebSockets) dan AI Chatbot (Gemini) diintegrasikan langsung sebagai modul di dalam backend monolith. |
+| **Simplified Deployment** | Proses build dan deployment hanya membutuhkan satu backend container dan satu frontend container, sehingga mengurangi penggunaan resource server. |
 
-### Diagram Arsitektur Docker Compose
+### Diagram Arsitektur Aplikasi
 
 ```mermaid
 graph TB
@@ -181,189 +178,106 @@ graph TB
         User([👤 User Browser])
     end
 
-    subgraph GATEWAY_TIER["🔀 API Gateway — Port 80"]
-        Gateway["🔀 Nginx\nReverse Proxy\n(Port 80)"]
+    subgraph APP_TIER["⚙️ Application Tier"]
+        Frontend["⚛️ React App\nServed via Nginx\n(Port 80)"]
+        Backend["🐍 FastAPI Monolith\n(Port 8000)"]
     end
 
-    subgraph FRONTEND_TIER["🎨 Frontend Tier"]
-        Frontend["⚛️ React App\nVite + Tailwind CSS\n(Port 3000)"]
+    subgraph DATA_TIER["🗄️ Data Tier"]
+        MonolithDB[("🗄️ PostgreSQL Database\ndata_sewain\n(Port 5432)")]
     end
 
-    subgraph BACKEND_TIER["⚙️ Backend Services (FastAPI)"]
-        AuthService["🔐 Auth Service\n(Port 8001)"]
-        ItemService["📦 Item Service\n(Port 8002)"]
-        RentalService["📋 Rental Service\n(Port 8003)"]
-        PaymentService["💳 Payment Service\n(Port 8004)"]
-        ChatService["💬 Chat Service\n(Port 8005)"]
-        ChatbotService["🤖 Chatbot Service\n(Port 8006)"]
-    end
-
-    subgraph DATA_TIER["🗄️ Data Tier — Database per Service"]
-        AuthDB[("🗄️ auth-db\nPostgreSQL 16\n(5433→5432)")]
-        ItemDB[("🗄️ item-db\nPostgreSQL 16\n(5434→5432)")]
-        RentalDB[("🗄️ rental-db\nPostgreSQL 16\n(5435→5432)")]
-        PaymentDB[("🗄️ payment-db\nPostgreSQL 16\n(5436→5432)")]
-        ChatDB[("🗄️ chat-db\nPostgreSQL 16\n(5437→5432)")]
-    end
-
-    subgraph EXTERNAL["☁️ External"]
+    subgraph EXTERNAL["☁️ External Services"]
         Midtrans["💰 Midtrans\nPayment Gateway"]
         Gemini["✨ Gemini AI\n(via SumoPod)"]
     end
 
-    User -->|"HTTP / WebSocket"| Gateway
-    Gateway -->|"/ → Frontend"| Frontend
-    Gateway -->|"/auth, /profile, /superadmin/users → :8001"| AuthService
-    Gateway -->|"/items, /categories → :8002"| ItemService
-    Gateway -->|"/rentals, /promos, /reviews → :8003"| RentalService
-    Gateway -->|"/payments, /admin/wallet → :8004"| PaymentService
-    Gateway -->|"/chat, /chat/ws → :8005"| ChatService
-    Gateway -->|"/chatbot → :8006"| ChatbotService
-
-    AuthService -->|"SQL"| AuthDB
-    ItemService -->|"SQL"| ItemDB
-    RentalService -->|"SQL"| RentalDB
-    PaymentService -->|"SQL"| PaymentDB
-    ChatService -->|"SQL"| ChatDB
-
-    ItemService -.->|"verify token"| AuthService
-    RentalService -.->|"verify token"| AuthService
-    RentalService -.->|"cek katalog"| ItemService
-    RentalService -.->|"buat payment"| PaymentService
-    PaymentService -.->|"verify token"| AuthService
-    PaymentService -.->|"update status sewa"| RentalService
-    ChatService -.->|"verify token"| AuthService
-    ChatService -.->|"info item"| ItemService
-
-    PaymentService -.->|"Snap API"| Midtrans
-    ChatbotService -.->|"LLM API"| Gemini
+    User -->|"HTTP / WebSocket"| Frontend
+    Frontend -->|"API Requests / WebSockets"| Backend
+    Backend -->|"SQL Queries (SQLAlchemy)"| MonolithDB
+    Backend -.->|"Snap API"| Midtrans
+    Backend -.->|"LLM API"| Gemini
 
     classDef client fill:#e1f5fe,stroke:#0288d1,stroke-width:2px,color:#01579b
-    classDef gateway fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,color:#4a148c
-    classDef frontend fill:#e8f5e9,stroke:#388e3c,stroke-width:2px,color:#1b5e20
-    classDef service fill:#fff3e0,stroke:#f57c00,stroke-width:2px,color:#e65100
+    classDef app fill:#e8f5e9,stroke:#388e3c,stroke-width:2px,color:#1b5e20
     classDef db fill:#fce4ec,stroke:#c62828,stroke-width:2px,color:#b71c1c
     classDef ext fill:#ede7f6,stroke:#512da8,stroke-width:2px,color:#311b92
 
     class User client
-    class Gateway gateway
-    class Frontend frontend
-    class AuthService,ItemService,RentalService,PaymentService,ChatService,ChatbotService service
-    class AuthDB,ItemDB,RentalDB,PaymentDB,ChatDB db
+    class Frontend,Backend app
+    class MonolithDB db
     class Midtrans,Gemini ext
 ```
 
-### Pemetaan Service & Port
+### Pemetaan Port & Container (Monolith Profile)
 
-| Service | Port Host | Port Container | Image / Build | Database | Deskripsi |
+| Container | Port Host | Port Container | Image / Build | Database | Deskripsi |
 |---------|-----------|----------------|---------------|----------|-----------|
-| `gateway` | **80** | 80 | `nginx:alpine` | — | API Gateway — reverse proxy untuk semua request |
-| `frontend` | — | 3000 | `./frontend` | — | React SPA — UI aplikasi |
-| `auth-service` | — | 8001 | `./services/auth-service` | `auth-db` | Registrasi, login, JWT verify, profil admin/user, super-admin users, verifikasi KYC |
-| `item-service` | — | 8002 | `./services/item-service` | `item-db` | Katalog & CRUD items, kategori, statistik inventaris |
-| `rental-service` | — | 8003 | `./services/rental-service` | `rental-db` | Penyewaan, status sewa, reviews & rating, promo/kupon |
-| `payment-service` | — | 8004 | `./services/payment-service` | `payment-db` | Pembayaran, integrasi Midtrans, wallet & withdrawal |
-| `chat-service` | — | 8005 | `./services/chat-service` | `chat-db` | Chat room & pesan, WebSocket realtime User ↔ Admin |
-| `chatbot-service` | — | 8006 | `./services/chatbot-service` | — *(stateless)* | AI Chatbot Sewain (Gemini via SumoPod) |
-| `auth-db` | 5433 | 5432 | `postgres:16-alpine` | — | Database kredensial & profil pengguna |
-| `item-db` | 5434 | 5432 | `postgres:16-alpine` | — | Database data barang & kategori |
-| `rental-db` | 5435 | 5432 | `postgres:16-alpine` | — | Database penyewaan, review & promo |
-| `payment-db` | 5436 | 5432 | `postgres:16-alpine` | — | Database pembayaran & wallet |
-| `chat-db` | 5437 | 5432 | `postgres:16-alpine` | — | Database chat room & pesan |
+| `backend` | **8000** | 8000 | `./backend` | `monolith-db` | Monolithic REST & WebSocket API Sewain |
+| `frontend` | **3000** (atau **80** via gateway) | 80 | `./frontend` | — | React SPA — Served via Nginx |
+| `monolith-db` | **15432** | 5432 | `postgres:16-alpine` | — | Database PostgreSQL utama (`data_sewain`) |
 
-### Dependensi Antar Service
+### Alur Proses Utama (Sequence Diagram)
 
-Komunikasi internal menggunakan **HTTP (httpx)** dengan **circuit breaker** untuk ketahanan terhadap kegagalan.
-
-| Service | Memanggil | Tujuan |
-|---------|-----------|--------|
-| `item-service` | `auth-service` | Verifikasi token JWT |
-| `rental-service` | `auth-service`, `item-service`, `payment-service` | Verifikasi token, cek ketersediaan katalog, inisiasi pembayaran |
-| `payment-service` | `auth-service`, `rental-service` | Verifikasi token, update status sewa setelah bayar |
-| `chat-service` | `auth-service`, `item-service` | Verifikasi token, ambil info item terkait chat |
-| `chatbot-service` | Gemini AI (eksternal) | Generasi respon chatbot |
-| `payment-service` | Midtrans (eksternal) | Snap API — pembuatan transaksi & webhook |
-
-### Pola Komunikasi Antar Service
+Berikut adalah visualisasi alur interaksi pengguna dengan modul monolitik Sewain:
 
 ```mermaid
 sequenceDiagram
     participant U as 👤 User Browser
-    participant GW as 🔀 Nginx Gateway
-    participant Auth as 🔐 Auth Service
-    participant Item as 📦 Item Service
-    participant Rental as 📋 Rental Service
-    participant Pay as 💳 Payment Service
+    participant FE as ⚛️ Frontend React
+    participant BE as 🐍 FastAPI Backend
+    participant DB as 🗄️ PostgreSQL DB
     participant MT as 💰 Midtrans
 
-    Note over U,MT: 1️⃣ Login Flow
-    U->>GW: POST /auth/login
-    GW->>Auth: Proxy → :8001/auth/login
-    Auth->>Auth: Validasi kredensial + terbitkan JWT
-    Auth-->>GW: { access_token }
-    GW-->>U: JWT Token
+    Note over U,MT: 1️⃣ Alur Login
+    U->>FE: Input Email & Password
+    FE->>BE: POST /auth/login
+    BE->>DB: Query User & verifikasi hash password
+    DB-->>BE: User data
+    BE-->>FE: { access_token, user_profile }
+    FE-->>U: Dashboard Tampil (Authenticated)
 
-    Note over U,MT: 2️⃣ Ajukan Sewa + Bayar (Authenticated)
-    U->>GW: POST /rentals (+ Bearer Token)
-    GW->>Rental: Proxy → :8003/rentals
-    Rental->>Auth: GET /verify (verifikasi token)
-    Auth-->>Rental: { user_id, email, role }
-    Rental->>Item: GET /items/{id} (cek stok & harga)
-    Item-->>Rental: Detail item
-    Rental->>Pay: POST /payments (inisiasi pembayaran)
-    Pay->>MT: Create Snap Transaction
-    MT-->>Pay: { snap_token }
-    Pay-->>Rental: { payment_id, snap_token }
-    Rental-->>GW: 201 Created
-    GW-->>U: { rental, snap_token }
+    Note over U,MT: 2️⃣ Alur Pengajuan Sewa & Pembayaran
+    U->>FE: Pilih Barang & Klik Sewa
+    FE->>BE: POST /rentals (dengan JWT token)
+    BE->>DB: Cek ketersediaan stok barang (items table)
+    DB-->>BE: Stok OK
+    BE->>BE: Hitung harga & diskon promo (jika ada)
+    BE->>MT: Inisiasi Transaksi (Snap API)
+    MT-->>BE: { snap_token }
+    BE->>DB: Simpan data rental (status: pending) & payment
+    DB-->>BE: OK
+    BE-->>FE: { rental, snap_token }
+    FE->>U: Tampilkan Pop-up Midtrans Snap Payment
 
-    Note over U,MT: 3️⃣ Konfirmasi Pembayaran (Webhook)
-    MT->>GW: POST /payments/notification
-    GW->>Pay: Proxy → :8004
-    Pay->>Pay: Verifikasi signature & update status
-    Pay->>Rental: PATCH status sewa → "disetujui"
-    Rental-->>Pay: OK
+    Note over U,MT: 3️⃣ Notifikasi Pembayaran (Webhook)
+    MT->>BE: POST /payments/notification (signature key terverifikasi)
+    BE->>DB: Update status payment -> 'completed'
+    BE->>DB: Update status rental -> 'disetujui'
+    DB-->>BE: OK
+    BE-->>MT: HTTP 200 OK
 ```
 
-### Routing Table (Nginx Gateway)
-
-| Path Pattern | Target Service | Keterangan |
-|---|---|---|
-| `/auth/*` | `auth-service:8001` | Endpoint autentikasi (register, login, verify-email, dll.) |
-| `/profile`, `/admin/profile` | `auth-service:8001` | Profil user & profil usaha admin |
-| `/superadmin/users`, `/superadmin/stats`, `/superadmin/verifications`, `/superadmin/admins` | `auth-service:8001` | Manajemen user, statistik & verifikasi KYC |
-| `/items`, `/categories`, `/admin/items` | `item-service:8002` | Katalog, kategori & CRUD items |
-| `/rentals`, `/admin/rentals`, `/superadmin/rentals` | `rental-service:8003` | Penyewaan & manajemen sewa |
-| `/promos`, `/superadmin/promos`, `/reviews` | `rental-service:8003` | Promo/kupon & review |
-| `/payments`, `/admin/payments`, `/superadmin/payments` | `payment-service:8004` | Pembayaran & verifikasi |
-| `/admin/wallet`, `/superadmin/withdrawals` | `payment-service:8004` | Wallet & withdrawal admin |
-| `/chat/ws/*` | `chat-service:8005` | WebSocket realtime chat |
-| `/chat` | `chat-service:8005` | REST chat (rooms & messages) |
-| `/chatbot` | `chatbot-service:8006` | AI Chatbot |
-| `/{service}/health`, `/{service}/metrics` | service terkait | Health check & Prometheus metrics |
-| `/health` | Gateway langsung | Health check aggregator |
-| `/*` (default) | `frontend:3000` | Static files & SPA fallback |
-
-> 💡 **Mode Development**: dengan `docker-compose.dev.yml`, setiap service mengekspos portnya langsung ke host (8001–8006) dan frontend berjalan di Vite HMR (port 5173) untuk debugging tanpa melalui gateway.
+> 💡 **Informasi Tambahan**: Selain arsitektur monolitik yang digunakan sebagai backend production utama, proyek ini juga menyediakan folder `services/` yang berisi dekomposisi layanan ke dalam **arsitektur microservices** (Auth Service, Item Service, Rental Service, Payment Service, Chat Service, Chatbot Service) yang dihubungkan melalui Nginx API Gateway untuk keperluan pembelajaran/eksperimen komputasi awan.
 
 ---
 
 ## 🗄 Database Schema
 
-Sewain menggunakan **12 tabel** dalam database utama (monolith backend) dengan relasi yang terstruktur:
+Sewain menggunakan **14 tabel** dalam database utama (monolith backend) dengan relasi yang terstruktur:
 
 ```mermaid
 erDiagram
-    users ||--o| admin_profiles : "1:1 (role=admin)"
+    users ||--o| admins : "1:1 (role=admin)"
     users ||--o| user_profiles : "1:1 (role=user)"
     users ||--o{ rentals : "has many"
-    admin_profiles ||--o{ items : "owns"
+    admins ||--o{ items : "owns"
     categories ||--o{ items : "has many"
     items ||--o{ rentals : "rented via"
     rentals ||--o| payments : "1:1"
     rentals ||--o| reviews : "1:1"
     rentals ||--o| promo_redemptions : "1:1"
-    admin_profiles ||--o| wallets : "1:1"
+    admins ||--o| wallets : "1:1"
     wallets ||--o{ withdrawals : "has many"
     users ||--o{ chat_rooms : "participates"
     chat_rooms ||--o{ chat_messages : "contains"
@@ -381,7 +295,7 @@ erDiagram
         text foto_profil
     }
 
-    admin_profiles {
+    admins {
         int id PK
         int user_id FK
         string nama_usaha
@@ -396,6 +310,9 @@ erDiagram
         int user_id FK
         string nama_orang_tua
         text alamat
+        string nomor_telepon
+        float latitude
+        float longitude
         text foto_ktp
         text foto_selfie_ktp
         enum status_verifikasi "menunggu | disetujui | ditolak"
@@ -434,7 +351,7 @@ erDiagram
         int id PK
         int rental_id FK
         float jumlah
-        enum metode_pembayaran "transfer | cash | e_wallet | midtrans"
+        enum metode_pembayaran "transfer | cash | e_wallet | credit_card | midtrans"
         enum status "pending | completed | failed | cancelled"
         string midtrans_order_id
         string snap_token
@@ -586,14 +503,15 @@ git clone https://github.com/aidilsaputrakirsan-classroom/cc-kelompok-harahetta-
 # 2. Masuk ke direktori proyek
 cd cc-kelompok-harahetta-2
 
-# 3. Build & jalankan semua service (microservices)
-docker compose up -d --build
+# 3. Build & jalankan service Monolith (Backend + DB + Frontend)
+#    Secara otomatis, frontend diarahkan ke backend port 8000
+VITE_API_URL=http://localhost:8000 docker compose up -d --build monolith-db backend frontend
 
-# 4. Cek status semua container
+# 4. Cek status container yang berjalan
 docker compose ps
 
 # 5. Akses aplikasi
-#    → http://localhost (melalui Nginx Gateway)
+#    → http://localhost:3000 (Frontend) atau debug backend langsung di http://localhost:8000
 ```
 
 ### 💻 Menjalankan Manual (Development)
@@ -623,28 +541,24 @@ npm install
 npm run dev
 ```
 
-### 🔗 Akses Service
+### 🔗 Akses Service (Monolith)
 
-| Service | URL | Keterangan |
+| Service / Container | URL Lokal | Keterangan |
 |---------|-----|------------|
-| 🌐 Aplikasi (Gateway) | `http://localhost` | Entry point utama via Nginx |
-| ⚛️ Frontend (dev/Vite) | `http://localhost:5173` | Vite dev server (mode development) |
-| 🔐 Auth Service | `http://localhost:8001` | Autentikasi, profil & verifikasi KYC |
-| 📦 Item Service | `http://localhost:8002` | Katalog, kategori & inventaris |
-| 📋 Rental Service | `http://localhost:8003` | Penyewaan, review & promo |
-| 💳 Payment Service | `http://localhost:8004` | Pembayaran, wallet & Midtrans |
-| 💬 Chat Service | `http://localhost:8005` | Chat realtime (REST + WebSocket) |
-| 🤖 Chatbot Service | `http://localhost:8006` | AI Chatbot (Gemini) |
+| ⚛️ Frontend (Development/Vite) | `http://localhost:5173` | Vite dev server dengan Hot Module Replacement (HMR) |
+| ⚛️ Frontend (Production/Docker) | `http://localhost:3000` | React production build disajikan oleh Nginx (port 80 internal) |
+| ⚙️ Backend API (Monolith) | `http://localhost:8000` | FastAPI server (Swagger Docs di `/docs`) |
+| 🗄️ Monolith Database | `localhost:15432` | Database PostgreSQL utama (`data_sewain`) |
 
-> ℹ️ Port langsung `8001–8006` dan `5173` hanya terekspos saat menjalankan mode development (`docker-compose.dev.yml`). Dalam mode default, semua akses melalui gateway di port `80`.
+> ℹ️ Saat menjalankan secara lokal, pastikan file konfigurasi `.env` pada folder `backend/` dan `.env.local` pada folder `frontend/` sudah dikonfigurasi dengan benar agar frontend dapat berkomunikasi dengan backend monolith di port `8000`.
 
 ### 🔑 Akun Default (Seed Data)
 
 | Role | Email | Password |
 |------|-------|----------|
-| Super Admin | `superadmin@sewain.id` | `superadmin123` |
-| Admin | `admin@sewain.id` | `admin123` |
-| User | `user@sewain.id` | `user123` |
+| Super Admin | `superadmin@sewain.com` | `SuperAdmin123!` |
+| Admin | `alif1@gmail.com` | `Alif1@gmail.com` |
+| User | `alif2@gmail.com` | `Alif2@gmail.com` |
 
 ---
 
@@ -653,129 +567,69 @@ npm run dev
 ```
 cc-kelompok-harahetta-2/
 │
-├── 🔐 services/                    # Microservices (Docker Compose)
-│   ├── auth-service/                # Auth & Profile (port 8001 → auth-db)
-│   │   ├── main.py                  #   FastAPI — register, login, verify, profil, KYC
-│   │   ├── models.py                #   SQLAlchemy models (users, profiles)
-│   │   ├── schemas.py               #   Pydantic schemas
-│   │   ├── database.py              #   PostgreSQL connection (auth_db)
-│   │   ├── email_service.py         #   Verifikasi email & reset password
-│   │   ├── logging_config.py        #   Structured logging
-│   │   ├── logging_middleware.py    #   Request logging middleware
-│   │   ├── metrics.py               #   Prometheus metrics
-│   │   ├── Dockerfile               #   Python 3.12-slim, port 8001
-│   │   └── tests/                   #   Unit tests
-│   │
-│   ├── item-service/                # Katalog & Kategori (port 8002 → item-db)
-│   │   ├── main.py                  #   FastAPI — CRUD items, kategori, stats
-│   │   ├── auth_client.py           #   HTTP client → Auth Service /verify
-│   │   ├── circuit_breaker.py       #   Circuit breaker antar service
-│   │   ├── models.py                #   SQLAlchemy Item & Category model
-│   │   └── Dockerfile               #   Python 3.12-slim, port 8002
-│   │
-│   ├── rental-service/              # Sewa, Review & Promo (port 8003 → rental-db)
-│   │   ├── main.py                  #   FastAPI — rentals, reviews, promos
-│   │   ├── auth_client.py           #   → Auth Service (verify token)
-│   │   ├── catalog_client.py        #   → Item Service (cek katalog)
-│   │   ├── payment_client.py        #   → Payment Service (inisiasi bayar)
-│   │   ├── circuit_breaker.py       #   Resilience antar service
-│   │   └── Dockerfile               #   Python 3.12-slim, port 8003
-│   │
-│   ├── payment-service/             # Pembayaran & Wallet (port 8004 → payment-db)
-│   │   ├── main.py                  #   FastAPI — payments, wallet, withdrawal
-│   │   ├── midtrans_service.py      #   Integrasi Midtrans Snap & webhook
-│   │   ├── auth_client.py           #   → Auth Service (verify token)
-│   │   ├── rental_client.py         #   → Rental Service (update status sewa)
-│   │   ├── circuit_breaker.py       #   Resilience antar service
-│   │   └── Dockerfile               #   Python 3.12-slim, port 8004
-│   │
-│   ├── chat-service/                # Chat realtime (port 8005 → chat-db)
-│   │   ├── main.py                  #   FastAPI — chat rooms, messages, WebSocket
-│   │   ├── auth_client.py           #   → Auth Service (verify token)
-│   │   ├── catalog_client.py        #   → Item Service (info item)
-│   │   ├── circuit_breaker.py       #   Resilience antar service
-│   │   └── Dockerfile               #   Python 3.12-slim, port 8005
-│   │
-│   ├── chatbot-service/             # AI Chatbot (port 8006, stateless)
-│   │   ├── main.py                  #   FastAPI — chatbot via Gemini (SumoPod)
-│   │   ├── requirements.txt         #   Dependencies: fastapi, litellm/openai
-│   │   └── Dockerfile               #   Python 3.12-slim, port 8006
-│   │
-│   ├── shared/                      # Modul bersama antar service
-│   │   ├── logging_config.py        #   Konfigurasi logging standar
-│   │   ├── logging_middleware.py    #   Middleware logging request
-│   │   └── metrics.py               #   Helper Prometheus metrics
-│   │
-│   └── gateway/                     # API Gateway
-│       └── nginx.conf               #   Routing per-path ke 6 service + frontend
-│
-├── ⚙️ backend/                      # Monolith Backend (referensi / legacy full-featured)
-│   ├── main.py                      #   FastAPI app — semua endpoint (2700+ lines)
-│   ├── models.py                    #   12 tabel SQLAlchemy (users, items, rentals, dll.)
+├── ⚙️ backend/                      # Monolith Backend (Core API Sewain)
+│   ├── main.py                      #   FastAPI app — semua endpoint & modular routers
+│   ├── models.py                    #   14 tabel SQLAlchemy (users, items, rentals, dll.)
 │   ├── schemas.py                   #   Request/Response Pydantic schemas
-│   ├── crud.py                      #   Database operations layer
+│   ├── crud.py                      #   Database operations layer (DAO)
 │   ├── auth.py                      #   JWT authentication & role guards
 │   ├── config.py                    #   Environment-based configuration
 │   ├── chat.py                      #   WebSocket chat (User ↔ Admin)
-│   ├── chatbot.py                   #   AI chatbot integration (OpenAI)
+│   ├── chatbot.py                   #   AI chatbot integration (Gemini)
 │   ├── email_service.py             #   Email verification & password reset
 │   ├── midtrans_service.py          #   Payment gateway integration
 │   ├── database.py                  #   Database connection manager
-│   ├── Dockerfile                   #   Multi-stage build
+│   ├── Dockerfile                   #   FastAPI multi-stage Docker build
 │   ├── requirements.txt             #   Python dependencies
-│   └── tests/                       #   10 test files (pytest)
-│       ├── conftest.py              #     Test fixtures & setup
-│       ├── test_auth.py             #     Authentication tests
-│       ├── test_admin.py            #     Admin endpoint tests
-│       ├── test_items.py            #     Item CRUD tests
-│       ├── test_categories.py       #     Category tests
-│       ├── test_chat.py             #     Chat functionality tests
-│       ├── test_reviews.py          #     Review system tests
-│       ├── test_wallet.py           #     Wallet & withdrawal tests
-│       ├── test_rental_due_at.py    #     Rental deadline tests
-│       └── test_health.py           #     Health check tests
+│   └── tests/                       #   10 unit test files (pytest)
 │
 ├── 🎨 frontend/                     # React SPA
 │   ├── src/
-│   │   ├── pages/                   #   21 halaman (Landing, Login, Dashboard, dll.)
-│   │   ├── components/              #   20+ komponen reusable
+│   │   ├── pages/                   #   21 Halaman utama (Landing, Login, Dashboard, dll.)
+│   │   ├── components/              #   Komponen reusable React
 │   │   │   ├── ui/                  #     Radix UI primitives
-│   │   │   ├── __tests__/           #     Component tests
 │   │   │   ├── ChatbotWidget.jsx    #     AI chatbot widget
-│   │   │   ├── MapPicker.jsx        #     Leaflet map component
-│   │   │   ├── PromoBanner.jsx      #     Promo display
+│   │   │   ├── MapPicker.jsx        #     Leaflet map picker koordinat
 │   │   │   └── ...
-│   │   ├── context/                 #   AuthContext (global state)
+│   │   ├── context/                 #   AuthContext (state autentikasi global)
 │   │   ├── services/
-│   │   │   ├── api.js               #     HTTP client (Axios-like)
-│   │   │   └── chat.js              #     WebSocket chat client
-│   │   ├── App.jsx                  #   Router & layout
-│   │   └── main.jsx                 #   Entry point
-│   ├── Dockerfile                   #   Multi-stage: build → nginx serve
-│   ├── nginx.conf                   #   SPA fallback config
-│   ├── package.json                 #   Node.js dependencies
+│   │   │   ├── api.js               #     Client API HTTP (fetch) ke Monolith Backend
+│   │   │   └── chat.js              #     Client WebSocket chat
+│   │   ├── App.jsx                  #   Router & layout utama
+│   │   └── main.jsx                 #   Entry point aplikasi
+│   ├── Dockerfile                   #   Multi-stage: build → served by Nginx
+│   ├── nginx.conf                   #   SPA routing configuration untuk Nginx
+│   ├── package.json                 #   Dependencies & scripts node
 │   └── vite.config.js               #   Vite build configuration
 │
-├── 📋 docs/                         #   Dokumentasi proyek
-│   ├── architecture.md              #     Arsitektur microservices detail
-│   ├── deployment-guide.md          #     Panduan deployment
-│   ├── setup-guide.md               #     Panduan setup lengkap
-│   ├── testing-guide.md             #     Strategi & panduan testing
-│   ├── testing/                     #     Hasil testing (API, UI, Auth)
-│   ├── seed-data.sql                #     Data awal database
-│   └── img/                         #     Screenshots & gambar
+├── 🔐 services/                    # Arsitektur Alternatif — Microservices (Eksperimen / Tugas Modul)
+│   ├── auth-service/                # Auth Service (port 8001 → auth-db)
+│   ├── item-service/                # Item Service (port 8002 → item-db)
+│   ├── rental-service/              # Rental Service (port 8003 → rental-db)
+│   ├── payment-service/             # Payment Service (port 8004 → payment-db)
+│   ├── chat-service/                # Chat Service (port 8005 → chat-db)
+│   ├── chatbot-service/             # AI Chatbot Service (port 8006, stateless)
+│   ├── shared/                      # Modul logging & metrik bersama
+│   └── gateway/                     # Nginx API Gateway configuration
+│
+├── 📋 docs/                         # Dokumentasi & Panduan Proyek
+│   ├── architecture.md              #   Arsitektur detail
+│   ├── deployment-guide.md          #   Panduan deployment ke DeployCC
+│   ├── setup-guide.md               #   Panduan setup environment lokal lengkap
+│   ├── testing-guide.md             #   Panduan testing API & UI
+│   ├── seed-data.sql                #   Seed data awal database
+│   └── img/                         #   Screenshots & logo
 │
 ├── 🔧 .github/
-│   ├── workflows/
-│   │   ├── ci.yml                   #   CI: test → build → notify
-│   │   └── cd.yml                   #   CD: detect changes → deploy → health check
-│   └── CODEOWNERS                   #   Auto-assign reviewers
+│   └── workflows/
+│       ├── ci.yml                   #   CI Pipeline (Test, lint, Docker build)
+│       └── cd.yml                   #   CD Pipeline (Deploy otomatis ke DeployCC)
 │
-├── docker-compose.yml               #   Microservices orchestration (13 containers)
-├── docker-compose.dev.yml           #   Development overrides (hot-reload, port expose)
-├── docker-compose.prod.yml          #   Production overrides
-├── Makefile                         #   Developer workflow shortcuts
-└── README.md                        #   ← You are here
+├── docker-compose.yml               # Orchestration semua services (Monolith + Microservices)
+├── docker-compose.dev.yml           # Development overrides
+├── docker-compose.prod.yml          # Production overrides (Monolith & DB)
+├── Makefile                         # Developer command shortcuts
+└── README.md                        # Dokumentasi utama proyek
 ```
 
 ---
@@ -801,29 +655,29 @@ Sewain API memiliki **50+ endpoints** yang terorganisir dalam 10 kategori:
 | 🤖 Chatbot | `/chatbot/*` | Login | 2 (send message, history) |
 | 💬 Chat | `/chat/*` | Login | 5 (rooms, messages, WebSocket) |
 
-### Microservices API Contract (via Gateway)
+### Monolith API Endpoints
 
-| Method | Endpoint | Service | Deskripsi |
+| Method | Endpoint | Modul Backend | Deskripsi |
 |--------|----------|---------|-----------|
-| `POST` | `/auth/register` | Auth Service | Registrasi user baru |
-| `POST` | `/auth/login` | Auth Service | Login, dapatkan JWT token |
-| `GET` | `/auth/verify` | Auth Service | Internal — verifikasi token (inter-service) |
-| `GET` | `/profile` · `/admin/profile` | Auth Service | Profil user & profil usaha admin |
-| `GET` | `/superadmin/users` · `/superadmin/verifications` | Auth Service | Manajemen user & verifikasi KYC |
-| `GET` | `/items` · `/items/{id}` | Item Service | Katalog & detail item |
-| `POST/PUT/DELETE` | `/admin/items` | Item Service | CRUD item (admin) |
-| `GET` | `/categories` | Item Service | Daftar kategori |
-| `POST` | `/rentals` | Rental Service | Ajukan penyewaan |
-| `GET` | `/rentals` · `/admin/rentals` | Rental Service | Riwayat & manajemen sewa |
-| `POST` | `/reviews` · `GET /reviews` | Rental Service | Ulasan & rating |
-| `POST` | `/promos/validate` | Rental Service | Validasi kode promo |
-| `POST` | `/payments` | Payment Service | Inisiasi pembayaran (Midtrans Snap) |
-| `POST` | `/payments/notification` | Payment Service | Webhook notifikasi Midtrans |
-| `GET` | `/admin/wallet` | Payment Service | Saldo & withdrawal admin |
-| `GET` | `/chat` · `WS /chat/ws/{room}` | Chat Service | Chat REST & WebSocket realtime |
-| `POST` | `/chatbot` | Chatbot Service | Kirim pesan ke AI chatbot |
+| `POST` | `/auth/register` | Autentikasi | Registrasi user baru (role: user) |
+| `POST` | `/auth/login` | Autentikasi | Login, dapatkan JWT token |
+| `GET` | `/auth/me` | Autentikasi | Ambil informasi profile user login |
+| `GET` | `/profile` · `/admin/profile` | Autentikasi | Profil user & profil usaha admin |
+| `GET` | `/superadmin/users` · `/superadmin/verifications` | Autentikasi | Manajemen user & verifikasi KYC |
+| `GET` | `/items` · `/items/{id}` | Katalog Barang | Katalog & detail item |
+| `POST/PUT/DELETE` | `/admin/items` | Katalog Barang | CRUD item (admin) |
+| `GET` | `/categories` | Katalog Barang | Daftar kategori |
+| `POST` | `/rentals` | Penyewaan | Ajukan penyewaan |
+| `GET` | `/rentals` · `/admin/rentals` | Penyewaan | Riwayat & manajemen sewa |
+| `POST` | `/reviews` · `GET /reviews` | Penyewaan | Ulasan & rating |
+| `POST` | `/promos/validate` | Penyewaan | Validasi kode promo |
+| `POST` | `/payments` | Pembayaran | Inisiasi pembayaran (Midtrans Snap) |
+| `POST` | `/payments/notification` | Pembayaran | Webhook notifikasi Midtrans |
+| `GET` | `/admin/wallet` | Pembayaran | Saldo & withdrawal admin |
+| `GET` | `/chat` · `WS /chat/ws/{room}` | Chat Real-time | Chat REST & WebSocket realtime |
+| `POST` | `/chatbot` | Chatbot AI | Kirim pesan ke AI chatbot (Gemini) |
 
-> 📖 Setiap service mengekspos dokumentasi OpenAPI-nya sendiri di `/<service>/docs` saat mode development. Dokumentasi lengkap juga tersedia di file [docs/testing/api-documentation.md](./docs/testing/api-documentation.md)
+> 📖 Setiap service mengekspos dokumentasi OpenAPI-nya sendiri di `/<service>/docs` saat mode development. 
 
 ---
 
@@ -957,6 +811,22 @@ npm run test:coverage
 
 </details>
 
+<details>
+<summary><strong>🛡️ Reliability Testing (4 Skenario)</strong></summary>
+
+| No | Skenario                    | Tujuan                                                                    | Hasil                                                                            | Status |
+| -- | --------------------------- | ------------------------------------------------------------------------- | -------------------------------------------------------------------------------- | ------ |
+| 1  | Retry Logic                 | Memastikan service melakukan retry saat Auth Service tidak tersedia       | Retry berjalan 3 kali dengan exponential backoff sebelum mengembalikan error 503 | ✅ Pass |
+| 2  | Circuit Breaker (Fast-Fail) | Memastikan circuit breaker berpindah ke OPEN setelah 5 kegagalan beruntun | Request berikutnya langsung ditolak (<100ms) tanpa menunggu timeout              | ✅ Pass |
+| 3  | Automatic Recovery          | Memastikan circuit breaker kembali normal setelah Auth Service pulih      | State berubah OPEN → HALF_OPEN → CLOSED secara otomatis                          | ✅ Pass |
+| 4  | Graceful Degradation        | Memastikan fitur publik tetap dapat diakses saat Auth Service gagal       | Endpoint publik tetap berjalan, endpoint privat ditolak dengan 503               | ✅ Pass |
+
+> Reliability Testing ini dilakukan khusus pada profil/folder services/ (versi Microservices) untuk menguji ketahanan inter-service, bukan pada backend monolith utama.
+
+> Detail lengkap: [docs/testing/reliability-testing.md](./docs/testing/reliability-testing.md)
+
+</details>
+
 ---
 
 ## ⚡ Makefile Commands
@@ -1018,11 +888,10 @@ make pr-check          # 🔎 Full pre-PR check (build + test)
 | 8 | UTS Demo | Presentasi tengah semester | ✅ Selesai |
 | 9–11 | CI/CD Pipeline | GitHub Actions, automated testing | ✅ Selesai |
 | 12–14 | Microservices | Service decomposition, API Gateway | ✅ Selesai |
-| 15–16 | Final & UAS | Polish, documentation, final demo | 🔄 In Progress |
+| 15–16 | Final & UAS | Polish, documentation, final demo | ✅ Selesai |
 
 ---
 
 ## 📄 Lisensi
 
 Proyek ini dibuat untuk keperluan akademis mata kuliah **Komputasi Awan** — Program Studi Sistem Informasi, Institut Teknologi Kalimantan (ITK).
-
