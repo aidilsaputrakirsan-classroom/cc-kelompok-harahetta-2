@@ -1,4 +1,5 @@
 import os
+import logging
 import smtplib
 import ssl
 import json
@@ -21,6 +22,8 @@ MAIL_FROM_NAME = os.getenv("MAIL_FROM_NAME", "Sewain")
 SECRET_KEY = os.getenv("SECRET_KEY", "fallback-secret-key-for-development-minimum-32")
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
+
+logger = logging.getLogger(__name__)
 
 VERIFY_TOKEN_EXPIRE_HOURS = 24
 RESET_TOKEN_EXPIRE_HOURS = 1
@@ -57,7 +60,7 @@ def decode_email_token(token: str, expected_purpose: str) -> dict | None:
 
 def _send_via_resend(to_email: str, subject: str, html_body: str) -> bool:
     if not RESEND_API_KEY:
-        print(f"[EMAIL] RESEND_API_KEY belum diset — skip kirim ke {to_email}")
+        logger.warning(f"[EMAIL] RESEND_API_KEY belum diset — skip kirim ke {to_email}")
         return False
 
     payload = {
@@ -81,20 +84,20 @@ def _send_via_resend(to_email: str, subject: str, html_body: str) -> bool:
     try:
         with urllib.request.urlopen(req, timeout=15) as response:
             body = response.read().decode("utf-8")
-            print(f"[EMAIL] Resend OK → {to_email}: {subject} | {body}")
+            logger.info(f"[EMAIL] Resend OK → {to_email}: {subject} | {body}")
             return True
     except urllib.error.HTTPError as e:
         err_body = e.read().decode("utf-8", errors="ignore")
-        print(f"[EMAIL] Resend HTTP {e.code} → {to_email}: {err_body}")
+        logger.error(f"[EMAIL] Resend HTTP {e.code} → {to_email}: {err_body}")
         return False
     except Exception as e:
-        print(f"[EMAIL] Resend gagal → {to_email}: {e}")
+        logger.error(f"[EMAIL] Resend gagal → {to_email}: {e}")
         return False
 
 
 def _send_via_smtp(to_email: str, subject: str, html_body: str) -> bool:
     if not SMTP_USERNAME or not SMTP_PASSWORD:
-        print(f"[EMAIL] SMTP credentials belum diset — skip kirim ke {to_email}")
+        logger.warning(f"[EMAIL] SMTP credentials belum diset — skip kirim ke {to_email}")
         return False
 
     msg = MIMEMultipart("alternative")
@@ -114,16 +117,16 @@ def _send_via_smtp(to_email: str, subject: str, html_body: str) -> bool:
         with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, context=context) as server:
             server.login(SMTP_USERNAME, SMTP_PASSWORD)
             server.send_message(msg)
-        print(f"[EMAIL] SMTP OK → {to_email}: {subject}")
+        logger.info(f"[EMAIL] SMTP OK → {to_email}: {subject}")
         return True
     except Exception as e:
-        print(f"[EMAIL] SMTP gagal → {to_email}: {e}")
+        logger.error(f"[EMAIL] SMTP gagal → {to_email}: {e}")
         return False
 
 
 def _send_email(to_email: str, subject: str, html_body: str) -> bool:
     if not EMAIL_ENABLED:
-        print(f"[EMAIL] Disabled — skip kirim ke {to_email}: {subject}")
+        logger.info(f"[EMAIL] Disabled — skip kirim ke {to_email}: {subject}")
         return True
 
     if EMAIL_PROVIDER == "resend":
