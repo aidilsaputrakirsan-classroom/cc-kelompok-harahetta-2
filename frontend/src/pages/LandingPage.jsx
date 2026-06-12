@@ -16,6 +16,10 @@ import {
   Wallet, MapPin, MessageSquare, Camera, Tent, Zap, Box,
   CheckCircle2, Quote,
 } from "lucide-react"
+import { useTour } from "../hooks/useTour"
+import TourButton from "../components/TourButton"
+import { TOUR_KEYS } from "../lib/tour"
+import { landingSteps } from "../lib/tourSteps"
 
 /* ─── motion helpers ──────────────────────────────────────── */
 const ease = [0.22, 1, 0.36, 1]
@@ -183,6 +187,13 @@ export default function LandingPage() {
   const [heroSearch, setHeroSearch] = useState("")
   const navigate = useNavigate()
 
+  const { startTour } = useTour({
+    tourKey:   TOUR_KEYS.landing,
+    steps:     landingSteps,
+    autoStart: true,
+    delay:     1200,
+  })
+
   useEffect(() => {
     fetchPublicStats()
       .then(data => setActiveUsers(data?.active_users || 0))
@@ -254,6 +265,7 @@ export default function LandingPage() {
 
               {/* Search bar */}
               <motion.form
+                id="landing-search-bar"
                 {...fadeUp(0.15)}
                 onSubmit={handleHeroSearch}
                 className="mt-5 flex items-center bg-card border border-border rounded-full p-1.5 pl-5 shadow-soft max-w-xl focus-within:ring-2 focus-within:ring-primary/30 transition"
@@ -339,7 +351,7 @@ export default function LandingPage() {
       {/* ══════════════════════════════════════════════════════
           FEATURE GRID
       ══════════════════════════════════════════════════════ */}
-      <section id="features" className="relative py-24 md:py-32 bg-section-alt overflow-hidden">
+      <section id="landing-features" className="relative py-24 md:py-32 bg-section-alt overflow-hidden">
         {/* Background image centered behind content */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <img
@@ -407,7 +419,7 @@ export default function LandingPage() {
       {/* ══════════════════════════════════════════════════════
           CATEGORIES
       ══════════════════════════════════════════════════════ */}
-      <section id="categories" className="py-24 md:py-32">
+      <section id="landing-categories" className="py-24 md:py-32">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="relative flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12 md:mb-16">
             {/* Background image behind the header text */}
@@ -478,7 +490,7 @@ export default function LandingPage() {
       {/* ══════════════════════════════════════════════════════
           HOW IT WORKS
       ══════════════════════════════════════════════════════ */}
-      <section className="py-24 md:py-32 bg-hero-deep text-white relative overflow-hidden">
+      <section id="landing-how-it-works" className="py-24 md:py-32 bg-hero-deep text-white relative overflow-hidden">
         <div className="absolute inset-0 bg-mesh opacity-50 pointer-events-none" />
         <div className="absolute inset-0 bg-dot-grid opacity-[0.05] pointer-events-none" />
 
@@ -601,7 +613,7 @@ export default function LandingPage() {
       {/* ══════════════════════════════════════════════════════
           CTA
       ══════════════════════════════════════════════════════ */}
-      <section className="py-24 md:py-32">
+      <section id="landing-cta" className="py-24 md:py-32">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <motion.div
             {...fadeUp(0)}
@@ -646,6 +658,9 @@ export default function LandingPage() {
       </section>
 
       <Footer />
+
+      {/* Tour button */}
+      <TourButton onClick={startTour} />
     </div>
   )
 }

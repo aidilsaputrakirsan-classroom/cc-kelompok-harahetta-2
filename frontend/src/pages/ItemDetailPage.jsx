@@ -20,6 +20,10 @@ import {
   XCircle, AlertTriangle, Store, Phone,
   Calendar, MapPin, Shield, Timer, Clock, Star, MessageCircle, Loader2, ChevronRight,
 } from "lucide-react"
+import { useTour } from "../hooks/useTour"
+import TourButton from "../components/TourButton"
+import { TOUR_KEYS } from "../lib/tour"
+import { itemDetailSteps } from "../lib/tourSteps"
 
 /* ─── status ──────────────────────────────────────────────── */
 const STATUS_META = {
@@ -34,6 +38,12 @@ export default function ItemDetailPage({ addToast }) {
   const { itemId } = useParams()
   const navigate = useNavigate()
   const { isAuthenticated, isVerified, isAdmin, isSuperAdmin } = useAuth()
+
+  const { startTour } = useTour({
+    tourKey:   TOUR_KEYS.itemDetail,
+    steps:     itemDetailSteps,
+    autoStart: false,
+  })
 
   const [item, setItem]           = useState(null)
   const [adminInfo, setAdminInfo] = useState(null)
@@ -145,7 +155,7 @@ export default function ItemDetailPage({ addToast }) {
       </button>
 
       {/* ═══ HERO IMAGE ═══ */}
-      <div className="relative w-full rounded-3xl overflow-hidden aspect-[16/9] bg-secondary border border-border">
+      <div id="item-detail-gallery" className="relative w-full rounded-3xl overflow-hidden aspect-[16/9] bg-secondary border border-border">
         <img
           src={item.foto_url || fallback(item.nama)}
           alt={item.nama}
@@ -169,7 +179,7 @@ export default function ItemDetailPage({ addToast }) {
       </div>
 
       {/* ═══ MAIN CONTENT — single card full width ═══ */}
-      <div className="rounded-3xl border border-border bg-card p-6 md:p-8 space-y-6">
+      <div id="item-detail-info" className="rounded-3xl border border-border bg-card p-6 md:p-8 space-y-6">
 
         {/* Top row: price + status + stok */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -191,7 +201,7 @@ export default function ItemDetailPage({ addToast }) {
 
           {/* Provider mini */}
           {adminInfo && (
-            <div className="bg-secondary/60 rounded-2xl px-4 py-3 sm:max-w-xs w-full">
+            <div id="item-detail-shop" className="bg-secondary/60 rounded-2xl px-4 py-3 sm:max-w-xs w-full">
               <Link
                 to={`/shops/${item.admin_id}`}
                 className="flex items-center gap-3 group"
@@ -336,7 +346,7 @@ export default function ItemDetailPage({ addToast }) {
 
             {/* CTA */}
             {isAvailable ? (
-              <Button className="w-full rounded-2xl h-12 text-base font-bold" size="lg" onClick={handleRent}>
+              <Button id="item-detail-rent-btn" className="w-full rounded-2xl h-12 text-base font-bold" size="lg" onClick={handleRent}>
                 <ShoppingCart className="w-5 h-5 mr-2" /> Sewa sekarang
               </Button>
             ) : (
@@ -356,7 +366,7 @@ export default function ItemDetailPage({ addToast }) {
       </div>
 
       {/* ═══ REVIEW SECTION ═══ */}
-      <section className="rounded-3xl border border-border bg-card p-6 md:p-8 space-y-5">
+      <section id="item-detail-reviews" className="rounded-3xl border border-border bg-card p-6 md:p-8 space-y-5">
         <div className="flex items-end justify-between gap-3 flex-wrap">
           <div>
             <h2 className="text-lg sm:text-xl font-bold tracking-tight inline-flex items-center gap-2">
@@ -391,6 +401,9 @@ export default function ItemDetailPage({ addToast }) {
           </div>
         )}
       </section>
+
+      {/* Tour button */}
+      <TourButton onClick={startTour} />
     </motion.div>
   )
 }
