@@ -187,7 +187,7 @@ export default function Navbar({
             className="relative"
           >
             <img
-              src="/Logo sewain.png"
+              src="/logo-sewain.png"
               alt="Sewain"
               className="h-9 w-auto object-contain"
               onError={(e) => {

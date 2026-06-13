@@ -9,6 +9,14 @@ from sqlalchemy.orm import Session
 import bcrypt
 import jwt
 
+from logging_config import setup_logging
+from logging_middleware import RequestLoggingMiddleware
+from metrics import metrics
+
+# Setup structured logging
+setup_logging()
+logger = logging.getLogger(__name__)
+
 from database import engine, get_db, Base
 from models import User, AdminProfile, UserProfile, UserRole, VerificationStatus
 from schemas import (
@@ -48,6 +56,7 @@ app.add_middleware(
 
 # Logging middleware (setelah CORS)
 app.add_middleware(RequestLoggingMiddleware)
+
 
 # Password hashing helper
 def hash_password(password: str) -> str:
@@ -134,10 +143,17 @@ def health():
 
 @app.get("/metrics")
 def get_metrics():
-    """Return application metrics."""
+    """Return application metrics + alert status."""
+    should_alert, error_rate, alert_info = metrics.check_alert_condition()
     return {
         "service": "auth-service",
         **metrics.get_metrics(),
+        "alert": {
+            "active": should_alert,
+            "recent_error_rate_percent": error_rate,
+            "threshold_percent": 10.0,
+            "window": alert_info,
+        },
     }
 
 @app.get("/team")

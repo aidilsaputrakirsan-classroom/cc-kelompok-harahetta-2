@@ -5,6 +5,7 @@ Stateless, tidak butuh DB.
 """
 
 import os
+import logging
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -14,6 +15,8 @@ app = FastAPI(
     description="AI Chatbot Microservice untuk Sewain (Sumopod/OpenAI-compatible)",
     version="1.0.0",
 )
+
+logger = logging.getLogger(__name__)
 
 CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost,http://localhost:5173").split(",")
 app.add_middleware(
@@ -105,7 +108,7 @@ async def chatbot(data: ChatMessageSchema):
 
     model_name = os.getenv("GEMINI_MODEL", "gemini/gemini-2.5-flash-lite")
     base_url   = os.getenv("AI_BASE_URL", "https://ai.sumopod.com/v1")
-    print(f"[CHATBOT] model={model_name}, base_url={base_url}, key={api_key[:8]}...")
+    logger.info(f"[CHATBOT] model={model_name}, base_url={base_url}, key={api_key[:8]}...")
 
     try:
         from openai import OpenAI
@@ -138,5 +141,5 @@ async def chatbot(data: ChatMessageSchema):
 
     except Exception as e:
         import traceback
-        print(f"[CHATBOT ERROR] {traceback.format_exc()}")
+        logger.error(f"[CHATBOT ERROR] {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Gagal menghubungi AI: {str(e)}")

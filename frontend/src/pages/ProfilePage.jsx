@@ -10,9 +10,19 @@ import { Separator } from "../components/ui/Separator"
 import { Skeleton } from "../components/ui/Skeleton"
 import Avatar from "../components/ui/Avatar"
 import { User, Clock, CheckCircle, Save, CreditCard, ImageIcon, X, Camera, Trash2, Loader2 } from "lucide-react"
+import { useTour } from "../hooks/useTour"
+import TourButton from "../components/TourButton"
+import { TOUR_KEYS } from "../lib/tour"
+import { profileSteps } from "../lib/tourSteps"
 
 export default function ProfilePage({ addToast }) {
   const { user, refreshUser } = useAuth()
+
+  const { startTour } = useTour({
+    tourKey:   TOUR_KEYS.profile,
+    steps:     profileSteps,
+    autoStart: false,
+  })
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -186,7 +196,7 @@ export default function ProfilePage({ addToast }) {
       </div>
 
       {/* User info + foto profil */}
-      <Card>
+      <Card id="profile-avatar-section">
         <CardContent className="p-5 flex items-center gap-4">
           <div className="relative">
             <Avatar
@@ -268,7 +278,7 @@ export default function ProfilePage({ addToast }) {
           )}
 
       {/* Profile form */}
-      <Card>
+      <Card id="profile-info-section">
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><User className="w-5 h-5" /> Data Diri</CardTitle>
         </CardHeader>
@@ -292,7 +302,7 @@ export default function ProfilePage({ addToast }) {
 
             <Separator />
 
-            <div>
+            <div id="profile-verification-section">
               <h4 className="text-sm font-semibold text-foreground flex items-center gap-2 mb-1">
                 <CreditCard className="w-4 h-4" /> Verifikasi KTP
               </h4>
@@ -383,6 +393,9 @@ export default function ProfilePage({ addToast }) {
       </Card>
         </>
       )}
+
+      {/* Tour button */}
+      <TourButton onClick={startTour} />
     </div>
   )
 }

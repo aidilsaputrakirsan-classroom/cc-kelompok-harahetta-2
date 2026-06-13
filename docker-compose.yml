@@ -19,6 +19,74 @@
 
 services:
   # ================================
+  # BACKEND MONOLITH + DATABASE
+  # (Backend legacy full-featured, port 8000)
+  # ================================
+  monolith-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: data_sewain
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: setiawan
+    ports:
+      - "15432:5432"
+    volumes:
+      - monolith_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+        reservations:
+          cpus: "0.10"
+          memory: 128M
+
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+    environment:
+      DATABASE_URL: postgresql://postgres:setiawan@monolith-db:5432/data_sewain
+      DB_HOST: monolith-db
+      DB_PORT: 5432
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: setiawan
+      POSTGRES_DB: data_sewain
+      APP_PORT: "8000"
+    depends_on:
+      monolith-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        tag: "backend-monolith"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+
+  # ================================
   # DATABASES (Database per Service)
   # ================================
   auth-db:
@@ -148,6 +216,12 @@ services:
         max-file: "3"
         tag: "auth-service"
     restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        tag: "auth-service"
     deploy:
       resources:
         limits:
@@ -183,6 +257,12 @@ services:
         max-file: "3"
         tag: "item-service"
     restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        tag: "item-service"
     deploy:
       resources:
         limits:
@@ -382,6 +462,7 @@ services:
           memory: 64M
 
 volumes:
+  monolith_db_data:
   auth_db_data:
   item_db_data:
   rental_db_data:

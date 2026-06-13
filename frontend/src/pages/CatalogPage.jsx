@@ -15,6 +15,10 @@ import {
   Search, Package, ShoppingCart, ArrowLeft, ArrowRight, X,
   Sparkles, Eye, SlidersHorizontal, Filter, Store, MapPin,
 } from "lucide-react"
+import { useTour } from "../hooks/useTour"
+import TourButton from "../components/TourButton"
+import { TOUR_KEYS } from "../lib/tour"
+import { catalogSteps } from "../lib/tourSteps"
 
 /* ─── motion ──────────────────────────────────────────────── */
 const ease = [0.22, 1, 0.36, 1]
@@ -159,6 +163,12 @@ export default function CatalogPage({ addToast }) {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const { isAuthenticated } = useAuth()
+
+  const { startTour } = useTour({
+    tourKey:   TOUR_KEYS.catalog,
+    steps:     catalogSteps,
+    autoStart: false,
+  })
 
   const initialSearch = searchParams.get("search") || ""
 
@@ -407,6 +417,7 @@ export default function CatalogPage({ addToast }) {
           </motion.p>
 
           <motion.form
+            id="catalog-search-form"
             initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, ease, delay: 0.15 }}
@@ -432,7 +443,7 @@ export default function CatalogPage({ addToast }) {
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-10">
         <div className="grid lg:grid-cols-12 gap-8">
           {/* Desktop sidebar */}
-          <aside className="hidden lg:block lg:col-span-3">
+          <aside id="catalog-filter-sidebar" className="hidden lg:block lg:col-span-3">
             <div className="sticky top-24 rounded-3xl border border-border bg-card p-6">
               <div className="flex items-center gap-2 mb-5">
                 <SlidersHorizontal className="w-4 h-4 text-primary" />
@@ -446,7 +457,7 @@ export default function CatalogPage({ addToast }) {
           <div className="lg:col-span-9">
             {/* Top bar */}
             <div className="flex items-center justify-between gap-3 mb-6">
-              <div className="text-sm text-muted-foreground">
+              <div id="catalog-results-count" className="text-sm text-muted-foreground">
                 {loading ? (
                   "Memuat..."
                 ) : (
@@ -524,6 +535,7 @@ export default function CatalogPage({ addToast }) {
             ) : (
               <>
                 <motion.div
+                  id="catalog-items-grid"
                   layout
                   className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5"
                 >
@@ -605,6 +617,9 @@ export default function CatalogPage({ addToast }) {
       </AnimatePresence>
 
       <Footer />
+
+      {/* Tour button */}
+      <TourButton onClick={startTour} />
     </div>
   )
 }

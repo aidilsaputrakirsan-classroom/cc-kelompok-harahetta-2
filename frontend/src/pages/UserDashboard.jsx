@@ -26,6 +26,10 @@ import PickupMap from "../components/PickupMap"
 import RatingStars from "../components/RatingStars"
 import ReviewForm from "../components/ReviewForm"
 import { getRentalDeadline, formatDeadline } from "../lib/rental"
+import { useTour } from "../hooks/useTour"
+import TourButton from "../components/TourButton"
+import { TOUR_KEYS } from "../lib/tour"
+import { dashboardSteps } from "../lib/tourSteps"
 
 /* ─── status meta ─────────────────────────────────────────── */
 const STATUS_META = {
@@ -186,6 +190,13 @@ function Metric({ label, value, sub, icon: Icon, accent = false }) {
 export default function UserDashboard({ addToast }) {
   const { user, isVerified } = useAuth()
   const navigate = useNavigate()
+
+  const { startTour } = useTour({
+    tourKey:   TOUR_KEYS.dashboard,
+    steps:     dashboardSteps,
+    autoStart: true,
+    delay:     800,
+  })
 
   const [rentals, setRentals]     = useState([])
   const [items, setItems]         = useState([])
@@ -465,7 +476,7 @@ export default function UserDashboard({ addToast }) {
         )}
 
         {/* ── METRICS ───────────────────────────────────── */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div id="dashboard-metrics-grid" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <Metric
             icon={TrendingUp}
             label="Total pengeluaran"
@@ -499,6 +510,7 @@ export default function UserDashboard({ addToast }) {
 
         {/* ── CTA BANNER ────────────────────────────────── */}
         <motion.div
+          id="dashboard-cta-banner"
           initial={{ opacity: 0, y: 12 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
@@ -544,7 +556,7 @@ export default function UserDashboard({ addToast }) {
         </motion.div>
 
         {/* ── SEWA SAYA ─────────────────────────────────── */}
-        <div className="rounded-3xl border border-border bg-card p-5 md:p-7">
+        <div id="dashboard-rental-section" className="rounded-3xl border border-border bg-card p-5 md:p-7">
           <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
             <div>
               <h2 className="text-xl font-bold tracking-tight">Sewa saya</h2>
@@ -553,6 +565,7 @@ export default function UserDashboard({ addToast }) {
               </p>
             </div>
             <Button
+              id="dashboard-new-rental-btn"
               variant="outline"
               size="sm"
               className="rounded-full"
@@ -563,7 +576,7 @@ export default function UserDashboard({ addToast }) {
           </div>
 
           {/* Tab pills */}
-          <div className="flex gap-2 flex-wrap mb-5 border-b border-border pb-5">
+          <div id="dashboard-rental-tabs" className="flex gap-2 flex-wrap mb-5 border-b border-border pb-5">
             {RENTAL_TABS.map(({ value, label, icon: Icon }) => (
               <button
                 key={value || "all"}
@@ -1024,6 +1037,9 @@ export default function UserDashboard({ addToast }) {
         onSubmit={handleSubmitReview}
         itemNama={reviewModal.rental?.item?.nama}
       />
+
+      {/* Tour button */}
+      <TourButton onClick={startTour} />
     </>
   )
 }

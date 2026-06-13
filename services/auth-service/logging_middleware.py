@@ -1,6 +1,7 @@
 """
 Request Logging Middleware.
 Log setiap HTTP request dengan timing, status, dan correlation ID.
+Dilengkapi error alerting: log CRITICAL jika error rate > 10% dalam 1 menit.
 """
 import time
 import uuid
@@ -14,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
-    """Middleware yang log setiap request/response dan mencatat metrics."""
+    """Middleware yang log setiap request/response + error alerting."""
 
     async def dispatch(self, request: Request, call_next):
         # Generate atau ambil correlation ID
@@ -32,9 +33,9 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         # Proses request
         try:
             response = await call_next(request)
-        except Exception:
+        except Exception as e:
             duration_ms = round((time.time() - start_time) * 1000, 2)
-            # Record failed request
+            # Record failed request di metrics
             metrics.record_request(request.method, request.url.path, 500, duration_ms)
             logger.error(
                 f"Request failed: {request.method} {request.url.path}",
@@ -46,6 +47,8 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
                     "status_code": 500,
                 },
             )
+            # Cek alert condition setelah error
+            self._check_and_log_alert(correlation_id)
             raise
 
         # Hitung durasi
@@ -57,7 +60,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             response.status_code, duration_ms
         )
 
-        # Log request (skip health & metrics checks agar log tidak terlalu noisy)
+        # Log request (skip health checks dan metrics agar log tidak terlalu noisy)
         if request.url.path not in ["/health", "/metrics"]:
             log_level = logging.WARNING if response.status_code >= 400 else logging.INFO
             logger.log(
@@ -72,6 +75,31 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
                 },
             )
 
+        # =============================================
+        # ERROR ALERTING — Lead Backend Task
+        # Cek apakah error rate > 10% dalam 1 menit
+        # =============================================
+        if response.status_code >= 400:
+            self._check_and_log_alert(correlation_id)
+
         # Teruskan correlation ID di response header
         response.headers["X-Correlation-ID"] = correlation_id
         return response
+
+    def _check_and_log_alert(self, correlation_id: str):
+        """
+        Cek error rate dan log CRITICAL jika melebihi threshold.
+        Alert field ditambahkan agar bisa di-pick up oleh log aggregator.
+        """
+        should_alert, error_rate, info = metrics.check_alert_condition()
+        if should_alert:
+            logger.critical(
+                f"HIGH ERROR RATE ALERT: {error_rate}% errors in last "
+                f"{info['window_seconds']}s (threshold: 10%) — "
+                f"{info['total_errors']}/{info['total_requests']} requests failed",
+                extra={
+                    "correlation_id": correlation_id,
+                    "alert": True,
+                    "error_rate": error_rate,
+                },
+            )

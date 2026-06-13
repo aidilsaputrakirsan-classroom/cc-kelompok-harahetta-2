@@ -159,7 +159,7 @@ def _serialize_room(
         item_foto_url=item_foto,
         last_message_preview=last_preview,
         unread_count=int(unread),
-        partner_online=manager.is_online(partner.id) if partner else False,
+        partner_online=(manager.is_online(partner.id) or _is_online_by_heartbeat(partner.id)) if partner else False,
     )
 
 
@@ -526,6 +526,9 @@ class ConnectionManager:
                         last_session = True
 
         if last_session and owner_id is not None:
+            # Hapus heartbeat agar fallback REST tidak membuat user tampak online
+            # setelah semua socket-nya terputus (misal tutup browser tanpa logout).
+            _heartbeat_store.pop(owner_id, None)
             await self._notify_partners_presence(owner_id, online=False)
 
     async def disconnect(self, room_id: int, websocket: WebSocket) -> None:
@@ -548,6 +551,9 @@ class ConnectionManager:
                         last_session = True
 
         if last_session and owner_id is not None:
+            # Hapus heartbeat agar fallback REST tidak membuat user tampak online
+            # setelah semua socket-nya terputus (misal tutup browser tanpa logout).
+            _heartbeat_store.pop(owner_id, None)
             await self._notify_partners_presence(owner_id, online=False)
 
     async def broadcast(self, room_id: int, payload: dict) -> None:

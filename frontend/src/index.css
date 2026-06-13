@@ -1,4 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Instrument+Serif&display=swap');
+@import "driver.js/dist/driver.css";
+
 
 @tailwind base;
 @tailwind components;
@@ -224,4 +226,207 @@
     transition: background-size .3s ease;
   }
   .link-underline:hover { background-size: 100% 1px; }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Driver.js · Sewain Tour Theme
+   Menyesuaikan popover dengan design system emerald.
+───────────────────────────────────────────────────────────── */
+
+/* Overlay — tipis dan clean */
+#driver-page-overlay {
+  background: rgba(10, 22, 18, 0.55) !important;
+}
+
+/* Popover wrapper */
+.sewain-tour-popover.driver-popover {
+  background: hsl(0 0% 100%) !important;
+  border: 1.5px solid hsl(150 15% 91%) !important;
+  border-radius: 1.25rem !important;
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.08),
+    0 20px 40px -8px rgba(10, 110, 74, 0.16) !important;
+  padding: 1.5rem !important;
+  max-width: 340px !important;
+  font-family: "Plus Jakarta Sans", system-ui, sans-serif !important;
+}
+
+/* Dark mode */
+.dark .sewain-tour-popover.driver-popover {
+  background: hsl(160 22% 9%) !important;
+  border-color: hsl(160 20% 18%) !important;
+  box-shadow: 0 20px 40px -8px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Title */
+.sewain-tour-popover .driver-popover-title {
+  font-family: "Plus Jakarta Sans", system-ui, sans-serif !important;
+  font-size: 1rem !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.015em !important;
+  color: hsl(160 35% 10%) !important;
+  margin-bottom: 0.375rem !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.5rem !important;
+}
+
+.dark .sewain-tour-popover .driver-popover-title {
+  color: hsl(150 12% 92%) !important;
+}
+
+/* Description */
+.sewain-tour-popover .driver-popover-description {
+  font-family: "Plus Jakarta Sans", system-ui, sans-serif !important;
+  font-size: 0.8125rem !important;
+  line-height: 1.6 !important;
+  color: hsl(160 10% 40%) !important;
+  margin-bottom: 0 !important;
+}
+
+.dark .sewain-tour-popover .driver-popover-description {
+  color: hsl(150 10% 58%) !important;
+}
+
+/* Footer (buttons + progress) */
+.sewain-tour-popover .driver-popover-footer {
+  margin-top: 1.25rem !important;
+  padding-top: 1rem !important;
+  border-top: 1px solid hsl(150 15% 91%) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 0.5rem !important;
+}
+
+.dark .sewain-tour-popover .driver-popover-footer {
+  border-top-color: hsl(160 20% 18%) !important;
+}
+
+/* Progress text */
+.sewain-tour-popover .driver-popover-progress-text {
+  font-family: "Plus Jakarta Sans", system-ui, sans-serif !important;
+  font-size: 0.6875rem !important;
+  font-weight: 700 !important;
+  color: hsl(160 10% 40%) !important;
+  letter-spacing: 0.02em !important;
+}
+
+.dark .sewain-tour-popover .driver-popover-progress-text {
+  color: hsl(150 10% 58%) !important;
+}
+
+/* Navigation buttons */
+.sewain-tour-popover .driver-popover-navigation-btns {
+  display: flex !important;
+  gap: 0.375rem !important;
+}
+
+.sewain-tour-popover .driver-popover-prev-btn,
+.sewain-tour-popover .driver-popover-next-btn,
+.sewain-tour-popover .driver-popover-close-btn {
+  font-family: "Plus Jakarta Sans", system-ui, sans-serif !important;
+  font-size: 0.75rem !important;
+  font-weight: 600 !important;
+  border-radius: 9999px !important;
+  padding: 0.4rem 0.875rem !important;
+  border: 1.5px solid transparent !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+  line-height: 1.4 !important;
+  text-shadow: none !important;
+}
+
+/* Prev button — outline style */
+.sewain-tour-popover .driver-popover-prev-btn {
+  background: transparent !important;
+  color: hsl(160 10% 40%) !important;
+  border-color: hsl(150 15% 91%) !important;
+}
+
+.sewain-tour-popover .driver-popover-prev-btn:hover {
+  border-color: hsl(160 84% 24%) !important;
+  color: hsl(160 84% 24%) !important;
+  background: hsl(150 38% 96%) !important;
+}
+
+.dark .sewain-tour-popover .driver-popover-prev-btn {
+  color: hsl(150 10% 58%) !important;
+  border-color: hsl(160 20% 18%) !important;
+}
+
+.dark .sewain-tour-popover .driver-popover-prev-btn:hover {
+  border-color: hsl(150 70% 50%) !important;
+  color: hsl(150 70% 50%) !important;
+  background: hsl(160 22% 14%) !important;
+}
+
+/* Next / Done button — primary filled */
+.sewain-tour-popover .driver-popover-next-btn {
+  background: hsl(160 84% 24%) !important;
+  color: #fff !important;
+  border-color: hsl(160 84% 24%) !important;
+}
+
+.sewain-tour-popover .driver-popover-next-btn:hover {
+  background: hsl(160 84% 20%) !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 12px hsl(160 84% 24% / 0.35) !important;
+}
+
+.dark .sewain-tour-popover .driver-popover-next-btn {
+  background: hsl(150 70% 50%) !important;
+  color: hsl(160 50% 8%) !important;
+  border-color: hsl(150 70% 50%) !important;
+}
+
+/* Close button (×) */
+.sewain-tour-popover .driver-popover-close-btn {
+  position: absolute !important;
+  top: 0.875rem !important;
+  right: 0.875rem !important;
+  width: 1.75rem !important;
+  height: 1.75rem !important;
+  padding: 0 !important;
+  border-radius: 9999px !important;
+  background: hsl(150 20% 96%) !important;
+  border-color: hsl(150 15% 91%) !important;
+  color: hsl(160 10% 40%) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 1rem !important;
+  line-height: 1 !important;
+}
+
+.sewain-tour-popover .driver-popover-close-btn:hover {
+  background: hsl(0 70% 50% / 0.1) !important;
+  border-color: hsl(0 70% 50% / 0.3) !important;
+  color: hsl(0 70% 50%) !important;
+}
+
+.dark .sewain-tour-popover .driver-popover-close-btn {
+  background: hsl(160 22% 14%) !important;
+  border-color: hsl(160 20% 18%) !important;
+  color: hsl(150 10% 58%) !important;
+}
+
+/* Arrow */
+.sewain-tour-popover .driver-popover-arrow-side-left.driver-popover-arrow {
+  border-right-color: hsl(0 0% 100%) !important;
+}
+.sewain-tour-popover .driver-popover-arrow-side-right.driver-popover-arrow {
+  border-left-color: hsl(0 0% 100%) !important;
+}
+.sewain-tour-popover .driver-popover-arrow-side-top.driver-popover-arrow {
+  border-bottom-color: hsl(0 0% 100%) !important;
+}
+.sewain-tour-popover .driver-popover-arrow-side-bottom.driver-popover-arrow {
+  border-top-color: hsl(0 0% 100%) !important;
+}
+
+/* Stage highlight ring — pakai warna brand */
+.driver-active .driver-highlighted-element {
+  box-shadow: 0 0 0 3px hsl(160 84% 24% / 0.35), 0 0 0 5px hsl(160 84% 24% / 0.12) !important;
+  border-radius: inherit !important;
 }

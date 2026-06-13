@@ -127,7 +127,7 @@ export default function LoginPage({ addToast }) {
               {/* Logo Sewain */}
               <div className="flex flex-col items-center gap-2 mb-4">
                 <img
-                  src="/Logo sewain.png"
+                  src="/logo-sewain.png"
                   alt="Sewain"
                   className="h-12 w-auto object-contain"
                 />
