@@ -3,7 +3,6 @@ Auth Client — HTTP client untuk berkomunikasi dengan Auth Service.
 Dilengkapi dengan retry logic dan circuit breaker.
 """
 import os
-import time
 import asyncio
 import logging
 import httpx
@@ -115,12 +114,15 @@ async def _call_auth_service(
         # Exponential backoff (hanya jika akan retry)
         if attempt < MAX_RETRIES:
             delay = BASE_DELAY * (2 ** (attempt - 1))  # 0.5s, 1s, 2s
-            logger.info(f"Retrying in {delay}s...")
+            logger.info(f"Retrying in {delay}s...", extra={"correlation_id": correlation_id})
             await asyncio.sleep(delay)
 
     # Semua retry gagal → record failure di circuit breaker
     auth_circuit.record_failure()
-    logger.error(f"Auth Service unreachable after {MAX_RETRIES} attempts")
+    logger.error(
+        f"Auth Service unreachable after {MAX_RETRIES} attempts",
+        extra={"correlation_id": correlation_id},
+    )
     raise HTTPException(
         status_code=503,
         detail="Auth Service unavailable. Please try again later."

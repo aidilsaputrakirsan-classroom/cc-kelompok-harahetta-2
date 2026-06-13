@@ -27,6 +27,13 @@ from schemas import (
     UserProfileResponse, VerificationAction, TokenVerifyResponse
 )
 import email_service
+from logging_config import setup_logging
+from logging_middleware import RequestLoggingMiddleware
+from metrics import metrics
+
+# Setup structured logging
+setup_logging()
+logger = logging.getLogger(__name__)
 
 # Create tables
 Base.metadata.create_all(bind=engine)

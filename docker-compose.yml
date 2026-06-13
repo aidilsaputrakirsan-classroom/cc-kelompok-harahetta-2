@@ -209,6 +209,12 @@ services:
       timeout: 5s
       retries: 3
       start_period: 15s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        tag: "auth-service"
     restart: unless-stopped
     logging:
       driver: "json-file"
@@ -244,6 +250,12 @@ services:
       timeout: 5s
       retries: 3
       start_period: 15s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+        tag: "item-service"
     restart: unless-stopped
     logging:
       driver: "json-file"

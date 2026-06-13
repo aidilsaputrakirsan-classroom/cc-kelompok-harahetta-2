@@ -1,0 +1,19 @@
+[pyrefly]
+# Project ini menggunakan Docker — FastAPI dan dependency lainnya
+# hanya ada di dalam container, tidak di Python host lokal.
+#
+# Pyrefly dikonfigurasi untuk SKIP folder backend service
+# karena mereka di-run via Docker, bukan Python lokal.
+
+# Gunakan Python dari PATH (Python 3.13)
+python_interpreter = "python"
+
+# Folder yang di-exclude dari type checking
+# (semua backend service yang pakai Docker)
+exclude = [
+    "services/**",
+    "**/__pycache__/**",
+    "**/node_modules/**",
+    "**/.git/**",
+    "**/*.pyc",
+]
