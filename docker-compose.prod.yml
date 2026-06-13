@@ -29,6 +29,6 @@ services:
   frontend:
     restart: always
 
-  db:
+  monolith-db:
     restart: always
     ports: !reset []

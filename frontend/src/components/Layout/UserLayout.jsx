@@ -193,7 +193,7 @@ function UserNavbar() {
             transition={{ type: "spring", stiffness: 320, damping: 18 }}
           >
             <img
-              src="/Logo sewain.png"
+              src="/logo-sewain.png"
               alt="Sewain"
               className="h-9 w-auto object-contain"
               onError={(e) => {

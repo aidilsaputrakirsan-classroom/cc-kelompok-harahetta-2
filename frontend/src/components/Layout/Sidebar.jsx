@@ -105,7 +105,7 @@ export default function Sidebar() {
       <div className="p-4 pb-3">
         <Link to={isAdmin || isSuperAdmin ? "/dashboard" : "/home"} className="flex items-center gap-2.5 group">
           <img
-            src="/Logo sewain.png"
+            src="/logo-sewain.png"
             alt="Sewain"
             className="h-9 w-auto object-contain flex-shrink-0"
             onError={(e) => {

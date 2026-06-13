@@ -50,6 +50,7 @@ app.add_middleware(
 app.add_middleware(RequestLoggingMiddleware)
 
 
+
 # =====================
 # HEALTH CHECK (Workshop 13.5)
 # =====================
@@ -105,10 +106,17 @@ def health_check():
 
 @app.get("/metrics")
 def get_metrics():
-    """Return application metrics."""
+    """Return application metrics + alert status."""
+    should_alert, error_rate, alert_info = metrics.check_alert_condition()
     return {
         "service": "item-service",
         **metrics.get_metrics(),
+        "alert": {
+            "active": should_alert,
+            "recent_error_rate_percent": error_rate,
+            "threshold_percent": 10.0,
+            "window": alert_info,
+        },
     }
 
 
@@ -279,6 +287,31 @@ async def list_item_cities(db: Session = Depends(get_db)):
             if city_name:
                 cities.add(city_name)
     return sorted(cities, key=lambda x: x.lower())
+
+
+@app.get("/items/stats", response_model=ItemStatsResponse)
+async def get_item_stats(
+    user: dict = Depends(verify_token_with_auth_service),
+    db: Session = Depends(get_db)
+):
+    """Statistik items: total, total value, termahal, termurah."""
+    items = db.query(Item).all()
+    total_items = len(items)
+
+    if total_items == 0:
+        return ItemStatsResponse(total_items=0, total_value=0.0)
+
+    total_value = sum(i.harga_per_hari * i.stok for i in items)
+    most_expensive = max(i.harga_per_hari for i in items)
+    cheapest = min(i.harga_per_hari for i in items)
+
+    return ItemStatsResponse(
+        total_items=total_items,
+        total_value=total_value,
+        most_expensive=most_expensive,
+        cheapest=cheapest,
+    )
+
 
 @app.get("/items/{item_id}", response_model=ItemResponse)
 async def get_item(item_id: int, db: Session = Depends(get_db)):

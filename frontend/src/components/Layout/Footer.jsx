@@ -15,7 +15,7 @@ export default function Footer() {
           <div className="md:col-span-5">
             <Link to="/" className="inline-flex items-center gap-2.5 mb-5">
               <img
-                src="/Logo sewain.png"
+                src="/logo-sewain.png"
                 alt="Sewain"
                 className="h-10 w-auto object-contain"
                 onError={(e) => {

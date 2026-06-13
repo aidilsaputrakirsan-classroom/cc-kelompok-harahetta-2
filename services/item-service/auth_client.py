@@ -9,6 +9,7 @@ import httpx
 from fastapi import HTTPException, Header, Request
 from typing import Optional
 
+
 from circuit_breaker import CircuitBreaker
 
 logger = logging.getLogger(__name__)
@@ -134,7 +135,7 @@ async def verify_token_with_auth_service(
 ) -> dict:
     """
     FastAPI Dependency: Verifikasi token via Auth Service.
-    Dengan retry logic, correlation ID forwarding, dan proper error handling.
+    Dengan retry logic, proper error handling, dan correlation ID.
     """
     if not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Invalid authorization header")
@@ -174,3 +175,4 @@ async def verify_token_optional(
             logger.warning(f"Auth unavailable ({e.status_code}) — entering degraded mode")
             return None
         raise  # Re-raise 401, 400, etc.
+

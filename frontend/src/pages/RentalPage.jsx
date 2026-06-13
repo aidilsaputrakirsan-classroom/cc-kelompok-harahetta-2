@@ -12,12 +12,23 @@ import {
   ArrowLeft, AlertTriangle, Calendar,
   CreditCard, Tag, X, CheckCircle2,
 } from "lucide-react"
+import { useTour } from "../hooks/useTour"
+import TourButton from "../components/TourButton"
+import { TOUR_KEYS } from "../lib/tour"
+import { rentalSteps } from "../lib/tourSteps"
 
 export default function RentalPage({ addToast }) {
   const [searchParams] = useSearchParams()
   const itemId = searchParams.get("item")
   const navigate = useNavigate()
   const { isVerified } = useAuth()
+
+  const { startTour } = useTour({
+    tourKey:   TOUR_KEYS.rental,
+    steps:     rentalSteps,
+    autoStart: true,
+    delay:     700,
+  })
 
   const [item, setItem]             = useState(null)
   const [loading, setLoading]       = useState(true)
@@ -144,7 +155,7 @@ export default function RentalPage({ addToast }) {
 
       <div className="grid md:grid-cols-2 gap-6 items-start">
         {/* Left: item info */}
-        <div className="rounded-3xl overflow-hidden border border-border bg-card md:sticky md:top-24">
+        <div id="rental-item-preview" className="rounded-3xl overflow-hidden border border-border bg-card md:sticky md:top-24">
           <div className="aspect-video overflow-hidden bg-secondary">
             <img
               src={item?.foto_url || imgFallback}
@@ -189,7 +200,7 @@ export default function RentalPage({ addToast }) {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
+            <div id="rental-date-start" className="space-y-2">
               <Label>Tanggal mulai</Label>
               <Input
                 type="date" min={today} value={form.tanggal_mulai}
@@ -197,7 +208,7 @@ export default function RentalPage({ addToast }) {
                 required
               />
             </div>
-            <div className="space-y-2">
+            <div id="rental-date-end" className="space-y-2">
               <Label>Tanggal selesai</Label>
               <Input
                 type="date" min={form.tanggal_mulai || today} value={form.tanggal_selesai}
@@ -275,7 +286,7 @@ export default function RentalPage({ addToast }) {
 
             {/* ── RINGKASAN HARGA */}
             {days > 0 && (
-              <div className="p-4 rounded-2xl bg-primary/5 border border-primary/15 space-y-2">
+              <div id="rental-price-summary" className="p-4 rounded-2xl bg-primary/5 border border-primary/15 space-y-2">
                 <div className="flex justify-between text-sm text-muted-foreground">
                   <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" /> Durasi</span>
                   <span className="font-semibold text-foreground">{days} hari</span>
@@ -313,12 +324,15 @@ export default function RentalPage({ addToast }) {
               </div>
             )}
 
-            <Button type="submit" className="w-full rounded-2xl" size="lg" loading={submitting} disabled={!isVerified}>
+            <Button id="rental-submit-btn" type="submit" className="w-full rounded-2xl" size="lg" loading={submitting} disabled={!isVerified}>
               <CreditCard className="w-4 h-4 mr-2" /> Lanjut ke Pembayaran
             </Button>
           </form>
         </div>
       </div>
+
+      {/* Tour button */}
+      <TourButton onClick={startTour} />
     </div>
   )
 }
