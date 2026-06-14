@@ -7,7 +7,7 @@
 
 <p align="center">
   <img src="https://github.com/aidilsaputrakirsan-classroom/cc-kelompok-harahetta-2/actions/workflows/ci.yml/badge.svg" alt="CI Pipeline"/>
-  <img src="https://github.com/aidilsaputrakirsan-classroom/cc-kelompok-harahetta-2/actions/workflows/cd.yml/badge.svg" alt="CD Pipeline"/>
+  <img src="https://github.com/aidilsaputrakirsan-classroom/cc-kelompok-harahetta-2/actions/workflows/deploy-vps.yml/badge.svg" alt="CD VPS Pipeline"/>
   <img src="https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white" alt="Python"/>
   <img src="https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white" alt="FastAPI"/>
   <img src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black" alt="React"/>
