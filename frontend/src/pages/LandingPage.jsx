@@ -227,7 +227,7 @@ export default function LandingPage() {
               <motion.div {...fadeUp(0)}>
                 <span className="chip">
                   <Sparkles className="w-3.5 h-3.5 text-primary" />
-                  Marketplace sewa barang #1 di Dunia
+                  Marketplace sewa barang #1 di Duniaa
                 </span>
               </motion.div>
 
