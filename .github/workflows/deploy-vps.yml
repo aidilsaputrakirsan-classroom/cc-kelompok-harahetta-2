@@ -31,13 +31,13 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_PORT || 22 }}
-          script_stop: true
+          script_stop: false
           script: |
             echo "=== MEMULAI DEPLOYMENT KE VPS ==="
             
             # 1. Masuk ke folder aplikasi
             if [ -d "$HOME/app" ]; then
-              cd "$HOME/app"
+              cd "$HOME/app" || exit 1
             else
               echo "Folder $HOME/app tidak ditemukan! Menggunakan directory default."
               exit 1
@@ -47,7 +47,7 @@ jobs:
             
             # 2. Fetch update terbaru tanpa menggabungkannya dahulu
             echo "Mengambil info terbaru dari GitHub..."
-            git fetch origin main
+            git fetch origin main || exit 1
             
             # 3. Deteksi perubahan sebelum melalukan pull
             # Cek apakah backend/requirements.txt berubah
@@ -57,15 +57,15 @@ jobs:
             
             # 4. Pull update dari main
             echo "Melakukan git pull..."
-            git pull origin main
+            git pull origin main || exit 1
             
             # 5. Install dependency backend (kalau ada perubahan requirements.txt)
             if [ -n "$REQUIREMENTS_CHANGED" ]; then
               echo "Ditemukan perubahan pada backend/requirements.txt. Menginstall dependencies..."
               if [ -f "backend/venv/bin/activate" ]; then
-                source backend/venv/bin/activate
-                pip install -r backend/requirements.txt
-                deactivate
+                source backend/venv/bin/activate || exit 1
+                pip install -r backend/requirements.txt || exit 1
+                deactivate || true
                 echo "Dependencies backend berhasil diupdate."
               else
                 echo "Virtual environment backend/venv tidak ditemukan! Lewati instalasi pip."
@@ -78,10 +78,10 @@ jobs:
             if [ -n "$FRONTEND_CHANGED" ]; then
               echo "Ditemukan perubahan pada frontend. Melakukan build..."
               if [ -d "frontend" ]; then
-                cd frontend
-                npm install
-                npm run build
-                cd ..
+                cd frontend || exit 1
+                npm install || exit 1
+                npm run build || exit 1
+                cd .. || exit 1
                 echo "Build frontend selesai."
               else
                 echo "Folder frontend tidak ditemukan!"
