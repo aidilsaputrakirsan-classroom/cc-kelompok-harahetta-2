@@ -1,0 +1,48 @@
+# 📝 Reflection Paper: Quality Assurance & Standardisasi Dokumentasi Sewain
+
+**Nama:** Riqqah Khalda Karina <br>
+**NIM:** 10231082 <br>
+**Peran:** Lead QA & Technical Writer <br>
+**Proyek:** Sewain Platform (Sistem Sewa Barang Online) <br>
+**Mata Kuliah:** Komputasi Awan (SI ITK)
+
+## 1. Pendahuluan & Tanggung Jawab Peran
+
+Sebagai Lead QA & Docs pada platform Sewain, tugas utama saya adalah membantu menjaga kualitas aplikasi serta memastikan komunikasi antara tim backend dan frontend berjalan dengan baik. Selain itu, saya juga bertanggung jawab memastikan sistem yang telah di-deploy ke server produksi dapat berjalan dengan stabil dan bebas dari bug yang mengganggu fitur utama.
+
+Dalam proyek ini, saya tidak hanya melakukan pengujian setelah fitur selesai dibuat, tetapi juga ikut merancang proses pengujian dan dokumentasi sejak awal pengembangan. Dengan cara ini, potensi kesalahan dapat ditemukan lebih cepat dan proses pengembangan menjadi lebih terarah.
+
+## 2. Analisis Keputusan Teknis (Technical Decisions)
+
+### A. Menentukan Ide dan Judul Proyek Sewain
+
+Pada awal perkuliahan, tim kami berdiskusi untuk menentukan jenis aplikasi yang akan dikembangkan. Beberapa ide sempat dipertimbangkan, seperti sistem manajemen inventaris dan platform penjualan online. Namun, setelah melihat kebutuhan masyarakat dan kemungkinan pengembangan fitur yang cukup luas, kami memutuskan untuk membuat platform penyewaan barang yang diberi nama Sewain.
+
+**Keputusan:** Tim sepakat memilih tema platform penyewaan barang online (Sewain).
+
+**Analisis:** Keputusan ini diambil karena layanan penyewaan barang memiliki banyak proses bisnis yang dapat diterapkan dalam proyek komputasi awan, seperti autentikasi pengguna, manajemen katalog barang, transaksi penyewaan, pembayaran digital, serta komunikasi antara penyewa dan pemilik barang. Selain itu, tema ini memungkinkan setiap anggota tim berkontribusi pada fitur yang berbeda sehingga pembagian tugas menjadi lebih jelas.
+
+## 3. Analisis Kesulitan Teknis & Strategi Resolusi (Challenges & Resolutions)
+
+### Kesulitan 1: Beradaptasi dengan GitHub dan Alur Kolaborasi Tim
+
+**Masalah:** Salah satu tantangan yang saya hadapi adalah penggunaan GitHub dalam pengembangan proyek secara tim. Sebelumnya saya belum terbiasa menggunakan workflow seperti branch, commit, push, pull request, code review, dan GitHub Actions. Pada awal pengerjaan, saya beberapa kali mengalami kebingungan saat melakukan sinkronisasi kode dan memahami alur kerja kolaboratif yang digunakan tim.
+
+**Resolusi:** Untuk mengatasi hal tersebut, saya mempelajari kembali penggunaan Git dan GitHub melalui dokumentasi serta praktik langsung selama pengerjaan proyek. Saya mulai membiasakan diri menggunakan branch terpisah, membuat commit yang lebih terstruktur, serta memahami proses pull request sebelum perubahan digabungkan ke branch utama. Seiring berjalannya proyek, saya menjadi lebih memahami alur pengembangan kolaboratif dan dapat berkontribusi dengan lebih baik dalam pengelolaan dokumentasi maupun pengujian.
+
+### Kesulitan 2: Komunikasi dan Sinkronisasi Kebutuhan Fitur
+
+**Masalah:** Selama proses pengembangan, terdapat beberapa perbedaan pemahaman mengenai fitur yang akan dibuat dan cara implementasinya. Hal ini terjadi karena setiap anggota tim memiliki fokus pekerjaan yang berbeda sehingga terkadang informasi yang disampaikan belum sepenuhnya dipahami oleh seluruh anggota.
+
+**Resolusi:** Untuk mengurangi kesalahpahaman, kami meningkatkan komunikasi melalui diskusi rutin dan menggunakan dokumentasi sebagai acuan bersama. Saya juga membantu menyusun dokumentasi API dan beberapa panduan proyek agar seluruh anggota memiliki referensi yang sama mengenai fitur yang sedang dikembangkan. Dengan komunikasi yang lebih terstruktur, proses pengembangan menjadi lebih lancar dan koordinasi tim dapat berjalan lebih baik.
+
+
+## 4. Pelajaran Berharga (Lessons Learned)
+
+Melalui pengembangan platform Sewain, saya memperoleh beberapa pelajaran penting.
+
+Pertama, QA bukan hanya mencari bug setelah aplikasi selesai dibuat. Keterlibatan QA sejak awal pengembangan dapat membantu mencegah munculnya banyak masalah di kemudian hari.
+
+Kedua, dokumentasi yang jelas dan selalu diperbarui sangat membantu kerja sama tim. Dengan adanya API Contract yang menjadi acuan bersama, komunikasi antara frontend dan backend menjadi lebih mudah dan pekerjaan dapat diselesaikan lebih cepat.
+
+Ketiga, pengujian otomatis memberikan rasa aman bagi tim pengembang. Setiap perubahan kode dapat diperiksa terlebih dahulu sehingga risiko terjadinya kesalahan saat demonstrasi atau deployment menjadi lebih kecil.
