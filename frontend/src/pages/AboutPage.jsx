@@ -55,7 +55,7 @@ const highlights = [
 ]
 
 const team = [
-  { name: "Djaky Abbyyu Fauzan Timumum", nim: "10231032", role: "Lead Backend",  photo: "/team/djaky.jpeg",
+  { name: "Djaky Abbyyu Fauzan Timumum NOVIANSYAH", nim: "10231032", role: "Lead Backend",  photo: "/team/djaky.jpeg",
     desc: "Arsitektur API, database, dan logika bisnis aplikasi." },
   { name: "Achmad Zaki Zaidan",          nim: "10231002", role: "Lead Frontend", photo: "/team/zaki.jpeg",
     desc: "Memimpin pengembangan antarmuka pengguna yang intuitif." },
