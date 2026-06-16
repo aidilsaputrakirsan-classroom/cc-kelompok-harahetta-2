@@ -17,6 +17,13 @@ env/
 dist/
 build/
 .pytest_cache/
+coverage.xml
+.coverage
+htmlcov/
+
+# ==================== Test Database ====================
+backend/test_sewain.db
+test_sewain.db
 
 # ==================== Environment Files (SECRETS!) ====================
 # JANGAN PERNAH commit file .env ke Git!

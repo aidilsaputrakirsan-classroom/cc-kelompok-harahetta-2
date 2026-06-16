@@ -616,85 +616,32 @@ def get_items(
     return {"total": total, "items": items}
 
 
-# ────────────────────────────────────────────────────────────
-# CITY EXTRACTION & LIST
-# ────────────────────────────────────────────────────────────
-
-# Province names (last segment di alamat hasil reverse geocode Nominatim)
-_INDO_PROVINCES = {
-    "aceh", "bali", "banten", "bengkulu", "daerah istimewa yogyakarta",
-    "di yogyakarta", "yogyakarta", "dki jakarta", "jakarta", "gorontalo",
-    "jambi", "jawa barat", "jawa tengah", "jawa timur", "kalimantan barat",
-    "kalimantan selatan", "kalimantan tengah", "kalimantan timur",
-    "kalimantan utara", "kepulauan bangka belitung", "kepulauan riau",
-    "lampung", "maluku", "maluku utara", "nusa tenggara barat",
-    "nusa tenggara timur", "papua", "papua barat", "papua barat daya",
-    "papua pegunungan", "papua selatan", "papua tengah", "riau",
-    "sulawesi barat", "sulawesi selatan", "sulawesi tengah",
-    "sulawesi tenggara", "sulawesi utara", "sumatera barat",
-    "sumatera selatan", "sumatera utara", "indonesia",
-}
-
-
-def extract_city(alamat: Optional[str]) -> Optional[str]:
+def get_items_stats(db: Session) -> dict:
     """
-    Ekstrak nama kota dari alamat usaha.
-    Format alamat dari Nominatim biasanya:
-        road, [house_no], suburb, district, city, state
-    Strategi:
-      1. Split by koma, trim, drop kosong
-      2. Strip prefix 'Kota '/'Kabupaten '/'Kab. '
-      3. Drop segment yang termasuk nama provinsi atau 'Indonesia'
-      4. Ambil segment terakhir setelah filter (kota biasanya before-last)
+    Statistik katalog barang: total, available, rented, unavailable, dan jumlah kategori aktif.
+    Digunakan oleh endpoint GET /items/stats (publik).
     """
-    if not alamat:
-        return None
-    parts = [p.strip() for p in alamat.split(",") if p.strip()]
-    if not parts:
-        return None
+    total = db.query(func.count(Item.id)).scalar() or 0
+    available = db.query(func.count(Item.id)).filter(
+        Item.status == ItemStatus.available
+    ).scalar() or 0
+    rented = db.query(func.count(Item.id)).filter(
+        Item.status == ItemStatus.rented
+    ).scalar() or 0
+    unavailable = db.query(func.count(Item.id)).filter(
+        Item.status == ItemStatus.unavailable
+    ).scalar() or 0
+    total_categories = db.query(func.count(func.distinct(Item.category_id))).filter(
+        Item.category_id.isnot(None)
+    ).scalar() or 0
 
-    cleaned = []
-    for p in parts:
-        low = p.lower()
-        # Skip kode pos murni
-        if low.replace(" ", "").isdigit():
-            continue
-        # Skip provinsi & 'Indonesia'
-        if low in _INDO_PROVINCES:
-            continue
-        # Strip prefix umum kota/kabupaten
-        for prefix in ("kota ", "kabupaten ", "kab. ", "kab "):
-            if low.startswith(prefix):
-                p = p[len(prefix):].strip()
-                low = p.lower()
-                break
-        cleaned.append(p)
-
-    if not cleaned:
-        return None
-    # Setelah membuang provinsi, kota = segment terakhir yang tersisa
-    return cleaned[-1]
-
-
-def get_item_cities(db: Session) -> List[str]:
-    """
-    List unik kota dari admin yang punya minimal 1 item aktif (status != unavailable).
-    Diurutkan alfabet.
-    """
-    rows = (
-        db.query(AdminProfile.alamat_usaha)
-        .join(Item, Item.admin_id == AdminProfile.id)
-        .filter(AdminProfile.alamat_usaha.isnot(None))
-        .filter(Item.status != ItemStatus.unavailable)
-        .distinct()
-        .all()
-    )
-    cities = set()
-    for (alamat,) in rows:
-        city = extract_city(alamat)
-        if city:
-            cities.add(city)
-    return sorted(cities, key=lambda x: x.lower())
+    return {
+        "total": total,
+        "available": available,
+        "rented": rented,
+        "unavailable": unavailable,
+        "total_categories": total_categories,
+    }
 
 
 def get_item(db: Session, item_id: int) -> Item | None:

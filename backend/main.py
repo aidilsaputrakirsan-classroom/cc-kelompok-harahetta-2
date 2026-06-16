@@ -1099,19 +1099,24 @@ def list_items(
 
 
 @app.get(
-    "/items/cities",
-    response_model=List[str],
+    "/items/stats",
     tags=["📦 Items — Barang Sewa"],
-    summary="Daftar kota tempat ada barang sewa (PUBLIK)",
+    summary="Statistik katalog barang (PUBLIK - tanpa login)",
 )
-def list_item_cities(db: Session = Depends(get_db)):
+def items_stats(db: Session = Depends(get_db)):
     """
-    Daftar unik kota dari admin penyedia yang punya minimal 1 barang aktif.
-    Kota diekstrak dari `alamat_usaha` admin (segment sebelum provinsi).
+    Statistik ringkasan katalog barang sewa.
 
     **Akses:** Publik (tidak perlu login)
+
+    **Response:**
+    - `total`: jumlah total barang
+    - `available`: barang yang tersedia
+    - `rented`: barang yang sedang disewa
+    - `unavailable`: barang yang tidak tersedia
+    - `total_categories`: jumlah kategori yang aktif digunakan
     """
-    return crud.get_item_cities(db=db)
+    return crud.get_items_stats(db=db)
 
 
 @app.get(
